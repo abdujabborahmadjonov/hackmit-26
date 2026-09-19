@@ -2,52 +2,106 @@ import { useState, type ReactNode } from "react";
 import { Link } from "react-router-dom";
 import type { Recommendation } from "../api/types";
 import { FACTOR_META, humanize } from "../api/vocab";
+import { Donut } from "./Donut";
+import { DEFAULT_WEIGHTS, FACTOR_ORDER } from "./WeightStudio";
 import { Avatar, Badge, Button, Card, ScoreRing, Stars } from "./ui";
 
-/** The "Why this match?" panel: every weighted factor, as a bar. */
+/** The "Why this match?" panel.
+ *
+ *  A match score is a part-to-whole: six weighted factors, plus whatever a
+ *  perfect match would have earned and this one didn't. The donut shows that
+ *  composition; the table beneath carries the numbers, which is also what makes
+ *  the lighter hues legible - three of them fall under 3:1 against white, so
+ *  they never have to be read on colour alone.
+ */
 export function WhyThisMatch({
   recommendation,
   displayScore,
+  weights,
 }: {
   recommendation: Recommendation;
   displayScore?: number;
+  weights?: Record<string, number>;
 }) {
-  const { explanation } = recommendation;
   const match_score = displayScore ?? recommendation.match_score;
+  const activeWeights = weights ?? DEFAULT_WEIGHTS;
+  const labelFor = (factor: string) =>
+    recommendation.explanation.find((entry) => entry.factor === factor)?.label;
+
+  // Fixed order - the palette is validated on these adjacencies, wrap included.
+  const rows = FACTOR_ORDER.map((factor) => {
+    const score = recommendation.components?.[factor] ?? 0;
+    const weight = activeWeights[factor] ?? 0;
+    return {
+      factor,
+      meta: FACTOR_META[factor],
+      score,
+      weight,
+      contribution: score * weight,
+      label: labelFor(factor),
+    };
+  });
+
   return (
     <div className="rise mt-4 rounded-lg bg-slate-50 p-4 ring-1 ring-line">
       <p className="text-xs font-semibold uppercase tracking-wide text-muted">
         How this {Math.round(match_score * 100)}% was calculated
       </p>
-      <ul className="mt-3 space-y-3">
-        {explanation.map((factor) => {
-          const meta = FACTOR_META[factor.factor] ?? {
-            label: humanize(factor.factor),
-            colour: "bg-slate-400",
-          };
-          return (
-            <li key={factor.factor}>
-              <div className="flex items-baseline justify-between gap-3 text-sm">
-                <span className="font-medium text-ink">{meta.label}</span>
-                <span className="tabular-nums text-xs text-muted">
-                  {Math.round(factor.score * 100)}% × {Math.round(factor.weight * 100)}% weight
-                </span>
-              </div>
-              <div className="mt-1 h-1.5 overflow-hidden rounded-full bg-slate-200">
-                <div
-                  className={`h-full rounded-full ${meta.colour}`}
-                  style={{ width: `${Math.max(factor.score * 100, 2)}%` }}
-                />
-              </div>
-              <p className="mt-1 text-xs text-muted">{factor.label}</p>
-            </li>
-          );
-        })}
-      </ul>
-      <p className="mt-4 border-t border-line pt-3 text-xs text-muted">
-        Scores are weighted and summed — teaching philosophy counts most (30%), then subject
-        overlap (20%), education and learner level (15% each), proximity and class size (10% each).
-      </p>
+
+      <div className="mt-3 flex flex-col items-center gap-5 sm:flex-row sm:items-start">
+        <div className="shrink-0">
+          <Donut
+            segments={rows.map((row) => ({
+              key: row.factor,
+              label: row.meta.label,
+              value: row.contribution,
+              colour: row.meta.colour,
+            }))}
+            total={1}
+            centreValue={`${Math.round(match_score * 100)}%`}
+            centreCaption="match"
+          />
+          <p className="mt-1 text-center text-[11px] text-muted">
+            Grey is what a perfect match would add
+          </p>
+        </div>
+
+        <table className="w-full text-sm">
+          <thead>
+            <tr className="text-xs text-muted">
+              <th className="pb-1 text-left font-medium">Factor</th>
+              <th className="pb-1 text-right font-medium">Score</th>
+              <th className="pb-1 text-right font-medium">Weight</th>
+              <th className="pb-1 text-right font-medium">Adds</th>
+            </tr>
+          </thead>
+          <tbody>
+            {rows.map((row) => (
+              <tr key={row.factor} className="border-t border-line/70">
+                <td className="py-1.5">
+                  <span className="flex items-center gap-2">
+                    <span
+                      className="h-2.5 w-2.5 shrink-0 rounded-sm"
+                      style={{ background: row.meta.colour }}
+                    />
+                    <span className="text-ink">{row.meta.label}</span>
+                  </span>
+                  {row.label && <span className="block pl-[18px] text-xs text-muted">{row.label}</span>}
+                </td>
+                <td className="py-1.5 text-right tabular-nums text-ink">
+                  {Math.round(row.score * 100)}%
+                </td>
+                <td className="py-1.5 text-right tabular-nums text-muted">
+                  {Math.round(row.weight * 100)}%
+                </td>
+                <td className="py-1.5 text-right font-medium tabular-nums text-ink">
+                  {(row.contribution * 100).toFixed(1)}
+                </td>
+              </tr>
+            ))}
+          </tbody>
+        </table>
+      </div>
     </div>
   );
 }
@@ -57,6 +111,8 @@ interface MatchCardProps {
   /** Overrides the API score when the viewer is re-weighting locally. */
   displayScore?: number;
   rankDelta?: ReactNode;
+  /** Present when the viewer is re-weighting, so the breakdown matches. */
+  weights?: Record<string, number>;
   onConnect?: (userId: string) => void;
   onMessage?: (userId: string) => void;
   onDismiss?: (userId: string) => void;
@@ -68,6 +124,7 @@ export function MatchCard({
   recommendation,
   displayScore,
   rankDelta,
+  weights,
   onConnect,
   onMessage,
   onDismiss,
@@ -134,7 +191,13 @@ export function MatchCard({
         ))}
       </ul>
 
-      {showWhy && <WhyThisMatch recommendation={recommendation} displayScore={match_score} />}
+      {showWhy && (
+        <WhyThisMatch
+          recommendation={recommendation}
+          displayScore={match_score}
+          weights={weights}
+        />
+      )}
 
       <div className="mt-4 flex flex-wrap items-center gap-2">
         <Button size="sm" variant="secondary" onClick={() => setShowWhy((open) => !open)}>

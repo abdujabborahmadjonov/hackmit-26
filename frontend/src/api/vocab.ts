@@ -87,12 +87,21 @@ export function humanize(value?: string | null): string {
     .join(" ");
 }
 
-/** The six components of a match score, in weight order, with a colour each. */
+/** The six components of a match score, in FIXED order with a validated
+ *  categorical palette.
+ *
+ *  The order is the colour-safety mechanism, not cosmetics: these hues clear the
+ *  adjacent-pair CVD and normal-vision gates in this sequence, including the
+ *  wrap from the last slice back to the first in a donut (worst adjacent
+ *  CVD deltaE 9.1, normal-vision 19.6). Three of them sit under 3:1 contrast on a
+ *  white surface, so anything drawn with them ships visible labels or a value
+ *  table alongside - never colour alone.
+ */
 export const FACTOR_META: Record<string, { label: string; colour: string }> = {
-  semantic: { label: "Teaching philosophy", colour: "bg-indigo-500" },
-  expertise: { label: "Subjects & expertise", colour: "bg-emerald-500" },
-  education: { label: "Education level", colour: "bg-amber-500" },
-  teaching_level: { label: "Learner level", colour: "bg-sky-500" },
-  location: { label: "Proximity", colour: "bg-rose-500" },
-  class_size: { label: "Class size", colour: "bg-violet-500" },
+  semantic: { label: "Teaching philosophy", colour: "#2a78d6" },
+  expertise: { label: "Subjects & expertise", colour: "#eb6834" },
+  education: { label: "Education level", colour: "#1baf7a" },
+  teaching_level: { label: "Learner level", colour: "#eda100" },
+  location: { label: "Proximity", colour: "#e87ba4" },
+  class_size: { label: "Class size", colour: "#008300" },
 };

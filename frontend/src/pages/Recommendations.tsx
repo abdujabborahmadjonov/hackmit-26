@@ -181,6 +181,7 @@ export default function Recommendations() {
               recommendation={recommendation}
               displayScore={recommendation.localScore}
               rankDelta={changed ? <RankDelta delta={recommendation.delta} /> : null}
+              weights={changed && weights ? normalise(weights) : (data?.weights ?? undefined)}
               onConnect={connect}
               onMessage={message}
               onDismiss={dismiss}

@@ -3,6 +3,7 @@ import { Link, useNavigate } from "react-router-dom";
 import { api } from "../api/client";
 import { FACTOR_META } from "../api/vocab";
 import { useAuth } from "../auth/AuthContext";
+import { Donut } from "../components/Donut";
 import { FACTOR_ORDER } from "../components/WeightStudio";
 import { Button, ErrorNote } from "../components/ui";
 
@@ -141,25 +142,36 @@ export default function Landing() {
           and inside the app, drag the weights and watch the ranking re-order live.
         </p>
 
-        <div className="mt-6 space-y-3">
-          {FACTOR_ORDER.map((factor) => {
-            const meta = FACTOR_META[factor];
-            const weight = WEIGHTS[factor];
-            return (
-              <div key={factor} className="flex items-center gap-4">
-                <span className="w-44 shrink-0 text-sm text-ink">{meta.label}</span>
-                <div className="h-2.5 flex-1 overflow-hidden rounded-full bg-slate-200">
-                  <div
-                    className={`h-full rounded-full ${meta.colour}`}
-                    style={{ width: `${weight * 100 * 2.6}%` }}
-                  />
-                </div>
-                <span className="w-10 shrink-0 text-right text-sm tabular-nums text-muted">
-                  {Math.round(weight * 100)}%
+        <div className="mt-6 flex flex-col items-center gap-8 sm:flex-row sm:items-center">
+          <Donut
+            segments={FACTOR_ORDER.map((factor) => ({
+              key: factor,
+              label: FACTOR_META[factor].label,
+              value: WEIGHTS[factor],
+              colour: FACTOR_META[factor].colour,
+            }))}
+            size={200}
+            thickness={30}
+            centreValue="100%"
+            centreCaption="of a match score"
+          />
+          <ul className="w-full flex-1 space-y-2">
+            {FACTOR_ORDER.map((factor) => (
+              <li
+                key={factor}
+                className="flex items-center gap-3 border-b border-line/70 pb-2 text-sm last:border-0"
+              >
+                <span
+                  className="h-2.5 w-2.5 shrink-0 rounded-sm"
+                  style={{ background: FACTOR_META[factor].colour }}
+                />
+                <span className="text-ink">{FACTOR_META[factor].label}</span>
+                <span className="ml-auto tabular-nums text-muted">
+                  {Math.round(WEIGHTS[factor] * 100)}%
                 </span>
-              </div>
-            );
-          })}
+              </li>
+            ))}
+          </ul>
         </div>
       </section>
 

@@ -1,7 +1,19 @@
 import { FACTOR_META } from "../api/vocab";
+import { Donut } from "./Donut";
 import { Button, cx } from "./ui";
 
 export type Weights = Record<string, number>;
+
+/** The server's published weights, duplicated here only as a fallback for
+ *  views that render a breakdown without having fetched them. */
+export const DEFAULT_WEIGHTS: Weights = {
+  semantic: 0.3,
+  expertise: 0.2,
+  education: 0.15,
+  teaching_level: 0.15,
+  location: 0.1,
+  class_size: 0.1,
+};
 
 export const FACTOR_ORDER = [
   "semantic",
@@ -56,7 +68,22 @@ export function WeightStudio({ weights, defaults, onChange, changed }: WeightStu
         )}
       </div>
 
-      <div className="mt-4 grid gap-x-6 gap-y-3 sm:grid-cols-2">
+      <div className="mt-4 flex flex-col gap-5 sm:flex-row sm:items-center">
+        <div className="shrink-0 self-center">
+          <Donut
+            segments={FACTOR_ORDER.map((factor) => ({
+              key: factor,
+              label: FACTOR_META[factor].label,
+              value: shown[factor] ?? 0,
+              colour: FACTOR_META[factor].colour,
+            }))}
+            size={148}
+            thickness={22}
+            centreValue="100%"
+            centreCaption="of the score"
+          />
+        </div>
+        <div className="grid flex-1 gap-x-6 gap-y-3 sm:grid-cols-2">
         {FACTOR_ORDER.map((factor) => {
           const meta = FACTOR_META[factor];
           const percent = Math.round((shown[factor] ?? 0) * 100);
@@ -65,7 +92,10 @@ export function WeightStudio({ weights, defaults, onChange, changed }: WeightStu
             <label key={factor} className="block">
               <div className="flex items-baseline justify-between gap-2">
                 <span className="flex items-center gap-1.5 text-sm text-ink">
-                  <span className={cx("h-2 w-2 rounded-full", meta.colour)} />
+                  <span
+                    className="h-2 w-2 shrink-0 rounded-full"
+                    style={{ background: meta.colour }}
+                  />
                   {meta.label}
                 </span>
                 <span
@@ -92,6 +122,7 @@ export function WeightStudio({ weights, defaults, onChange, changed }: WeightStu
             </label>
           );
         })}
+        </div>
       </div>
     </div>
   );
