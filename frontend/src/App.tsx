@@ -2,6 +2,7 @@ import { Navigate, NavLink, Route, Routes, useLocation } from "react-router-dom"
 import type { ReactNode } from "react";
 import { useAuth } from "./auth/AuthContext";
 import { Avatar, Button, Loading, cx } from "./components/ui";
+import Landing from "./pages/Landing";
 import Login from "./pages/Login";
 import Register from "./pages/Register";
 import ProfileSetup from "./pages/ProfileSetup";
@@ -26,14 +27,14 @@ function Shell({ children }: { children: ReactNode }) {
   return (
     <div className="min-h-screen">
       <header className="sticky top-0 z-10 border-b border-line bg-paper/85 backdrop-blur">
-        <div className="mx-auto flex max-w-5xl items-center gap-6 px-4 py-3">
+        <div className="mx-auto flex max-w-5xl items-center gap-3 px-4 py-3 sm:gap-6">
           <NavLink to="/" className="flex items-center gap-2 font-semibold text-ink">
             <span className="grid h-7 w-7 place-items-center rounded-lg bg-indigo-600 text-sm text-white">
               E
             </span>
             EduMatch
           </NavLink>
-          <nav className="flex items-center gap-1 overflow-x-auto">
+          <nav className="-mx-1 flex min-w-0 flex-1 items-center gap-1 overflow-x-auto px-1 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
             {NAV.map((item) => (
               <NavLink
                 key={item.to}
@@ -50,7 +51,7 @@ function Shell({ children }: { children: ReactNode }) {
               </NavLink>
             ))}
           </nav>
-          <div className="ml-auto flex items-center gap-3">
+          <div className="flex shrink-0 items-center gap-2">
             <NavLink to="/profile" className="flex items-center gap-2">
               <Avatar name={name} size={30} />
               <span className="hidden text-sm font-medium text-ink sm:block">
@@ -95,9 +96,16 @@ export default function App() {
       <Route
         path="/"
         element={
-          <RequireAuth>
-            <Recommendations />
-          </RequireAuth>
+          loading ? (
+            <Loading />
+          ) : !user ? (
+            // Logged-out visitors get the pitch, not a bare login form.
+            <Landing />
+          ) : (
+            <RequireAuth>
+              <Recommendations />
+            </RequireAuth>
+          )
         }
       />
       <Route

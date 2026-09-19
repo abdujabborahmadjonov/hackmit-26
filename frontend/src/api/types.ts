@@ -82,6 +82,9 @@ export interface MatchReason {
 export interface Recommendation {
   teacher: TeacherSummary;
   match_score: number;
+  /** All six factor scores, 0-1. Complete, unlike `explanation` — so the
+   *  client can re-rank under different weights without another request. */
+  components: Record<string, number>;
   reasons: string[];
   explanation: MatchReason[];
   distance_km: number | null;

@@ -1,12 +1,19 @@
-import { useState } from "react";
+import { useState, type ReactNode } from "react";
 import { Link } from "react-router-dom";
 import type { Recommendation } from "../api/types";
 import { FACTOR_META, humanize } from "../api/vocab";
 import { Avatar, Badge, Button, Card, ScoreRing, Stars } from "./ui";
 
 /** The "Why this match?" panel: every weighted factor, as a bar. */
-export function WhyThisMatch({ recommendation }: { recommendation: Recommendation }) {
-  const { explanation, match_score } = recommendation;
+export function WhyThisMatch({
+  recommendation,
+  displayScore,
+}: {
+  recommendation: Recommendation;
+  displayScore?: number;
+}) {
+  const { explanation } = recommendation;
+  const match_score = displayScore ?? recommendation.match_score;
   return (
     <div className="rise mt-4 rounded-lg bg-slate-50 p-4 ring-1 ring-line">
       <p className="text-xs font-semibold uppercase tracking-wide text-muted">
@@ -47,21 +54,29 @@ export function WhyThisMatch({ recommendation }: { recommendation: Recommendatio
 
 interface MatchCardProps {
   recommendation: Recommendation;
+  /** Overrides the API score when the viewer is re-weighting locally. */
+  displayScore?: number;
+  rankDelta?: ReactNode;
   onConnect?: (userId: string) => void;
   onMessage?: (userId: string) => void;
+  onDismiss?: (userId: string) => void;
   connecting?: boolean;
   connected?: boolean;
 }
 
 export function MatchCard({
   recommendation,
+  displayScore,
+  rankDelta,
   onConnect,
   onMessage,
+  onDismiss,
   connecting,
   connected,
 }: MatchCardProps) {
   const [showWhy, setShowWhy] = useState(false);
-  const { teacher, match_score, reasons } = recommendation;
+  const { teacher, reasons } = recommendation;
+  const match_score = displayScore ?? recommendation.match_score;
   const name = `${teacher.first_name} ${teacher.last_name}`;
 
   return (
@@ -102,7 +117,10 @@ export function MatchCard({
             ))}
           </div>
         </div>
-        <ScoreRing score={match_score} />
+        <div className="flex flex-col items-center gap-1.5">
+          <ScoreRing score={match_score} />
+          {rankDelta}
+        </div>
       </div>
 
       <ul className="mt-4 space-y-1.5">
@@ -116,7 +134,7 @@ export function MatchCard({
         ))}
       </ul>
 
-      {showWhy && <WhyThisMatch recommendation={recommendation} />}
+      {showWhy && <WhyThisMatch recommendation={recommendation} displayScore={match_score} />}
 
       <div className="mt-4 flex flex-wrap items-center gap-2">
         <Button size="sm" variant="secondary" onClick={() => setShowWhy((open) => !open)}>
@@ -135,6 +153,11 @@ export function MatchCard({
         {onMessage && (
           <Button size="sm" variant="ghost" onClick={() => onMessage(teacher.user_id)}>
             Message
+          </Button>
+        )}
+        {onDismiss && (
+          <Button size="sm" variant="ghost" onClick={() => onDismiss(teacher.user_id)}>
+            Not a fit
           </Button>
         )}
         <Link

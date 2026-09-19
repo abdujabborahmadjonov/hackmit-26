@@ -10,7 +10,8 @@ import {
   humanize,
 } from "../api/vocab";
 import { TeacherCard } from "../components/TeacherCard";
-import { Button, Card, ErrorNote, Field, Input, Loading, Select } from "../components/ui";
+import { TeacherCardSkeleton } from "../components/Skeleton";
+import { Button, Card, ErrorNote, Field, Input, Select } from "../components/ui";
 
 interface Filters {
   query: string;
@@ -233,7 +234,11 @@ export default function Search() {
       </div>
 
       {loading ? (
-        <Loading label="Searching" />
+        <div className="mt-4 grid gap-3 sm:grid-cols-2">
+          {[0, 1, 2, 3].map((n) => (
+            <TeacherCardSkeleton key={n} />
+          ))}
+        </div>
       ) : (
         <div className="mt-4 grid gap-3 sm:grid-cols-2">
           {data?.items.map((hit) => (
