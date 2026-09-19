@@ -134,6 +134,77 @@ textarea {
   transform: scale(0.97);
 }
 
+/* --- landing constellation ---------------------------------------------- */
+.landing-grid {
+  background-image:
+    linear-gradient(oklch(0.95 0.02 150 / 0.035) 1px, transparent 1px),
+    linear-gradient(90deg, oklch(0.95 0.02 150 / 0.035) 1px, transparent 1px);
+  background-size: 72px 72px;
+  mask-image: linear-gradient(to bottom, black 0%, transparent 82%);
+}
+
+.landing-glow {
+  background:
+    radial-gradient(circle at 72% 43%, oklch(0.84 0.18 125 / 0.13), transparent 18%),
+    radial-gradient(circle at 78% 45%, oklch(0.71 0.11 190 / 0.12), transparent 38%);
+}
+
+@keyframes orbit-spin {
+  to {
+    transform: rotate(360deg);
+  }
+}
+
+@keyframes orbit-spin-reverse {
+  to {
+    transform: rotate(-360deg);
+  }
+}
+
+@keyframes constellation-float {
+  0%, 100% {
+    transform: translate3d(0, 0, 0);
+  }
+  50% {
+    transform: translate3d(0, -9px, 0);
+  }
+}
+
+@keyframes signal-pulse {
+  0%, 100% {
+    box-shadow: 0 0 70px oklch(0.88 0.18 125 / 0.08);
+  }
+  50% {
+    box-shadow: 0 0 105px oklch(0.88 0.18 125 / 0.18);
+  }
+}
+
+.landing-orbit-spin {
+  animation: orbit-spin 42s linear infinite;
+  transform-box: fill-box;
+}
+
+.landing-orbit-spin-reverse {
+  animation: orbit-spin-reverse 34s linear infinite;
+  transform-box: fill-box;
+}
+
+.landing-float {
+  animation: constellation-float 5.5s var(--ease-out) infinite;
+}
+
+.landing-pulse {
+  animation: signal-pulse 4s ease-in-out infinite;
+}
+
+.landing-dark-donut .fill-ink {
+  fill: white;
+}
+
+.landing-dark-donut .fill-muted {
+  fill: oklch(0.78 0.01 150);
+}
+
 /* --- range inputs: the tuner is the thing people touch most -------------- */
 input[type="range"] {
   -webkit-appearance: none;
