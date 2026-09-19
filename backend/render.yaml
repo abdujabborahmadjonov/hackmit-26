@@ -12,11 +12,12 @@ services:
   - type: web
     name: edumatch-api
     runtime: docker
-    # Both are relative to the REPO ROOT, per the blueprint spec - and this is
-    # the combination that actually builds. rootDir is the build context;
-    # dockerfilePath is a full path from the root, so it repeats `backend/`.
     rootDir: backend
-    dockerfilePath: ./backend/Dockerfile
+    # Relative to rootDir, NOT the repo root. The blueprint spec says repo
+    # root, but every build proves otherwise: ./backend/Dockerfile makes the
+    # checkout fail with "lstat .../src/backend/backend: no such file", while
+    # ./Dockerfile builds the image. Do not "fix" this.
+    dockerfilePath: ./Dockerfile
     plan: free
     region: oregon
     healthCheckPath: /health
