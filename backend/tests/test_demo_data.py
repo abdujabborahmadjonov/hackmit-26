@@ -10,6 +10,7 @@ from app.models.profile import TeacherProfile
 from app.models.rating import Rating
 from app.models.resource import Resource
 from app.models.user import User
+from app.services.demo_data_catalog import INSTITUTIONS, LEVEL_PROFILES
 from app.services.demo_data_service import (
     DEMO_PASSWORD,
     DemoDataGenerator,
@@ -66,15 +67,23 @@ async def test_demo_accounts_exist_and_are_documented(generated, db_session):
 
 async def test_content_is_internally_consistent(generated, db_session):
     """Elementary teachers never get graduate-level expertise, and vice versa."""
+    graduate_only = {"quantum_computing", "thesis_supervision", "grant_writing", "deep_learning"}
     rows = (
         await db_session.execute(
-            select(TeacherProfile.education_levels, TeacherProfile.fields_of_expertise)
+            select(
+                TeacherProfile.education_levels,
+                TeacherProfile.fields_of_expertise,
+                TeacherProfile.teaching_methods,
+                TeacherProfile.class_size,
+            )
         )
     ).all()
-    for levels, expertise in rows:
+    for levels, expertise, methods, class_size in rows:
         if "elementary" in levels:
-            assert "quantum_computing" not in expertise
-            assert "thesis_supervision" not in expertise
+            assert not (graduate_only & set(expertise or []))
+            assert class_size is None or class_size <= 30
+        if levels == ["graduate"]:
+            assert class_size is None or class_size <= 30
 
     resources = (
         await db_session.execute(
@@ -86,6 +95,75 @@ async def test_content_is_internally_consistent(generated, db_session):
             assert difficulty == "beginner"
         if level == "graduate":
             assert difficulty == "advanced"
+
+
+async def test_profiles_have_rich_prose_and_real_institutions(generated, db_session):
+    rows = (
+        await db_session.execute(
+            select(
+                TeacherProfile.bio,
+                TeacherProfile.teaching_style,
+                TeacherProfile.institution,
+                TeacherProfile.location_name,
+            )
+        )
+    ).all()
+    bios = [bio for bio, _, _, _ in rows if bio]
+    styles = [style for _, style, _, _ in rows if style]
+    assert bios
+    assert sum(len(b) for b in bios) / len(bios) >= 120
+    assert sum(len(s) for s in styles) / len(styles) >= 80
+
+    # Majority of institutions should come from the curated city catalogs,
+    # not the "{town} High School" fallback templates.
+    catalog_names = {
+        name
+        for city_catalog in INSTITUTIONS.values()
+        for names in city_catalog.values()
+        for name in names
+    }
+    known = sum(1 for _, _, institution, _ in rows if institution in catalog_names)
+    assert known / len(rows) >= 0.7
+
+    cities = {location for _, _, _, location in rows if location}
+    assert len(cities) >= 8
+
+
+async def test_subject_expertise_stays_coherent(generated, db_session):
+    """CS teachers should usually land software / programming expertise, not grant writing."""
+    rows = (
+        await db_session.execute(
+            select(TeacherProfile.subjects, TeacherProfile.fields_of_expertise)
+        )
+    ).all()
+    cs_rows = [
+        (subjects, expertise) for subjects, expertise in rows if "computer_science" in (subjects or [])
+    ]
+    assert cs_rows
+    coherent = 0
+    cs_expertise = {
+        "software_engineering",
+        "python",
+        "web_development",
+        "robotics",
+        "programming",
+        "data_science",
+        "machine_learning",
+        "curriculum_design",
+        "exam_preparation",
+        "maker_education",
+        "ap_ib_programmes",
+        "undergraduate_research",
+        "assessment_design",
+        "open_educational_resources",
+        "industry_partnerships",
+        "college_counseling",
+        "debate",
+    }
+    for _, expertise in cs_rows:
+        if set(expertise or []) & cs_expertise:
+            coherent += 1
+    assert coherent / len(cs_rows) >= 0.7
 
 
 async def test_rating_rollups_match_the_ratings_table(generated, db_session):
@@ -121,3 +199,18 @@ async def test_alice_recommendation_scenario(generated, db_session):
         assert names.index("Bob") < names.index("Carol")
     assert result.items[0].breakdown.total > 0.7
     assert result.items[0].reasons
+
+
+async def test_level_profiles_cover_all_education_bands():
+    assert set(LEVEL_PROFILES) == {
+        "elementary",
+        "middle_school",
+        "high_school",
+        "university",
+        "graduate",
+        "adult_education",
+    }
+    for spec in LEVEL_PROFILES.values():
+        assert spec["method_weights"]
+        assert sum(spec["method_weights"].values()) > 0
+        assert spec["institution_band"] in {"k12", "higher", "adult"}

@@ -260,8 +260,10 @@ The data is internally consistent: an elementary teacher never gets
 "Advanced Quantum Computing", class sizes follow the education level, resource
 difficulty matches its level, and the prose bio matches the structured
 attributes (which is what makes the embeddings meaningful). Teachers are spread
-across Boston, New York, Toronto, Edmonton, San Francisco, Seattle, London,
-Dubai, Singapore, Tashkent and Cambridge MA.
+across 50+ cities with curated real school/university names, level-weighted
+teaching methods, subject-aligned expertise, denser geo hubs for proximity
+demos, and social graphs biased toward same-city / same-subject peers. Catalog
+and prose templates live in `app/services/demo_data_catalog.py`.
 
 Demo accounts — password **`DemoPassword123!`** for all of them:
 
