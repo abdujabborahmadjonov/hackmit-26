@@ -3,6 +3,7 @@
 
 import type {
   Connection,
+  ProfileDraft,
   Conversation,
   Message,
   Page,
@@ -211,6 +212,19 @@ export const api = {
     request<{ detail: string }>(`/messages/conversations/${conversationId}/read`, {
       method: "POST",
     }),
+
+  // --- generative features (503 when the deployment has no key) ---
+  aiStatus: () => request<{ enabled: boolean; features: string[] }>("/ai/status"),
+
+  collaborationBrief: (teacherId: string) =>
+    request<{ brief: string; teacher_id: string; cached: boolean }>(`/ai/brief/${teacherId}`),
+
+  profileFromDocument: (input: File | string) => {
+    const form = new FormData();
+    if (typeof input === "string") form.append("text", input);
+    else form.append("file", input);
+    return request<ProfileDraft>("/ai/profile-from-document", { method: "POST", body: form });
+  },
 
   // --- system ---
   health: () => request<{ status: string; database: string }>("/health"),

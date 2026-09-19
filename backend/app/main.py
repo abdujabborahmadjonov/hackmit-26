@@ -14,6 +14,7 @@ from fastapi.responses import JSONResponse
 from fastapi.staticfiles import StaticFiles
 
 from app.api import (
+    ai,
     auth,
     connections,
     messages,
@@ -68,6 +69,7 @@ TAGS_METADATA = [
     {"name": "ratings", "description": "Peer ratings and reviews."},
     {"name": "connections", "description": "Connection requests between educators."},
     {"name": "messages", "description": "Direct messaging (HTTPS transport security only)."},
+    {"name": "ai", "description": "Generative features: collaboration briefs and syllabus import."},
     {"name": "system", "description": "Health and diagnostics."},
 ]
 
@@ -152,6 +154,7 @@ def create_app() -> FastAPI:
 
     for router in (
         auth.router,
+        ai.router,
         users.router,
         profiles.router,
         recommendations.router,

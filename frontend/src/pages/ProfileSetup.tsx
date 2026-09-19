@@ -13,6 +13,7 @@ import {
 } from "../api/vocab";
 import { useAuth } from "../auth/AuthContext";
 import { ChipSelect, TagInput } from "../components/ChipSelect";
+import { SyllabusImport } from "../components/SyllabusImport";
 import { Badge, Button, Card, ErrorNote, Field, Input, PageHeader, Select } from "../components/ui";
 
 const EMPTY: ProfileInput = {
@@ -40,6 +41,14 @@ export default function ProfileSetup() {
   const [error, setError] = useState<unknown>(null);
   const [busy, setBusy] = useState(false);
   const [saved, setSaved] = useState(false);
+  const [aiEnabled, setAiEnabled] = useState(false);
+
+  useEffect(() => {
+    void api
+      .aiStatus()
+      .then((status) => setAiEnabled(status.enabled))
+      .catch(() => setAiEnabled(false));
+  }, []);
 
   useEffect(() => {
     if (profile) {
@@ -110,6 +119,34 @@ export default function ProfileSetup() {
           />
         </div>
       </div>
+
+      {aiEnabled && (
+        <div className="mt-6">
+          <SyllabusImport
+            onExtract={(draft) =>
+              setForm((current) => ({
+                ...current,
+                // Merge, never clobber: anything already typed wins.
+                subjects: current.subjects.length ? current.subjects : draft.subjects,
+                education_levels: current.education_levels.length
+                  ? current.education_levels
+                  : draft.education_levels,
+                teaching_levels: current.teaching_levels.length
+                  ? current.teaching_levels
+                  : draft.teaching_levels,
+                teaching_methods: current.teaching_methods.length
+                  ? current.teaching_methods
+                  : draft.teaching_methods,
+                fields_of_expertise: current.fields_of_expertise.length
+                  ? current.fields_of_expertise
+                  : draft.fields_of_expertise,
+                teaching_style: current.teaching_style || draft.teaching_style,
+                class_size: current.class_size ?? draft.class_size,
+              }))
+            }
+          />
+        </div>
+      )}
 
       <form onSubmit={submit} className="mt-6 space-y-6">
         <Card className="space-y-5 p-6 sm:p-7">

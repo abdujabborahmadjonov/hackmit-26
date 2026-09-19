@@ -112,6 +112,15 @@ class Settings(BaseSettings):
     embedding_model: str = ""
     embedding_dim: int = 384
 
+    # --- generative features (optional) ---
+    # An Anthropic API key. Unset means the brief and syllabus import are
+    # disabled and their endpoints return 503; nothing else changes.
+    llm_api_key: str = Field(
+        default="",
+        repr=False,
+        validation_alias=AliasChoices("LLM_API_KEY", "ANTHROPIC_API_KEY"),
+    )
+
     # --- search ---
     search_provider: Literal["postgres", "elasticsearch"] = "postgres"
     elasticsearch_url: str = "http://localhost:9200"

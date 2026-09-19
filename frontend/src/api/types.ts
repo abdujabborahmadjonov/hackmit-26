@@ -194,3 +194,18 @@ export interface Page<T> {
   limit: number;
   offset: number;
 }
+
+
+/** A profile suggested from an uploaded document. Nothing is saved until the
+ *  teacher reviews it and submits the form. */
+export interface ProfileDraft {
+  subjects: string[];
+  education_levels: string[];
+  teaching_levels: string[];
+  teaching_methods: string[];
+  fields_of_expertise: string[];
+  teaching_style: string;
+  class_size: number | null;
+  confidence: string;
+  source_name: string | null;
+}

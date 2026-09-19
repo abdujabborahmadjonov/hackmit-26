@@ -28,6 +28,9 @@ argon2-cffi==23.1.0
 # --- search engine (optional backend, SEARCH_PROVIDER=elasticsearch) ---
 elasticsearch[async]==8.17.0
 
+# --- generative features (optional at runtime; the key is what enables them) ---
+anthropic==1.7.0
+
 # --- embeddings / storage over HTTP ---
 httpx==0.28.1
 
