@@ -127,6 +127,8 @@ export interface Resource {
   tags: string[];
   file_url: string | null;
   file_name: string | null;
+  file_size_bytes?: number | null;
+  mime_type?: string | null;
   download_count: number;
   created_at?: string | null;
 }

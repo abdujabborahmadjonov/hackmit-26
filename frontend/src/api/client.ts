@@ -167,6 +167,10 @@ export const api = {
     request<RecommendedResource[]>("/resources/recommended", { query: { limit } }),
   createResource: (data: Partial<Resource>) =>
     request<Resource>("/resources", { method: "POST", body: JSON.stringify(data) }),
+  uploadResource: (form: FormData) =>
+    request<Resource>("/resources/upload", { method: "POST", body: form }),
+  deleteResource: (id: string) =>
+    request<{ detail: string }>(`/resources/${id}`, { method: "DELETE" }),
 
   // --- ratings ---
   ratings: (teacherId: string) => request<Page<Rating>>(`/teachers/${teacherId}/ratings`),
