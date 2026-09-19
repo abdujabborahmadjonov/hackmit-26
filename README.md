@@ -15,12 +15,14 @@ likely to collaborate well with — and explains every recommendation.
 | Path | What it is |
 | --- | --- |
 | [`backend/`](backend/) | FastAPI + PostgreSQL/pgvector + optional Elasticsearch service. See [backend/README.md](backend/README.md). |
+| [`frontend/`](frontend/) | React + TypeScript + Vite client built around the match explanation. See [frontend/README.md](frontend/README.md). |
 | [`.github/workflows/ci.yml`](.github/workflows/ci.yml) | CI: lint, unit tests, the full suite against pgvector with a coverage gate, migrations, the Elasticsearch engine, and a Docker end-to-end smoke test. |
 
 ## Live
 
 | | |
 | --- | --- |
+| **Web app** | <https://edumatch-web.onrender.com> |
 | API | <https://edumatch-api-asbp.onrender.com> |
 | Docs | <https://edumatch-api-asbp.onrender.com/docs> |
 | Demo login | `demo_teacher@example.com` / `DemoPassword123!` |

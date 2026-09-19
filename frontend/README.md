@@ -4,6 +4,9 @@ React + TypeScript + Vite client for the [EduMatch API](../backend/README.md).
 The whole app is built around one question: *why* is this the right educator to
 collaborate with?
 
+**Live:** <https://edumatch-web.onrender.com> — talking to
+<https://edumatch-api-asbp.onrender.com>.
+
 ## Run it
 
 ```bash
@@ -81,5 +84,8 @@ npm run preview
       source: /*
       destination: /index.html     # client-side routing
 ```
+
+Single-page routing needs the rewrite rule above (or Redirects/Rewrites →
+`/*` → `/index.html`, status 200); without it a refresh on `/search` 404s.
 
 Set the API's `CORS_ORIGINS` to the deployed frontend origin once it's live.

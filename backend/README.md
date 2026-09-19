@@ -23,6 +23,7 @@ likely to collaborate well with — and explains every match.
 
 | | |
 | --- | --- |
+| Web app | <https://edumatch-web.onrender.com> |
 | API | <https://edumatch-api-asbp.onrender.com> |
 | Interactive docs | <https://edumatch-api-asbp.onrender.com/docs> |
 | Database | Supabase Postgres (`us-west-2`), pgvector 0.8.2 |
