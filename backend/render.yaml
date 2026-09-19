@@ -12,11 +12,11 @@ services:
   - type: web
     name: edumatch-api
     runtime: docker
-    # Paths here resolve against THIS FILE's directory, not the repo root.
-    # The blueprint lives in backend/, so that is already the service root -
-    # adding `rootDir: backend` made Render look for backend/backend and the
-    # checkout failed with "lstat .../src/backend/backend: no such file".
-    dockerfilePath: ./Dockerfile
+    # Both are relative to the REPO ROOT, per the blueprint spec - and this is
+    # the combination that actually builds. rootDir is the build context;
+    # dockerfilePath is a full path from the root, so it repeats `backend/`.
+    rootDir: backend
+    dockerfilePath: ./backend/Dockerfile
     plan: free
     region: oregon
     healthCheckPath: /health
