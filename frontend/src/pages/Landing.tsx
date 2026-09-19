@@ -78,12 +78,15 @@ export default function Landing() {
   return (
     <div className="min-h-screen overflow-hidden bg-paper">
       <header className="relative z-10 mx-auto flex max-w-6xl items-center justify-between px-5 py-5 sm:px-6">
-        <span className="flex items-center gap-2.5 font-semibold tracking-tight text-ink">
+        <Link
+          to="/"
+          className="press flex items-center gap-2.5 font-semibold tracking-tight text-ink"
+        >
           <span className="grid h-8 w-8 place-items-center rounded-lg bg-indigo-600 text-sm text-white shadow-sm">
             E
           </span>
           EduMatch
-        </span>
+        </Link>
         <div className="flex items-center gap-2">
           <Link
             to="/login"
