@@ -10,7 +10,7 @@ from app.models.profile import TeacherProfile
 from app.models.rating import Rating
 from app.models.resource import Resource
 from app.models.user import User
-from app.services.demo_data_catalog import INSTITUTIONS, LEVEL_PROFILES
+from app.services.demo_data_catalog import INSTITUTION_LOOKUP, INSTITUTIONS, LEVEL_PROFILES
 from app.services.demo_data_service import (
     DEMO_PASSWORD,
     DemoDataGenerator,
@@ -81,7 +81,7 @@ async def test_content_is_internally_consistent(generated, db_session):
         if "elementary" in levels:
             assert not (graduate_only & set(expertise or []))
             assert class_size is None or class_size <= 30
-        if levels == ["graduate"]:
+        if "graduate" in levels:
             assert class_size is None or class_size <= 30
 
     resources = (
@@ -117,10 +117,17 @@ async def test_profiles_have_rich_prose_and_real_institutions(generated, db_sess
     # not the "{town} High School" fallback templates.
     catalog_names = {
         name
-        for city_catalog in INSTITUTIONS.values()
+        for city_catalog in INSTITUTION_LOOKUP.values()
         for names in city_catalog.values()
         for name in names
     }
+    # Raw INSTITUTIONS entries are also acceptable (lookup is derived from them).
+    catalog_names.update(
+        name
+        for city_catalog in INSTITUTIONS.values()
+        for names in city_catalog.values()
+        for name in names
+    )
     known = sum(1 for _, _, institution, _ in rows if institution in catalog_names)
     assert known / len(rows) >= 0.7
 
@@ -212,4 +219,21 @@ async def test_level_profiles_cover_all_education_bands():
     for spec in LEVEL_PROFILES.values():
         assert spec["method_weights"]
         assert sum(spec["method_weights"].values()) > 0
-        assert spec["institution_band"] in {"k12", "higher", "adult"}
+        assert "class_size" in spec
+
+
+async def test_institution_lookup_separates_levels_and_types():
+    """Elementary/CC buckets must not silently contain incompatible names."""
+    for city, buckets in INSTITUTION_LOOKUP.items():
+        for name in buckets["elementary"]:
+            low = name.lower()
+            assert "high school" not in low, f"{city}: {name}"
+        for name in buckets["university"]:
+            low = name.lower()
+            assert "community college" not in low, f"{city}: {name}"
+        for name in buckets["community_college"]:
+            low = name.lower()
+            # Universities must never appear in the CC bucket.
+            assert not (
+                "university" in low and "community" not in low
+            ), f"{city}: {name}"

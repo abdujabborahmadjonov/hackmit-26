@@ -13,6 +13,7 @@ import random
 import time
 import uuid
 from dataclasses import dataclass, field
+from itertools import accumulate
 
 from sqlalchemy import delete, insert, select, text
 from sqlalchemy.ext.asyncio import AsyncSession
@@ -28,7 +29,7 @@ from app.services.demo_data_catalog import (
     BIO_HOOKS,
     CITIES,
     CITY_WEIGHTS,
-    INSTITUTIONS,
+    INSTITUTION_LOOKUP,
     LEVEL_PROFILES,
     MESSAGE_OPENERS,
     MESSAGE_REPLIES,
@@ -122,44 +123,76 @@ class DemoDataGenerator:
     def _pick_city_index(self) -> int:
         return self.random.choices(range(len(CITIES)), weights=CITY_WEIGHTS, k=1)[0]
 
+    def _institution_bucket(self, level: str, institution_type: str) -> str:
+        """Map education level + institution_type to a catalog bucket."""
+        if institution_type == "community_college":
+            return "community_college"
+        if institution_type in ("online_academy", "nonprofit", "independent"):
+            return "adult"
+        if institution_type == "university" or level in ("university", "graduate"):
+            return "university"
+        if level == "adult_education":
+            return "adult"
+        if level == "elementary":
+            return "elementary"
+        if level == "middle_school":
+            return "middle_school"
+        return "high_school"
+
     def _institution_name(self, level: str, city: str, institution_type: str) -> str:
-        band = LEVEL_PROFILES[level]["institution_band"]
-        catalog = INSTITUTIONS.get(city, {})
-        names = catalog.get(band) or []
+        bucket = self._institution_bucket(level, institution_type)
+        catalog = INSTITUTION_LOOKUP.get(city, {})
+        # Prefer the exact bucket; allow narrow, compatible fallbacks only.
+        fallbacks = {
+            "elementary": ("elementary", "middle_school"),
+            "middle_school": ("middle_school", "elementary"),
+            "high_school": ("high_school",),
+            "university": ("university",),
+            "community_college": ("community_college", "adult"),
+            "adult": ("adult", "community_college"),
+        }
+        names: list[str] = []
+        for key in fallbacks.get(bucket, (bucket,)):
+            names = catalog.get(key) or []
+            if names:
+                break
         if names:
             return self.random.choice(names)
 
         town = city.split(",")[0]
-        if band == "higher" or institution_type in ("university", "community_college"):
+        if bucket == "university":
             return self.random.choice(
                 [
                     f"University of {town}",
                     f"{town} Institute of Technology",
                     f"{town} State University",
-                    f"{town} College",
                 ]
             )
-        if band == "adult" or institution_type in (
-            "online_academy",
-            "nonprofit",
-            "independent",
-            "community_college",
-        ):
+        if bucket == "community_college":
+            return self.random.choice(
+                [f"{town} Community College", f"{town} Technical College"]
+            )
+        if bucket == "adult":
             return self.random.choice(
                 [
-                    f"{town} Community College",
                     f"{town} Adult Learning Centre",
                     f"{town} Continuing Education",
                     f"{town} Skills Hub",
                 ]
+            )
+        if bucket == "elementary":
+            return self.random.choice(
+                [f"{town} Elementary School", f"{town} Primary School"]
+            )
+        if bucket == "middle_school":
+            return self.random.choice(
+                [f"{town} Middle School", f"{town} Junior High School"]
             )
         return self.random.choice(
             [
                 f"{town} High School",
                 f"{town} Academy",
                 f"{town} Preparatory School",
-                f"{town} Middle School",
-                f"{town} Primary School",
                 f"International School of {town}",
             ]
         )
@@ -198,7 +231,13 @@ class DemoDataGenerator:
         return self.random.sample(unique, k=min(count, len(unique)))
 
     def _education_levels_for(self, primary: str) -> list[str]:
-        """Most teachers stick to one band; ~18% span an adjacent level."""
+        """Most teachers stick to one band; ~18% span an adjacent level.
+
+        University never pairs with graduate here: their class-size ranges do
+        not overlap, and mixed profiles would violate the consistency contract
+        unless class size is derived from the intersection (see _class_size_for).
+        Graduate may still list university as an adjacent band.
+        """
         levels = [primary]
         if self.random.random() > 0.18:
             return levels
@@ -206,7 +245,7 @@ class DemoDataGenerator:
             "elementary": ["middle_school"],
             "middle_school": ["elementary", "high_school"],
             "high_school": ["middle_school", "adult_education"],
-            "university": ["graduate", "adult_education"],
+            "university": ["adult_education"],
             "graduate": ["university"],
             "adult_education": ["high_school", "university"],
         }
@@ -214,6 +253,17 @@ class DemoDataGenerator:
         if extras:
             levels.append(self.random.choice(extras))
         return levels
+
+    def _class_size_for(self, levels: list[str]) -> int:
+        """Sample a class size compatible with every education level taught."""
+        low = max(LEVEL_PROFILES[level]["class_size"][0] for level in levels)
+        high = min(LEVEL_PROFILES[level]["class_size"][1] for level in levels)
+        if low > high:
+            # No overlap — use the most restrictive band's full range so we
+            # never exceed any listed level's maximum.
+            restrictive = min(levels, key=lambda level: LEVEL_PROFILES[level]["class_size"][1])
+            low, high = LEVEL_PROFILES[restrictive]["class_size"]
+        return self.random.randint(low, high)
 
     def _years_experience(self, level: str) -> int:
         # Career arcs differ by sector; graduate faculty skew more senior.
@@ -343,7 +393,7 @@ class DemoDataGenerator:
             "teaching_levels": teaching_levels,
             "teaching_style": self._teaching_style_text(methods, subjects, level),
             "bio": self._bio_text(years, education_levels, subjects, expertise, institution, methods),
-            "class_size": self.random.randint(*spec["class_size"]),
+            "class_size": self._class_size_for(education_levels),
             "years_experience": years,
             "languages": spoken,
             "institution": institution,
@@ -683,7 +733,8 @@ class DemoDataGenerator:
         """Resources consistent with their owner's subjects and level.
 
         Ownership follows a mild power law so a minority of educators look like
-        prolific publishers (closer to real repositories).
+        prolific publishers (closer to real repositories). Owners are ordered by
+        user_id so the Zipf weights are deterministic under a fixed seed.
         """
         owners = (
             await self.db.execute(
@@ -692,20 +743,22 @@ class DemoDataGenerator:
                     TeacherProfile.subjects,
                     TeacherProfile.education_levels,
                     TeacherProfile.teaching_methods,
-                )
+                ).order_by(TeacherProfile.user_id)
             )
         ).all()
         if not owners:
             return 0
 
-        # Zipf-ish weights: early owners publish more.
+        # Zipf-ish weights over the stable owner order; cum_weights avoids
+        # rebuilding the cumulative array on every one of N resource draws.
         owner_weights = [1.0 / ((i + 1) ** 0.55) for i in range(len(owners))]
+        owner_cum_weights = list(accumulate(owner_weights))
 
         rows: list[dict] = []
         texts: list[str] = []
         for _ in range(count):
             user_id, subjects, levels, methods = self.random.choices(
-                owners, weights=owner_weights, k=1
+                owners, cum_weights=owner_cum_weights, k=1
             )[0]
             subject = self.random.choice(list(subjects) or ["mathematics"])
             level = self.random.choice(list(levels) or ["high_school"])

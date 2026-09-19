@@ -383,6 +383,181 @@ INSTITUTIONS: dict[str, dict[str, list[str]]] = {
     },
 }
 
+# Finer buckets used by the generator. Raw INSTITUTIONS stay as k12/higher/adult
+# for readability; this index splits them so elementary teachers never draw a
+# high-school-only name and community_college never draws MIT.
+_INSTITUTION_BUCKETS = (
+    "elementary",
+    "middle_school",
+    "high_school",
+    "university",
+    "community_college",
+    "adult",
+)
+
+_ELEMENTARY_HINTS = (
+    "elementary",
+    "primary",
+    "k-5",
+    "k-6",
+    "grammar school",
+    "p.s.",
+    "ps ",
+    "josiah quincy",
+    "orchard gardens",
+    "amigos school",
+    "graham and parks",
+    "healey school",
+    "winter hill",
+)
+
+_MIDDLE_HINTS = (
+    "middle school",
+    "middle ",
+    "junior high",
+    "upper school",
+    "k-8",
+    "k-9",
+    "intermediate school",
+    "cambridge street upper",
+)
+
+_HIGH_HINTS = (
+    "high school",
+    "secondary",
+    "senior high",
+    "collegiate",
+    "preparatory",
+    "prep ",
+    "academy",
+    "lycee",
+    "lycée",
+    "gymnasium",
+    "grammar",
+    "sixth form",
+    "preparatoria",
+    "colegio",
+    "college prep",
+    "magnet",
+    "technical high",
+    "boys' school",
+    "girls' school",
+    "boys school",
+    "girls school",
+    "institution",  # Raffles Institution, Hwa Chong, etc.
+    "junior college",
+)
+
+_COMMUNITY_COLLEGE_HINTS = (
+    "community college",
+    "community learning",
+    "community college",
+    "city college",
+    "city colleges",
+    "borough of",
+    "tafe",
+    "polytechnic",
+    "continuing education",
+    "adult education",
+    "adult learning",
+    "adult technical",
+    "skills hub",
+    "skills ",
+    "technical college",
+    "technical trainers",
+    "tvet",
+    "roc ",
+    "greta",
+    "volkshochschule",
+    "senac",
+    "niit",
+    "ignou",
+    "etb",
+    "scale adult",
+    "knowledge park",
+    "lifelong learning",
+    "formation professionnel",
+    "norquest",
+    "bow valley",
+    "george brown",
+    "seneca college",
+    "dawson college",
+    "vanier college",
+    "bunker hill",
+    "laney college",
+    "phoenix college",
+    "holmesglen",
+    "unitec",
+    "false bay",
+    "yaba college",
+    "morley college",
+    "city lit",
+    "manchester college",
+    "edinburgh college",
+    "vancouver community",
+    "minneapolis college",
+    "austin community",
+    "houston community",
+    "community college of",
+    "city of dublin",
+)
+
+
+def _is_community_college_name(name: str) -> bool:
+    low = name.lower()
+    if "university" in low and "community" not in low:
+        return False
+    return any(hint in low for hint in _COMMUNITY_COLLEGE_HINTS)
+
+
+def _classify_k12(name: str) -> list[str]:
+    """Return one or more k12 buckets this name is compatible with."""
+    low = name.lower()
+    buckets: list[str] = []
+    if any(hint in low for hint in _ELEMENTARY_HINTS):
+        buckets.append("elementary")
+    if any(hint in low for hint in _MIDDLE_HINTS):
+        buckets.append("middle_school")
+    if any(hint in low for hint in _HIGH_HINTS):
+        buckets.append("high_school")
+    # K-8 / all-through schools serve elementary + middle.
+    if "k-8" in low or "k-9" in low:
+        for band in ("elementary", "middle_school"):
+            if band not in buckets:
+                buckets.append(band)
+    return buckets
+
+
+def _build_institution_lookup(
+    raw: dict[str, dict[str, list[str]]],
+) -> dict[str, dict[str, list[str]]]:
+    lookup: dict[str, dict[str, list[str]]] = {}
+    for city, bands in raw.items():
+        buckets: dict[str, list[str]] = {key: [] for key in _INSTITUTION_BUCKETS}
+        for name in bands.get("k12", []):
+            classified = _classify_k12(name)
+            if classified:
+                for band in classified:
+                    buckets[band].append(name)
+            else:
+                # Unclassified recognisable schools default to high school only —
+                # never silently handed to elementary profiles.
+                buckets["high_school"].append(name)
+        for name in bands.get("higher", []):
+            if _is_community_college_name(name):
+                buckets["community_college"].append(name)
+            else:
+                buckets["university"].append(name)
+        for name in bands.get("adult", []):
+            buckets["adult"].append(name)
+            if _is_community_college_name(name):
+                buckets["community_college"].append(name)
+        lookup[city] = buckets
+    return lookup
+
+
+INSTITUTION_LOOKUP: dict[str, dict[str, list[str]]] = _build_institution_lookup(INSTITUTIONS)
+
 # Subjects / expertise / class sizes that make sense at each education level.
 LEVEL_PROFILES: dict[str, dict] = {
     "elementary": {
@@ -408,7 +583,6 @@ LEVEL_PROFILES: dict[str, dict] = {
         "class_size": (16, 28),
         "levels": ["beginner"],
         "institution_types": ["public_school", "private_school", "charter_school"],
-        "institution_band": "k12",
         "method_weights": {
             "hands_on": 22,
             "game_based": 18,
@@ -447,7 +621,6 @@ LEVEL_PROFILES: dict[str, dict] = {
         "class_size": (18, 32),
         "levels": ["beginner", "intermediate"],
         "institution_types": ["public_school", "charter_school", "private_school"],
-        "institution_band": "k12",
         "method_weights": {
             "project_based": 20,
             "collaborative": 18,
@@ -495,7 +668,6 @@ LEVEL_PROFILES: dict[str, dict] = {
         "class_size": (16, 34),
         "levels": ["beginner", "intermediate", "advanced"],
         "institution_types": ["public_school", "private_school", "charter_school"],
-        "institution_band": "k12",
         "method_weights": {
             "project_based": 18,
             "problem_based": 14,
@@ -542,7 +714,6 @@ LEVEL_PROFILES: dict[str, dict] = {
         "class_size": (25, 180),
         "levels": ["intermediate", "advanced"],
         "institution_types": ["university", "community_college"],
-        "institution_band": "higher",
         "method_weights": {
             "lecture_based": 18,
             "discussion_based": 16,
@@ -584,7 +755,6 @@ LEVEL_PROFILES: dict[str, dict] = {
         "class_size": (6, 28),
         "levels": ["advanced"],
         "institution_types": ["university"],
-        "institution_band": "higher",
         "method_weights": {
             "socratic": 20,
             "discussion_based": 20,
@@ -621,7 +791,6 @@ LEVEL_PROFILES: dict[str, dict] = {
         "class_size": (8, 24),
         "levels": ["beginner", "intermediate"],
         "institution_types": ["community_college", "online_academy", "nonprofit", "independent"],
-        "institution_band": "adult",
         "method_weights": {
             "hands_on": 18,
             "project_based": 16,
