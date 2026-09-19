@@ -1,7 +1,19 @@
-# Everything the test suite and CI need on top of the runtime dependencies.
+# Everything in the deployed image, plus tests, linting and the demo-data
+# generator. CI and local development install this file; the Docker image
+# installs requirements.txt alone.
+#
+#     pip install -r requirements-dev.txt
 -r requirements.txt
 
-ruff==0.16.8
+# --- tests ---
+pytest==9.1.1
+pytest-asyncio==1.4.0
 pytest-cov==7.1.0
 coverage==7.16.1
+
+# --- demo data generator ---
+faker==33.1.0
+
+# --- lint / security ---
+ruff==0.16.8
 pip-audit==2.9.0

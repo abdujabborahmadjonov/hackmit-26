@@ -17,7 +17,18 @@ likely to collaborate well with — and explains every recommendation.
 | [`backend/`](backend/) | FastAPI + PostgreSQL/pgvector + optional Elasticsearch service. See [backend/README.md](backend/README.md). |
 | [`.github/workflows/ci.yml`](.github/workflows/ci.yml) | CI: lint, unit tests, the full suite against pgvector with a coverage gate, migrations, the Elasticsearch engine, and a Docker end-to-end smoke test. |
 
-## Run it
+## Live
+
+| | |
+| --- | --- |
+| API | <https://edumatch-api-asbp.onrender.com> |
+| Docs | <https://edumatch-api-asbp.onrender.com/docs> |
+| Demo login | `demo_teacher@example.com` / `DemoPassword123!` |
+
+The free instance sleeps when idle — wake it before demoing:
+`curl https://edumatch-api-asbp.onrender.com/health`
+
+## Run it locally
 
 ```bash
 cd backend

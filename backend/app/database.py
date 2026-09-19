@@ -72,13 +72,25 @@ def _ensure_vector_type(engine: AsyncEngine) -> None:
             logger.debug("Could not ensure the pgvector extension: %s", exc)
 
 
+def connect_args_for(url: str) -> dict:
+    """Driver arguments that depend on what is on the other end of the socket."""
+    args: dict = {}
+    if "+asyncpg" in url and settings.db_disable_prepared_statements:
+        # Both caches must go: the dialect's own LRU and asyncpg's.
+        args["prepared_statement_cache_size"] = 0
+        args["statement_cache_size"] = 0
+    return args
+
+
 def create_engine(url: str | None = None, **kwargs) -> AsyncEngine:
+    url = url or settings.database_url
     engine = create_async_engine(
-        url or settings.database_url,
+        url,
         echo=kwargs.pop("echo", settings.db_echo),
         pool_size=kwargs.pop("pool_size", settings.db_pool_size),
         max_overflow=kwargs.pop("max_overflow", settings.db_max_overflow),
         pool_pre_ping=True,
+        connect_args=kwargs.pop("connect_args", connect_args_for(url)),
         **kwargs,
     )
     _ensure_vector_type(engine)

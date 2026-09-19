@@ -1,3 +1,6 @@
+# Runtime dependencies only - what the deployed container needs.
+# Test and demo-data tooling lives in requirements-dev.txt.
+
 # --- web ---
 fastapi==0.141.1
 uvicorn[standard]==0.34.0
@@ -25,15 +28,9 @@ argon2-cffi==23.1.0
 # --- search engine (optional backend, SEARCH_PROVIDER=elasticsearch) ---
 elasticsearch[async]==8.17.0
 
-# --- embeddings / http ---
+# --- embeddings / storage over HTTP ---
 httpx==0.28.1
 
-# --- demo data ---
-faker==33.1.0
-
-# --- tests ---
-pytest==9.1.1
-pytest-asyncio==1.4.0
-
-# Optional: S3-compatible storage (STORAGE_PROVIDER=s3)
+# Optional: S3-compatible storage (STORAGE_PROVIDER=s3).
+# Supabase Storage needs nothing extra - it uses httpx.
 # boto3==1.35.90

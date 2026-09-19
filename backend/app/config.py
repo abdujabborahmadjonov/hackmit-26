@@ -3,11 +3,76 @@
 from __future__ import annotations
 
 import json
+import logging
+import re
 from functools import lru_cache
 from typing import Literal
+from urllib.parse import parse_qsl, urlencode, urlsplit, urlunsplit
 
-from pydantic import Field
+from pydantic import Field, field_validator
 from pydantic_settings import BaseSettings, SettingsConfigDict
+
+# libpq accepts these; asyncpg rejects them outright. Managed Postgres
+# providers (Neon, Supabase, Render, Heroku) put them in the URL they hand you.
+_LIBPQ_ONLY_PARAMS = frozenset(
+    {"channel_binding", "options", "target_session_attrs", "connect_timeout", "gssencmode"}
+)
+
+
+def normalise_database_url(url: str) -> str:
+    """Turn any Postgres URL into one the asyncpg driver accepts.
+
+    Managed databases hand out `postgres://user:pass@host/db?sslmode=require`;
+    SQLAlchemy needs the `+asyncpg` scheme and asyncpg spells the TLS option
+    `ssl`. Doing this here means a deploy is a copy-paste, not a debugging
+    session.
+    """
+    url = url.strip()
+    if url.startswith("postgres://"):
+        url = "postgresql://" + url[len("postgres://") :]
+    if url.startswith("postgresql://"):
+        url = "postgresql+asyncpg://" + url[len("postgresql://") :]
+
+    if "[YOUR-PASSWORD]" in url or "[PASSWORD]" in url:
+        raise ValueError(
+            "DATABASE_URL still contains the [YOUR-PASSWORD] placeholder. Paste the "
+            "real password from Supabase (Connect -> Session pooler, or Settings -> "
+            "Database -> Reset database password)."
+        )
+
+    try:
+        parts = urlsplit(url)
+        _ = parts.port  # accessing it is what validates the host and port
+    except ValueError as exc:
+        raise ValueError(
+            f"DATABASE_URL could not be parsed ({exc}). If the password contains "
+            "@ : / ? # or %, percent-encode it - or generate one without them."
+        ) from exc
+
+    # Supabase's direct host has no A record. It works from a laptop and fails
+    # on every IPv4-only platform (Render, Fly, Railway) with a DNS error that
+    # says nothing about the cause.
+    if re.match(r"^db\.[a-z0-9]+\.supabase\.co$", parts.hostname or ""):
+        logging.getLogger(__name__).warning(
+            "DATABASE_URL uses Supabase's direct connection (%s), which is "
+            "IPv6-only. If this host is IPv4-only the connection will fail with "
+            "'Name or service not known'. Use Connect -> Session pooler instead.",
+            parts.hostname,
+        )
+
+    if not parts.query:
+        return url
+
+    kept: list[tuple[str, str]] = []
+    for key, value in parse_qsl(parts.query, keep_blank_values=True):
+        lowered = key.lower()
+        if lowered == "sslmode":
+            kept.append(("ssl", value))
+        elif lowered in _LIBPQ_ONLY_PARAMS:
+            continue
+        else:
+            kept.append((key, value))
+    return urlunsplit(parts._replace(query=urlencode(kept)))
 
 
 class Settings(BaseSettings):
@@ -27,6 +92,10 @@ class Settings(BaseSettings):
     db_pool_size: int = 10
     db_max_overflow: int = 20
     db_echo: bool = False
+    # Transaction-mode connection poolers (Supabase Supavisor on port 6543,
+    # PgBouncer) multiplex one server session across clients, which breaks
+    # server-side prepared statements. Set this when connecting through one.
+    db_disable_prepared_statements: bool = False
 
     # --- auth ---
     jwt_secret: str = "insecure-development-secret-change-me"
@@ -51,7 +120,7 @@ class Settings(BaseSettings):
     search_fallback_to_postgres: bool = True
 
     # --- storage ---
-    storage_provider: Literal["local", "s3"] = "local"
+    storage_provider: Literal["local", "s3", "supabase"] = "local"
     storage_local_dir: str = "./storage"
     storage_public_base_url: str = "http://localhost:8000/static/uploads"
     max_upload_size_mb: int = 25
@@ -60,6 +129,11 @@ class Settings(BaseSettings):
     s3_endpoint_url: str = ""
     s3_access_key_id: str = ""
     s3_secret_access_key: str = ""
+    # Supabase Storage (STORAGE_PROVIDER=supabase). Plain REST, so no SDK and
+    # no extra dependency. The service key is a secret - server side only.
+    supabase_url: str = ""
+    supabase_service_key: str = ""
+    supabase_storage_bucket: str = "resources"
 
     # --- http ---
     cors_origins_raw: str = Field(default="*", alias="CORS_ORIGINS")
@@ -79,6 +153,11 @@ class Settings(BaseSettings):
     # Optional JSON override, e.g. {"high_school": {"university": 0.4}}
     education_compatibility_json: str = ""
 
+    @field_validator("database_url", mode="after")
+    @classmethod
+    def _normalise_database_url(cls, value: str) -> str:
+        return normalise_database_url(value)
+
     @property
     def cors_origins(self) -> list[str]:
         raw = self.cors_origins_raw.strip()
@@ -90,6 +169,19 @@ class Settings(BaseSettings):
     def sync_database_url(self) -> str:
         """psycopg/libpq style URL (used by tooling that cannot speak asyncpg)."""
         return self.database_url.replace("+asyncpg", "")
+
+    @property
+    def alembic_url(self) -> str:
+        """The URL as Alembic needs it.
+
+        Alembic stores it in a ConfigParser, which treats `%` as interpolation
+        syntax - and a percent-encoded password is full of them.
+        """
+        return self.database_url.replace("%", "%%")
+
+    @property
+    def is_production(self) -> bool:
+        return self.environment == "production"
 
     @property
     def max_upload_size_bytes(self) -> int:

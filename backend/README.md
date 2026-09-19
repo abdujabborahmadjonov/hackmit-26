@@ -19,6 +19,22 @@ likely to collaborate well with — and explains every match.
 
 ---
 
+## Live deployment
+
+| | |
+| --- | --- |
+| API | <https://edumatch-api-asbp.onrender.com> |
+| Interactive docs | <https://edumatch-api-asbp.onrender.com/docs> |
+| Database | Supabase Postgres (`us-west-2`), pgvector 0.8.2 |
+| Demo login | `demo_teacher@example.com` / `DemoPassword123!` |
+
+The free Render instance sleeps after 15 minutes idle and takes ~50 s to wake.
+**Before demoing, wake it first:**
+
+```bash
+curl https://edumatch-api-asbp.onrender.com/health   # {"status":"ok","database":"ok"}
+```
+
 ## Quick start (Docker)
 
 ```bash
@@ -59,7 +75,7 @@ available.
 ```bash
 cd backend
 python -m venv .venv && source .venv/bin/activate
-pip install -r requirements.txt
+pip install -r requirements-dev.txt   # runtime deps + tests + demo data
 
 cp .env.example .env                  # point DATABASE_URL at your database
 createdb edumatch                     # if it does not exist yet
@@ -88,9 +104,11 @@ backend/
 │   └── utils/                  auth (JWT/Argon2), geo (haversine), rate limiting
 ├── migrations/                 Alembic (async)
 ├── scripts/                    generate_demo_data.py · reindex_elasticsearch.py
-│                               benchmark_recommendations.py
+│                               benchmark_recommendations.py · setup_remote_db.py
 ├── tests/                      pytest suite (unit + API integration)
-├── Dockerfile · docker-compose.yml · requirements.txt · .env.example
+├── Dockerfile · docker-compose.yml · .env.example
+├── requirements.txt            runtime only (what the image installs)
+└── requirements-dev.txt        + pytest, faker, ruff
 ```
 
 ---
@@ -332,6 +350,121 @@ curl -s "http://localhost:8000/search/teachers?query=students%20build%20real%20s
 
 ---
 
+## Deploying
+
+The image is self-contained: it runs `alembic upgrade head` on boot and listens
+on `$PORT`, so any Docker host works. `DATABASE_URL` is normalised
+automatically — paste the `postgres://…?sslmode=require` string a managed
+provider gives you and the app rewrites it for asyncpg.
+
+### Render + Supabase (the deployed setup)
+
+Supabase hosts Postgres; Render runs the container. `render.yaml` describes the
+service, so Render configures itself.
+
+1. **Supabase** → new project → **SQL Editor**:
+
+   ```sql
+   create extension if not exists vector;
+   create extension if not exists pg_trgm;
+   ```
+
+   Then **Connect → Session pooler** and copy the URI (port `5432`, host
+   `*.pooler.supabase.com`). Also create a **public Storage bucket** named
+   `resources` — Render's free plan has no disk, so uploads live there.
+
+2. **Point the app at it, in one command.** Render's free plan has no shell, so
+   migrate and seed from your laptop:
+
+   ```bash
+   cd backend
+   python scripts/setup_remote_db.py
+   ```
+
+   It prompts for the connection string (input hidden, password never printed),
+   then enables the extensions, writes `.env`, runs the migrations, seeds demo
+   data and verifies that Alice's top match is Bob on *your* database. It also
+   warns you if you pasted the IPv6-only direct URL or the transaction pooler.
+
+3. **Render** → **New → Blueprint** → pick this repo and the `backend` branch.
+   Paste `DATABASE_URL` when prompted; Render generates `JWT_SECRET` itself.
+
+4. Render prompts for `SUPABASE_URL` and `SUPABASE_SERVICE_KEY`
+   (Project Settings → API). Set `CORS_ORIGINS` to your frontend's origin.
+
+5. Check it: `https://<your-service>.onrender.com/health` → `{"status":"ok"}`,
+   and `/docs` for the live API.
+
+**Free-tier trade-off.** The service sleeps after 15 minutes idle (~30 s cold
+start — wake it before judging). `plan: starter` removes that. Uploads are safe
+either way because they go to Supabase Storage, not the container's disk.
+
+Prefer one dashboard? Uncomment the `databases:` block in `render.yaml` to let
+Render host Postgres too.
+
+### Supabase (database only)
+
+Supabase gives you the Postgres; run the API anywhere (Render, Railway, Fly).
+You do **not** need Supabase Auth or Storage — EduMatch issues its own JWTs.
+
+1. Create a project, then in **SQL Editor** run:
+
+   ```sql
+   create extension if not exists vector;
+   create extension if not exists pg_trgm;
+   ```
+
+2. **Connect → Session pooler** and copy that URI (port `5432` on a
+   `*.pooler.supabase.com` host). Use it as `DATABASE_URL` — the `postgres://`
+   scheme and `?sslmode=require` are rewritten for you.
+
+   *Why the session pooler:* the direct connection (`db.<ref>.supabase.co`) has
+   no A record at all - it is IPv6-only unless you buy the IPv4 add-on - and
+   Render is IPv4, so it fails at DNS with `Name or service not known`. If you use the **transaction**
+   pooler (port `6543`) instead, also set `DB_DISABLE_PREPARED_STATEMENTS=true`
+   — that mode multiplexes sessions and breaks server-side prepared statements.
+
+3. Deploy the API as usual. Migrations run on boot.
+
+If a migration fails with `type "vector" does not exist`, Supabase installed the
+extension into its `extensions` schema; fix the lookup path once:
+
+```sql
+alter database postgres set search_path to public, extensions;
+```
+
+### Railway / Fly.io / Cloud Run
+
+Same image, no blueprint needed:
+
+```bash
+# Railway: add a Postgres plugin, then
+railway up                      # detects backend/Dockerfile
+
+# Fly.io
+fly launch --dockerfile backend/Dockerfile --no-deploy
+fly postgres create && fly postgres attach <db-name>
+fly secrets set JWT_SECRET=$(python3 -c "import secrets;print(secrets.token_urlsafe(48))")
+fly deploy
+```
+
+For Fly, enable pgvector once with
+`fly postgres connect -a <db-name>` then `CREATE EXTENSION vector;`.
+
+### Production checklist
+
+| | |
+| --- | --- |
+| `JWT_SECRET` | fresh random value, injected as a secret — never the example one |
+| `ENVIRONMENT` / `DEBUG` | `production` / `false` |
+| `CORS_ORIGINS` | your frontend origin, not `*` |
+| TLS | terminate HTTPS at the platform's proxy (all of the above do this for you) |
+| Uploads | local disk needs a persistent volume; otherwise set `STORAGE_PROVIDER=s3` |
+| Rate limiting | in-process, so it is per worker — move it to Redis before scaling out |
+| Elasticsearch | optional; set `SEARCH_PROVIDER=elasticsearch` + `ELASTICSEARCH_URL`, then run `scripts/reindex_elasticsearch.py` |
+
+---
+
 ## Tests
 
 ```bash
@@ -391,7 +524,8 @@ for `main` and it stays correct as jobs are added or renamed.
 
 | Variable | Default | Purpose |
 | --- | --- | --- |
-| `DATABASE_URL` | `postgresql+asyncpg://edumatch:edumatch@localhost:5432/edumatch` | Async Postgres DSN |
+| `DATABASE_URL` | `postgresql+asyncpg://edumatch:edumatch@localhost:5432/edumatch` | Async Postgres DSN. `postgres://…?sslmode=require` strings from managed providers are rewritten automatically. |
+| `DB_DISABLE_PREPARED_STATEMENTS` | `false` | Set for transaction-mode poolers (Supabase :6543, PgBouncer) |
 | `JWT_SECRET` | *(change it)* | HS256 signing key |
 | `ACCESS_TOKEN_EXPIRE_MINUTES` | `10080` | Token lifetime |
 | `EMBEDDING_PROVIDER` | `hashing` | `hashing` · `openai` · `voyage` |
@@ -399,7 +533,7 @@ for `main` and it stays correct as jobs are added or renamed.
 | `EMBEDDING_DIM` | `384` | Vector width (schema-affecting) |
 | `SEARCH_PROVIDER` | `postgres` | `postgres` · `elasticsearch` |
 | `ELASTICSEARCH_URL` | `http://localhost:9200` | Cluster endpoint |
-| `STORAGE_PROVIDER` | `local` | `local` · `s3` |
+| `STORAGE_PROVIDER` | `local` | `local` · `supabase` · `s3` |
 | `MAX_UPLOAD_SIZE_MB` | `25` | Upload ceiling |
 | `CORS_ORIGINS` | `*` | Comma-separated origins |
 | `RATE_LIMIT_PER_MINUTE` / `AUTH_RATE_LIMIT_PER_MINUTE` | `120` / `20` | Per-IP limits |

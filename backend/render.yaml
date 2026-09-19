@@ -1,0 +1,84 @@
+# Render blueprint for the EduMatch API.
+#
+#   1. Push this branch to GitHub.
+#   2. Render dashboard -> New -> Blueprint -> pick this repo.
+#   3. Paste your DATABASE_URL when Render asks (Supabase: Connect ->
+#      Session pooler). Render generates JWT_SECRET itself.
+#
+# Migrations run on every boot (see the Dockerfile CMD), so the first deploy
+# creates the schema. Seed demo data from your laptop with the same
+# DATABASE_URL:  python scripts/generate_demo_data.py --scale 0.1
+services:
+  - type: web
+    name: edumatch-api
+    runtime: docker
+    rootDir: backend
+    # Relative to rootDir, NOT the repo root. The blueprint spec says repo
+    # root, but every build proves otherwise: ./backend/Dockerfile makes the
+    # checkout fail with "lstat .../src/backend/backend: no such file", while
+    # ./Dockerfile builds the image. Do not "fix" this.
+    dockerfilePath: ./Dockerfile
+    plan: free
+    region: oregon
+    healthCheckPath: /health
+    autoDeploy: true
+    envVars:
+      # Prompted at deploy time. Supabase/Neon postgres:// URLs are rewritten
+      # for asyncpg automatically - paste the string as given.
+      - key: DATABASE_URL
+        sync: false
+      # Generated once by Render and kept secret. Never hard-code it.
+      - key: JWT_SECRET
+        generateValue: true
+      - key: ENVIRONMENT
+        value: production
+      - key: DEBUG
+        value: "false"
+      - key: WEB_CONCURRENCY
+        value: "1"
+      - key: EMBEDDING_PROVIDER
+        value: hashing
+      - key: EMBEDDING_DIM
+        value: "384"
+      - key: SEARCH_PROVIDER
+        value: postgres
+      # Render's free plan has no persistent disk, so uploads go to Supabase
+      # Storage. Create a PUBLIC bucket named "resources" first.
+      - key: STORAGE_PROVIDER
+        value: supabase
+      - key: SUPABASE_URL
+        sync: false
+      # Paste the service_role key (Project Settings -> API). Secret: it is
+      # never sent to the browser, only used server side.
+      - key: SUPABASE_SERVICE_KEY
+        sync: false
+      - key: SUPABASE_STORAGE_BUCKET
+        value: resources
+      # Replace with your frontend's origin before demo day.
+      - key: CORS_ORIGINS
+        value: "*"
+
+# --- Optional: let Render host Postgres instead of Supabase ------------------
+# Uncomment this block AND swap the DATABASE_URL entry above for:
+#       - key: DATABASE_URL
+#         fromDatabase:
+#           name: edumatch-db
+#           property: connectionString
+#
+# databases:
+#   - name: edumatch-db
+#     plan: free            # free plan expires after 30 days
+#     databaseName: edumatch
+#     user: edumatch
+#     postgresMajorVersion: "16"
+
+# --- Optional: local disk instead of Supabase Storage ------------------------
+# Set STORAGE_PROVIDER=local with STORAGE_LOCAL_DIR=/app/storage and
+# STORAGE_PUBLIC_BASE_URL=https://<service>.onrender.com/static/uploads, then
+# move to `plan: starter` and add a disk (the free plan has none, so files
+# would not survive a restart):
+#
+#     disk:
+#       name: uploads
+#       mountPath: /app/storage
+#       sizeGB: 1
