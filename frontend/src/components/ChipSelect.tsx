@@ -29,9 +29,9 @@ export function ChipSelect({
             onClick={() => toggle(option)}
             aria-pressed={selected}
             className={cx(
-              "rounded-full px-3 py-1 text-sm transition ring-1",
+              "press rounded-full px-3 py-1 text-sm ring-1",
               selected
-                ? "bg-indigo-600 text-white ring-indigo-600"
+                ? "bg-indigo-600 text-white ring-indigo-600 shadow-sm"
                 : "bg-white text-muted ring-line hover:text-ink hover:ring-slate-300",
             )}
           >

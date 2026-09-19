@@ -134,7 +134,7 @@ export default function Recommendations() {
       </div>
 
       {tuning && weights && defaults && (
-        <div className="mt-4">
+        <div className="rise mt-4">
           <WeightStudio
             weights={weights}
             defaults={defaults}
@@ -174,7 +174,7 @@ export default function Recommendations() {
           ))}
         </div>
       ) : ranked.length > 0 ? (
-        <div className="mt-4 space-y-4">
+        <div className="stagger mt-4 space-y-4">
           {ranked.slice(0, SHOWN).map((recommendation) => (
             <MatchCard
               key={recommendation.teacher.user_id}

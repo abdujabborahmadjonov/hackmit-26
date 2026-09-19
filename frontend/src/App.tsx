@@ -28,8 +28,11 @@ function Shell({ children }: { children: ReactNode }) {
     <div className="min-h-screen">
       <header className="sticky top-0 z-10 border-b border-line bg-paper/85 backdrop-blur">
         <div className="mx-auto flex max-w-5xl items-center gap-3 px-4 py-3 sm:gap-6">
-          <NavLink to="/" className="flex items-center gap-2 font-semibold text-ink">
-            <span className="grid h-7 w-7 place-items-center rounded-lg bg-indigo-600 text-sm text-white">
+          <NavLink
+            to="/"
+            className="press flex shrink-0 items-center gap-2 font-semibold text-ink"
+          >
+            <span className="grid h-7 w-7 place-items-center rounded-lg bg-indigo-600 text-sm text-white shadow-sm">
               E
             </span>
             EduMatch
@@ -52,7 +55,10 @@ function Shell({ children }: { children: ReactNode }) {
             ))}
           </nav>
           <div className="flex shrink-0 items-center gap-2">
-            <NavLink to="/profile" className="flex items-center gap-2">
+            <NavLink
+              to="/profile"
+              className="press flex items-center gap-2 rounded-lg p-1 hover:bg-slate-100"
+            >
               <Avatar name={name} size={30} />
               <span className="hidden text-sm font-medium text-ink sm:block">
                 {user?.first_name}
@@ -64,7 +70,10 @@ function Shell({ children }: { children: ReactNode }) {
           </div>
         </div>
       </header>
-      <main className="mx-auto max-w-5xl px-4 py-8">{children}</main>
+      {/* Keyed on the path so each route fades in rather than snapping. */}
+      <main key={useLocation().pathname} className="rise mx-auto max-w-5xl px-4 py-8">
+        {children}
+      </main>
     </div>
   );
 }

@@ -240,7 +240,7 @@ export default function Search() {
           ))}
         </div>
       ) : (
-        <div className="mt-4 grid gap-3 sm:grid-cols-2">
+        <div className="stagger mt-4 grid gap-3 sm:grid-cols-2">
           {data?.items.map((hit) => (
             <TeacherCard key={hit.teacher.user_id} teacher={hit.teacher} score={hit.score} />
           ))}

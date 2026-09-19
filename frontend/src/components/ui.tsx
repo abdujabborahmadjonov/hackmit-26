@@ -20,7 +20,7 @@ export function Button({
   ...props
 }: ButtonProps) {
   const base =
-    "inline-flex items-center justify-center gap-2 rounded-lg font-medium transition " +
+    "press inline-flex items-center justify-center gap-2 rounded-lg font-medium " +
     "focus:outline-none focus-visible:ring-2 focus-visible:ring-indigo-500 focus-visible:ring-offset-2 " +
     "disabled:cursor-not-allowed disabled:opacity-50";
   const variants = {
@@ -42,9 +42,26 @@ export function Button({
   );
 }
 
-export function Card({ className, children }: { className?: string; children: ReactNode }) {
+export function Card({
+  className,
+  children,
+  interactive,
+}: {
+  className?: string;
+  children: ReactNode;
+  /** Adds the hover lift. For cards that are themselves a link or a target. */
+  interactive?: boolean;
+}) {
   return (
-    <div className={cx("rounded-xl bg-white ring-1 ring-line shadow-sm", className)}>{children}</div>
+    <div
+      className={cx(
+        "rounded-xl bg-white ring-1 ring-line shadow-sm",
+        interactive && "lift hover:ring-slate-300",
+        className,
+      )}
+    >
+      {children}
+    </div>
   );
 }
 
@@ -78,7 +95,8 @@ export function Input({ className, ...props }: InputHTMLAttributes<HTMLInputElem
     <input
       className={cx(
         "w-full rounded-lg bg-white px-3 py-2 text-sm text-ink ring-1 ring-line",
-        "placeholder:text-slate-400 focus:outline-none focus:ring-2 focus:ring-indigo-500",
+        "transition duration-150 placeholder:text-slate-400 hover:ring-slate-300",
+        "focus:outline-none focus:ring-2 focus:ring-indigo-500",
         className,
       )}
       {...props}
@@ -91,7 +109,7 @@ export function Select({ className, children, ...props }: SelectHTMLAttributes<H
     <select
       className={cx(
         "w-full rounded-lg bg-white px-3 py-2 text-sm text-ink ring-1 ring-line",
-        "focus:outline-none focus:ring-2 focus:ring-indigo-500",
+        "transition duration-150 hover:ring-slate-300 focus:outline-none focus:ring-2 focus:ring-indigo-500",
         className,
       )}
       {...props}

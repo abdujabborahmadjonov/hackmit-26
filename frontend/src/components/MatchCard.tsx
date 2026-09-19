@@ -43,7 +43,7 @@ export function WhyThisMatch({
   });
 
   return (
-    <div className="rise mt-4 rounded-lg bg-slate-50 p-4 ring-1 ring-line">
+    <div className="mt-4 rounded-lg bg-slate-50 p-4 ring-1 ring-line">
       <p className="text-xs font-semibold uppercase tracking-wide text-muted">
         How this {Math.round(match_score * 100)}% was calculated
       </p>
@@ -137,7 +137,7 @@ export function MatchCard({
   const name = `${teacher.first_name} ${teacher.last_name}`;
 
   return (
-    <Card className="p-5">
+    <Card className="p-5" interactive>
       <div className="flex items-start gap-4">
         <Avatar name={name} size={48} />
         <div className="min-w-0 flex-1">
@@ -191,13 +191,16 @@ export function MatchCard({
         ))}
       </ul>
 
-      {showWhy && (
-        <WhyThisMatch
-          recommendation={recommendation}
-          displayScore={match_score}
-          weights={weights}
-        />
-      )}
+      {/* Grid-rows trick: animates open without measuring the content height. */}
+      <div className="collapsible" data-open={showWhy}>
+        <div>
+          <WhyThisMatch
+            recommendation={recommendation}
+            displayScore={match_score}
+            weights={weights}
+          />
+        </div>
+      </div>
 
       <div className="mt-4 flex flex-wrap items-center gap-2">
         <Button size="sm" variant="secondary" onClick={() => setShowWhy((open) => !open)}>

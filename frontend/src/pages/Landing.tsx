@@ -83,7 +83,7 @@ export default function Landing() {
         </div>
       </header>
 
-      <section className="mx-auto max-w-5xl px-4 pb-12 pt-10 sm:pt-16">
+      <section className="rise mx-auto max-w-5xl px-4 pb-12 pt-10 sm:pt-16">
         <p className="text-sm font-medium text-indigo-600">A professional network for educators</p>
         <h1 className="mt-3 max-w-3xl text-4xl font-semibold leading-tight tracking-tight text-ink sm:text-5xl">
           Find the teachers you'll actually work well with.
@@ -95,7 +95,11 @@ export default function Landing() {
         </p>
 
         <div className="mt-7 flex flex-wrap items-center gap-3">
-          <Button onClick={tryDemo} loading={busy} className="px-5 py-2.5 text-base">
+          <Button
+            onClick={tryDemo}
+            loading={busy}
+            className="px-5 py-2.5 text-base shadow-lg shadow-indigo-600/20 hover:shadow-indigo-600/30"
+          >
             Try the live demo
           </Button>
           <Link to="/register">
@@ -120,7 +124,7 @@ export default function Landing() {
       </section>
 
       <section className="border-y border-line bg-white">
-        <div className="mx-auto grid max-w-5xl gap-8 px-4 py-12 sm:grid-cols-3">
+        <div className="stagger mx-auto grid max-w-5xl gap-8 px-4 py-12 sm:grid-cols-3">
           {STEPS.map((step, index) => (
             <div key={step.title}>
               <span className="grid h-7 w-7 place-items-center rounded-lg bg-indigo-50 text-sm font-semibold text-indigo-700">

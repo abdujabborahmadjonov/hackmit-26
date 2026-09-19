@@ -6,7 +6,7 @@ import { Avatar, Badge, Card, Stars } from "./ui";
 export function TeacherCard({ teacher, score }: { teacher: TeacherSummary; score?: number }) {
   const name = `${teacher.first_name} ${teacher.last_name}`;
   return (
-    <Card className="p-4 transition hover:ring-indigo-300">
+    <Card className="p-4" interactive>
       <Link to={`/teachers/${teacher.user_id}`} className="flex items-start gap-3">
         <Avatar name={name} size={40} />
         <div className="min-w-0 flex-1">
