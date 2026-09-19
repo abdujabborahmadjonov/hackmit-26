@@ -12,8 +12,8 @@ import logging
 import math
 import re
 from collections import Counter
-from hashlib import blake2b
 from collections.abc import Iterable, Sequence
+from hashlib import blake2b
 from typing import Protocol
 
 import httpx

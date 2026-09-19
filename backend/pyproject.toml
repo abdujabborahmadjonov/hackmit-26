@@ -1,0 +1,43 @@
+# Tooling configuration only. Runtime settings live in app/config.py + .env,
+# and pytest keeps its own pytest.ini.
+
+[tool.ruff]
+line-length = 120
+target-version = "py312"
+# Alembic writes these; they are not hand-maintained code.
+extend-exclude = ["migrations/versions"]
+
+[tool.ruff.lint]
+select = ["E", "W", "F", "I", "B", "C4", "UP", "SIM"]
+ignore = [
+    # zip(..., strict=...) changes runtime behaviour on a length mismatch; every
+    # call site here zips sequences that are equal-length by construction.
+    "B905",
+    # str+Enum is deliberate: the members must serialise as plain strings for
+    # SQLAlchemy and Pydantic, which StrEnum only matches on Python 3.11+.
+    "UP042",
+    # PEP 695 type parameters are not worth the churn on the paginated schemas.
+    "UP046",
+    # dict(key=...) reads better than a literal for the keyword-style fixtures.
+    "C408",
+    # The wrapped """...""".split() word lists are more readable than one long
+    # list literal.
+    "SIM905",
+]
+
+[tool.ruff.lint.isort]
+known-first-party = ["app", "scripts", "tests"]
+
+[tool.coverage.run]
+source = ["app"]
+branch = true
+omit = ["app/__init__.py"]
+
+[tool.coverage.report]
+show_missing = true
+exclude_also = [
+    "if TYPE_CHECKING:",
+    "raise NotImplementedError",
+    "if __name__ == .__main__.:",
+    "@(abc\\.)?abstractmethod",
+]

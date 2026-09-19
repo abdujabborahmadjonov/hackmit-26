@@ -16,7 +16,8 @@ from sqlalchemy import (
     Text,
     text,
 )
-from sqlalchemy.dialects.postgresql import ARRAY, UUID as PGUUID
+from sqlalchemy.dialects.postgresql import ARRAY
+from sqlalchemy.dialects.postgresql import UUID as PGUUID
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
 from app.config import settings
@@ -84,7 +85,7 @@ class TeacherProfile(UUIDPrimaryKeyMixin, TimestampMixin, Base):
         Vector(settings.embedding_dim)
     )
 
-    user: Mapped["User"] = relationship(back_populates="profile")
+    user: Mapped[User] = relationship(back_populates="profile")
 
     __table_args__ = (
         CheckConstraint("class_size IS NULL OR class_size > 0", name="class_size_positive"),

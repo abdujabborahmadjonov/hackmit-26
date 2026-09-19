@@ -167,7 +167,7 @@ class ProfileRead(ProfileBase):
     updated_at: datetime | None = None
 
     @classmethod
-    def from_model(cls, profile, *, user=None) -> "ProfileRead":
+    def from_model(cls, profile, *, user=None) -> ProfileRead:
         data = cls.model_validate(profile)
         data.has_embedding = profile.teaching_style_embedding is not None
         if user is not None:

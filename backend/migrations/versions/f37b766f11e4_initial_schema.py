@@ -222,3 +222,6 @@ def downgrade() -> None:
     op.drop_table('users')
     op.drop_table('conversations')
     # ### end Alembic commands ###
+    # Enum types outlive their tables unless they are dropped explicitly.
+    sa.Enum(name='recommendation_feedback').drop(op.get_bind(), checkfirst=True)
+    sa.Enum(name='connection_status').drop(op.get_bind(), checkfirst=True)

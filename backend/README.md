@@ -335,8 +335,12 @@ curl -s "http://localhost:8000/search/teachers?query=students%20build%20real%20s
 ## Tests
 
 ```bash
+pip install -r requirements-dev.txt
+
 pytest                      # everything
 pytest -m "not integration" # unit tests only (no database needed)
+pytest --cov=app            # with a coverage report
+ruff check .                # lint
 ```
 
 API tests need PostgreSQL with pgvector; set `TEST_DATABASE_URL` (defaults to
@@ -348,6 +352,38 @@ calculation (including *Teacher A must rank Teacher B highly when their profiles
 are similar*), semantic similarity, location similarity, search filters,
 resource creation/upload/ownership, ratings and rollups, connections, messaging,
 authorisation on every protected route, and the demo data generator.
+
+### End-to-end smoke test
+
+`scripts/smoke_test.sh` exercises a **running** API the way a user (or a judge)
+would: health, OpenAPI, login, a rejected bad password, an anonymous request to
+a protected route, recommendations with reasons and explanations, both search
+endpoints, and a full register → create profile → get recommendations → delete
+account round trip. Run it before a demo:
+
+```bash
+docker compose up -d --build
+docker compose exec -T backend python scripts/generate_demo_data.py --scale 0.02
+scripts/smoke_test.sh                      # or BASE_URL=https://... scripts/smoke_test.sh
+```
+
+### CI
+
+[`.github/workflows/ci.yml`](../.github/workflows/ci.yml) runs on every pull
+request to `main` and on every push to `main`:
+
+| Job | What it guards |
+| --- | --- |
+| **Lint** | `ruff check`, requirements pinned with `==`, no committed `.env` |
+| **Unit tests** | The app imports, the OpenAPI schema is complete, and `pytest -m "not integration"` passes with no services running |
+| **Tests + coverage** | The whole suite against `pgvector/pgvector:pg16`, failing under **75%** line coverage (currently ~78%); JUnit + HTML/XML coverage are uploaded as artifacts |
+| **Migrations** | `alembic upgrade head`, `alembic check` (models and migrations agree), exactly one head, and a `downgrade base` → `upgrade head` round trip |
+| **Search engine** | `tests/test_search_elasticsearch.py` against a real Elasticsearch 8.17 cluster, after asserting the cluster is actually up so the tests cannot silently skip |
+| **Docker** | Builds the image, boots the compose stack, seeds demo data, runs `scripts/smoke_test.sh`, and checks the container is not running as root |
+| **Dependency audit** | `pip-audit` — advisory only, so a fresh CVE cannot block an unrelated PR |
+
+The `CI` job at the end aggregates the rest; make that the required status check
+for `main` and it stays correct as jobs are added or renamed.
 
 ---
 

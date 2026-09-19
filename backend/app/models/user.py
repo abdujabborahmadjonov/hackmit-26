@@ -28,7 +28,7 @@ class User(UUIDPrimaryKeyMixin, TimestampMixin, Base):
         Boolean, nullable=False, server_default=text("true")
     )
 
-    profile: Mapped["TeacherProfile | None"] = relationship(
+    profile: Mapped[TeacherProfile | None] = relationship(
         back_populates="user", uselist=False, cascade="all, delete-orphan"
     )
 

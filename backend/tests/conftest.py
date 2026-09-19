@@ -20,12 +20,11 @@ from httpx import ASGITransport, AsyncClient
 from sqlalchemy import text
 from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker
 
+from app import models as _models  # noqa: F401  (registers the tables)
 from app.config import settings
 from app.database import Base, create_engine, get_db
 from app.main import app as fastapi_app
 from app.utils.rate_limit import reset_rate_limits
-
-from app import models as _models  # noqa: F401  (registers the tables)
 
 
 def _test_database_url() -> str:

@@ -20,10 +20,10 @@ from app.database import Base, TimestampMixin, UUIDPrimaryKeyMixin
 class Conversation(UUIDPrimaryKeyMixin, TimestampMixin, Base):
     __tablename__ = "conversations"
 
-    participants: Mapped[list["ConversationParticipant"]] = relationship(
+    participants: Mapped[list[ConversationParticipant]] = relationship(
         back_populates="conversation", cascade="all, delete-orphan", lazy="selectin"
     )
-    messages: Mapped[list["Message"]] = relationship(
+    messages: Mapped[list[Message]] = relationship(
         back_populates="conversation", cascade="all, delete-orphan"
     )
 
@@ -41,7 +41,7 @@ class ConversationParticipant(Base):
         DateTime(timezone=True), server_default=func.now(), nullable=False
     )
 
-    conversation: Mapped["Conversation"] = relationship(back_populates="participants")
+    conversation: Mapped[Conversation] = relationship(back_populates="participants")
     user = relationship("User", lazy="joined")
 
     __table_args__ = (
@@ -65,7 +65,7 @@ class Message(UUIDPrimaryKeyMixin, Base):
     )
     read_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
 
-    conversation: Mapped["Conversation"] = relationship(back_populates="messages")
+    conversation: Mapped[Conversation] = relationship(back_populates="messages")
     sender = relationship("User", lazy="joined")
 
     __table_args__ = (

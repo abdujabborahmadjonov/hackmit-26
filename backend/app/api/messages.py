@@ -8,7 +8,7 @@ encryption, and the API never claims that it does.
 from __future__ import annotations
 
 import uuid
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 from typing import Annotated
 
 from fastapi import APIRouter, Depends, HTTPException, Query, status
@@ -18,7 +18,8 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from app.database import get_db
 from app.models.message import Conversation, ConversationParticipant, Message
 from app.models.user import User
-from app.schemas.common import Message as MessageEnvelope, Page
+from app.schemas.common import Message as MessageEnvelope
+from app.schemas.common import Page
 from app.schemas.message import (
     ConversationCreate,
     ConversationRead,
@@ -256,7 +257,7 @@ async def mark_read(
             Message.sender_id != current_user.id,
             Message.read_at.is_(None),
         )
-        .values(read_at=datetime.now(timezone.utc))
+        .values(read_at=datetime.now(UTC))
     )
     await db.commit()
     return MessageEnvelope(detail=f"Marked {result.rowcount} message(s) as read")

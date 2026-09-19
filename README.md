@@ -1,5 +1,7 @@
 # hackmit-26
 
+[![CI](https://github.com/ProgrammingPerson/hackmit-26/actions/workflows/ci.yml/badge.svg?branch=main)](https://github.com/ProgrammingPerson/hackmit-26/actions/workflows/ci.yml)
+
 **EduMatch** — an AI-powered professional network for educators, built for
 HackMIT 2026.
 
@@ -13,6 +15,7 @@ likely to collaborate well with — and explains every recommendation.
 | Path | What it is |
 | --- | --- |
 | [`backend/`](backend/) | FastAPI + PostgreSQL/pgvector + optional Elasticsearch service. See [backend/README.md](backend/README.md). |
+| [`.github/workflows/ci.yml`](.github/workflows/ci.yml) | CI: lint, unit tests, the full suite against pgvector with a coverage gate, migrations, the Elasticsearch engine, and a Docker end-to-end smoke test. |
 
 ## Run it
 

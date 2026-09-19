@@ -160,9 +160,9 @@ async def test_end_to_end_indexing_and_search(monkeypatch, db_session):
 
     from app.models.profile import TeacherProfile
     from app.models.user import User
+    from app.services.profile_service import refresh_profile_embedding
     from app.services.search_service import SearchService
     from app.utils.auth import hash_password
-    from app.services.profile_service import refresh_profile_embedding
 
     monkeypatch.setattr(settings, "search_provider", "elasticsearch")
     monkeypatch.setattr(settings, "elasticsearch_teacher_index", "edumatch_test_teachers")

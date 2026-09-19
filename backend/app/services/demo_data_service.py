@@ -294,7 +294,8 @@ class DemoDataGenerator:
             [
                 f"{years} years teaching {subject_text} at {level_text} level. Currently at {institution}.",
                 f"{level_text.capitalize()} {subject_text} teacher at {institution}, {years} years in the classroom.",
-                f"I have spent {years} years building {subject_text} curricula for {level_text} students at {institution}.",
+                f"I have spent {years} years building {subject_text} curricula "
+                f"for {level_text} students at {institution}.",
             ]
         )
 

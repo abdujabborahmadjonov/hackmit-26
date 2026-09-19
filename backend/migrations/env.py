@@ -9,9 +9,9 @@ from alembic import context
 from sqlalchemy import pool, text
 from sqlalchemy.ext.asyncio import async_engine_from_config
 
+import app.models  # noqa: F401  (registers every table on Base.metadata)
 from app.config import settings
 from app.database import Base
-import app.models  # noqa: F401  (registers every table on Base.metadata)
 
 config = context.config
 config.set_main_option("sqlalchemy.url", settings.database_url)
