@@ -27,7 +27,10 @@ services:
       retries: 20
 
   backend:
-    build: .
+    build:
+      context: .
+      args:
+        INSTALL_DEV: "true"
     depends_on:
       postgres:
         condition: service_healthy

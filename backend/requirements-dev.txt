@@ -1,0 +1,9 @@
+# Everything in the deployed image, plus tests and the demo-data generator.
+#
+#     pip install -r requirements-dev.txt
+-r requirements.txt
+
+pytest==8.3.4
+pytest-asyncio==0.25.0
+faker==33.1.0
+ruff==0.8.4

@@ -59,7 +59,7 @@ available.
 ```bash
 cd backend
 python -m venv .venv && source .venv/bin/activate
-pip install -r requirements.txt
+pip install -r requirements-dev.txt   # runtime deps + tests + demo data
 
 cp .env.example .env                  # point DATABASE_URL at your database
 createdb edumatch                     # if it does not exist yet
@@ -90,7 +90,9 @@ backend/
 ├── scripts/                    generate_demo_data.py · reindex_elasticsearch.py
 │                               benchmark_recommendations.py · setup_remote_db.py
 ├── tests/                      pytest suite (unit + API integration)
-├── Dockerfile · docker-compose.yml · requirements.txt · .env.example
+├── Dockerfile · docker-compose.yml · .env.example
+├── requirements.txt            runtime only (what the image installs)
+└── requirements-dev.txt        + pytest, faker, ruff
 ```
 
 ---
