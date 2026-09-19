@@ -12,7 +12,7 @@ import {
   scoreWith,
   type Weights,
 } from "../components/WeightStudio";
-import { Button, Card, ErrorNote } from "../components/ui";
+import { Badge, Button, Card, ErrorNote, PageHeader } from "../components/ui";
 
 /** How many candidates to pull. We show ten, but re-weighting only makes sense
  *  if there are others that can overtake them. */
@@ -105,15 +105,12 @@ export default function Recommendations() {
 
   return (
     <div>
-      <div className="flex flex-wrap items-end justify-between gap-4">
-        <div>
-          <h1 className="text-2xl font-semibold tracking-tight text-ink">Your matches</h1>
-          <p className="mt-1 text-sm text-muted">
-            Ranked by teaching philosophy, subject overlap, level, proximity and class size — every
-            one explains itself.
-          </p>
-        </div>
-        <div className="flex flex-wrap items-center gap-3">
+      <PageHeader
+        eyebrow="Personalized for your classroom"
+        title="Your best matches"
+        description="Educators ranked by teaching philosophy, subject overlap, learner level, proximity, and class size. Every recommendation shows its work."
+        actions={
+          <>
           <label className="flex items-center gap-2 text-sm text-muted">
             <input
               type="checkbox"
@@ -130,11 +127,12 @@ export default function Recommendations() {
           >
             {tuning ? "Done tuning" : "Tune the algorithm"}
           </Button>
-        </div>
-      </div>
+          </>
+        }
+      />
 
       {tuning && weights && defaults && (
-        <div className="rise mt-4">
+        <div className="rise mt-6">
           <WeightStudio
             weights={weights}
             defaults={defaults}
@@ -145,25 +143,28 @@ export default function Recommendations() {
       )}
 
       {data && !loading && (
-        <p className="mt-4 text-xs text-muted">
-          Scored {data.candidate_pool_size} candidates in {Math.round(data.took_ms)} ms
-          {changed ? (
-            <span className="ml-1 font-medium text-indigo-600">
-              · re-ranked live with your weights
-            </span>
-          ) : (
-            <>
-              {" "}
-              · weights{" "}
-              {FACTOR_ORDER.map((f) => `${f.replace("_", " ")} ${Math.round(data.weights[f] * 100)}%`).join(
-                " · ",
-              )}
-            </>
-          )}
-        </p>
+        <div className="mt-6 grid grid-cols-3 gap-2 sm:gap-3">
+          <Card className="p-3 sm:p-4">
+            <p className="text-xs text-muted">Candidates considered</p>
+            <p className="mt-1 text-2xl font-semibold text-ink">{data.candidate_pool_size}</p>
+          </Card>
+          <Card className="p-3 sm:p-4">
+            <p className="text-xs text-muted">Top match</p>
+            <p className="mt-1 text-2xl font-semibold text-ink">
+              {ranked[0] ? `${Math.round(ranked[0].localScore * 100)}%` : "—"}
+            </p>
+          </Card>
+          <Card className="p-3 sm:p-4">
+            <p className="text-xs text-muted">Ranking speed</p>
+            <div className="mt-1 flex items-center gap-2">
+              <p className="text-2xl font-semibold text-ink">{Math.round(data.took_ms)} ms</p>
+              {changed && <Badge tone="indigo">Re-ranked live</Badge>}
+            </div>
+          </Card>
+        </div>
       )}
 
-      <div className="mt-4">
+      <div className="mt-5">
         <ErrorNote error={error} />
       </div>
 
@@ -174,7 +175,7 @@ export default function Recommendations() {
           ))}
         </div>
       ) : ranked.length > 0 ? (
-        <div className="stagger mt-4 space-y-4">
+        <div className="stagger mt-6 space-y-4">
           {ranked.slice(0, SHOWN).map((recommendation) => (
             <MatchCard
               key={recommendation.teacher.user_id}

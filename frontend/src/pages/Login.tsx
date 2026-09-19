@@ -1,7 +1,8 @@
 import { useState, type FormEvent } from "react";
 import { Link, useNavigate } from "react-router-dom";
 import { useAuth } from "../auth/AuthContext";
-import { Button, Card, ErrorNote, Field, Input } from "../components/ui";
+import { AuthShell } from "../components/AuthShell";
+import { Button, ErrorNote, Field, Input } from "../components/ui";
 
 const DEMO = { email: "demo_teacher@example.com", password: "DemoPassword123!" };
 
@@ -28,22 +29,21 @@ export default function Login() {
   }
 
   return (
-    <div className="mx-auto flex min-h-screen max-w-md flex-col justify-center px-4 py-12">
-      <div className="mb-8">
-        <span className="grid h-10 w-10 place-items-center rounded-xl bg-indigo-600 font-semibold text-white">
-          E
-        </span>
-        <h1 className="mt-4 text-2xl font-semibold tracking-tight text-ink">
-          Find the educators you'll teach best with
-        </h1>
-        <p className="mt-2 text-sm text-muted">
-          EduMatch reads how you teach — not just what you teach — and explains every match it
-          makes.
-        </p>
-      </div>
-
-      <Card className="p-6">
-        <form onSubmit={(e) => submit(e)} className="space-y-4">
+    <AuthShell
+      eyebrow="Welcome back"
+      title="Sign in to your educator network"
+      description="Return to your matches, conversations, and shared teaching resources."
+      footer={
+        <>
+          New to EduMatch?{" "}
+          <Link to="/register" className="font-semibold text-indigo-600 hover:text-indigo-700">
+            Create an account
+          </Link>
+        </>
+      }
+    >
+      <div className="rounded-2xl bg-white p-6 ring-1 ring-line shadow-sm">
+        <form onSubmit={(e) => submit(e)} className="space-y-5">
           <Field label="Email">
             <Input
               type="email"
@@ -69,30 +69,34 @@ export default function Login() {
           </Button>
         </form>
 
-        <div className="mt-4 border-t border-line pt-4">
+        <div className="relative my-6">
+          <div className="absolute inset-0 flex items-center">
+            <div className="w-full border-t border-line" />
+          </div>
+          <div className="relative flex justify-center">
+            <span className="bg-white px-3 text-[11px] font-medium uppercase tracking-wider text-muted">
+              or explore instantly
+            </span>
+          </div>
+        </div>
+
+        <div>
           <Button
             variant="secondary"
-            className="w-full"
+            className="w-full border-indigo-100 bg-indigo-50 text-indigo-700 ring-indigo-100 hover:bg-indigo-100"
             onClick={(e) => {
               setEmail(DEMO.email);
               setPassword(DEMO.password);
               void submit(e as unknown as FormEvent, DEMO);
             }}
           >
-            Sign in as Alice (demo account)
+            Explore Alice's demo account
           </Button>
           <p className="mt-2 text-center text-xs text-muted">
-            High-school CS teacher in Boston, project-based. Her top match is Bob in Cambridge.
+            No setup required · project-based CS teacher in Boston
           </p>
         </div>
-      </Card>
-
-      <p className="mt-6 text-center text-sm text-muted">
-        New here?{" "}
-        <Link to="/register" className="font-medium text-indigo-600 hover:text-indigo-700">
-          Create an account
-        </Link>
-      </p>
-    </div>
+      </div>
+    </AuthShell>
   );
 }

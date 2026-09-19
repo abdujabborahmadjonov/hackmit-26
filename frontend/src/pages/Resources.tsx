@@ -3,17 +3,25 @@ import { Link } from "react-router-dom";
 import { api } from "../api/client";
 import type { RecommendedResource, Resource } from "../api/types";
 import { EDUCATION_LEVELS, SUBJECTS, humanize } from "../api/vocab";
-import { Badge, Button, Card, ErrorNote, Input, Loading, Select, cx } from "../components/ui";
+import { Badge, Button, Card, ErrorNote, Input, Loading, PageHeader, Select, cx } from "../components/ui";
 
 function ResourceRow({ resource, score, reasons }: { resource: Resource; score?: number; reasons?: string[] }) {
   return (
-    <Card className="p-4">
+    <Card className="flex h-full flex-col p-5" interactive>
       <div className="flex items-start justify-between gap-3">
-        <div className="min-w-0">
-          <p className="font-medium text-ink">{resource.title}</p>
+        <div className="flex min-w-0 gap-3">
+          <span className="grid h-10 w-10 shrink-0 place-items-center rounded-xl bg-indigo-50 text-indigo-600">
+            <svg aria-hidden="true" className="h-5 w-5" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8">
+              <path d="M7 3h7l4 4v14H7V3Z" />
+              <path d="M14 3v5h5M10 13h5M10 17h5" />
+            </svg>
+          </span>
+          <div className="min-w-0">
+          <p className="font-semibold text-ink">{resource.title}</p>
           {resource.description && (
-            <p className="mt-0.5 text-sm text-muted">{resource.description}</p>
+            <p className="mt-1 line-clamp-2 text-sm leading-5 text-muted">{resource.description}</p>
           )}
+          </div>
         </div>
         {score !== undefined && (
           <span className="shrink-0 rounded-md bg-indigo-50 px-2 py-1 text-xs font-medium text-indigo-700">
@@ -21,7 +29,7 @@ function ResourceRow({ resource, score, reasons }: { resource: Resource; score?:
           </span>
         )}
       </div>
-      <div className="mt-2 flex flex-wrap gap-1.5">
+      <div className="mt-4 flex flex-wrap gap-1.5">
         {resource.subject && <Badge tone="emerald">{humanize(resource.subject)}</Badge>}
         {resource.education_level && <Badge tone="amber">{humanize(resource.education_level)}</Badge>}
         {resource.teaching_method && <Badge tone="indigo">{humanize(resource.teaching_method)}</Badge>}
@@ -38,17 +46,17 @@ function ResourceRow({ resource, score, reasons }: { resource: Resource; score?:
         )}
       </div>
       {reasons && reasons.length > 0 && (
-        <ul className="mt-2 space-y-0.5">
+        <ul className="mt-4 space-y-1.5 rounded-xl bg-slate-50 p-3">
           {reasons.map((reason) => (
-            <li key={reason} className="text-xs text-muted">
-              · {reason}
+            <li key={reason} className="flex gap-2 text-xs leading-5 text-muted">
+              <span className="text-emerald-600">✓</span> {reason}
             </li>
           ))}
         </ul>
       )}
       <Link
         to={`/teachers/${resource.owner_id}`}
-        className="mt-2 inline-block text-xs text-muted hover:text-indigo-700"
+        className="mt-auto inline-block pt-4 text-xs font-semibold text-indigo-600 hover:text-indigo-700"
       >
         View the educator who made this →
       </Link>
@@ -104,12 +112,13 @@ export default function Resources() {
 
   return (
     <div>
-      <h1 className="text-2xl font-semibold tracking-tight text-ink">Teaching resources</h1>
-      <p className="mt-1 text-sm text-muted">
-        Lesson plans, project briefs and assessments shared by other educators.
-      </p>
+      <PageHeader
+        eyebrow="Community library"
+        title="Resources built by educators"
+        description="Discover lesson plans, project briefs, assessments, and classroom-ready ideas—ranked by how well they fit your teaching context."
+      />
 
-      <div className="mt-5 flex gap-1 rounded-lg bg-slate-100 p-1">
+      <div className="mt-7 inline-flex gap-1 rounded-xl bg-slate-100 p-1">
         {(
           [
             ["foryou", "Picked for you"],
@@ -120,7 +129,7 @@ export default function Resources() {
             key={key}
             onClick={() => setTab(key)}
             className={cx(
-              "flex-1 rounded-md px-3 py-1.5 text-sm font-medium transition",
+              "rounded-lg px-5 py-2 text-sm font-medium transition",
               tab === key ? "bg-white text-ink shadow-sm" : "text-muted hover:text-ink",
             )}
           >
@@ -130,7 +139,7 @@ export default function Resources() {
       </div>
 
       {tab === "browse" && (
-        <Card className="mt-4 grid gap-3 p-4 sm:grid-cols-4">
+        <Card className="mt-5 grid gap-3 p-5 sm:grid-cols-4">
           <div className="sm:col-span-2">
             <Input
               value={query}
@@ -168,7 +177,7 @@ export default function Resources() {
       {loading ? (
         <Loading />
       ) : tab === "foryou" ? (
-        <div className="mt-4 space-y-3">
+        <div className="stagger mt-5 grid gap-4 md:grid-cols-2">
           {recommended.map((item) => (
             <ResourceRow
               key={item.resource.id}
@@ -185,8 +194,8 @@ export default function Resources() {
         </div>
       ) : (
         <>
-          <p className="mt-4 text-xs text-muted">{total.toLocaleString()} resources</p>
-          <div className="mt-2 space-y-3">
+          <p className="mt-5 text-xs font-medium text-muted">{total.toLocaleString()} resources found</p>
+          <div className="stagger mt-3 grid gap-4 md:grid-cols-2">
             {browse.map(({ resource, score }) => (
               <ResourceRow key={resource.id} resource={resource} score={query ? score : undefined} />
             ))}

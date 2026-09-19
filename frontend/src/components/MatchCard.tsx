@@ -43,7 +43,7 @@ export function WhyThisMatch({
   });
 
   return (
-    <div className="mt-4 rounded-lg bg-slate-50 p-4 ring-1 ring-line">
+    <div className="mt-4 rounded-2xl bg-slate-50 p-4 ring-1 ring-line sm:p-5">
       <p className="text-xs font-semibold uppercase tracking-wide text-muted">
         How this {Math.round(match_score * 100)}% was calculated
       </p>
@@ -137,9 +137,11 @@ export function MatchCard({
   const name = `${teacher.first_name} ${teacher.last_name}`;
 
   return (
-    <Card className="p-5" interactive>
+    <Card className="overflow-hidden" interactive>
+      <div className="h-1 bg-gradient-to-r from-indigo-500 via-blue-500 to-emerald-400" />
+      <div className="p-5 sm:p-6">
       <div className="flex items-start gap-4">
-        <Avatar name={name} size={48} />
+        <Avatar name={name} size={52} />
         <div className="min-w-0 flex-1">
           <div className="flex flex-wrap items-center gap-x-3 gap-y-1">
             <Link
@@ -180,10 +182,10 @@ export function MatchCard({
         </div>
       </div>
 
-      <ul className="mt-4 space-y-1.5">
+      <ul className="mt-5 grid gap-2 rounded-xl bg-slate-50 p-4 ring-1 ring-line/70 sm:grid-cols-2">
         {reasons.map((reason) => (
-          <li key={reason} className="flex gap-2 text-sm text-ink">
-            <span aria-hidden className="mt-0.5 text-emerald-600">
+          <li key={reason} className="flex gap-2 text-sm leading-5 text-slate-700">
+            <span aria-hidden className="mt-0.5 grid h-4 w-4 shrink-0 place-items-center rounded-full bg-emerald-100 text-[10px] text-emerald-700">
               ✓
             </span>
             <span>{reason}</span>
@@ -232,6 +234,7 @@ export function MatchCard({
         >
           View profile →
         </Link>
+      </div>
       </div>
     </Card>
   );

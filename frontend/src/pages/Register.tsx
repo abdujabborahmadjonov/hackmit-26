@@ -1,7 +1,8 @@
 import { useState, type FormEvent } from "react";
 import { Link, useNavigate } from "react-router-dom";
 import { useAuth } from "../auth/AuthContext";
-import { Button, Card, ErrorNote, Field, Input } from "../components/ui";
+import { AuthShell } from "../components/AuthShell";
+import { Button, ErrorNote, Field, Input } from "../components/ui";
 
 export default function Register() {
   const { register } = useAuth();
@@ -35,14 +36,21 @@ export default function Register() {
   }
 
   return (
-    <div className="mx-auto flex min-h-screen max-w-md flex-col justify-center px-4 py-12">
-      <h1 className="text-2xl font-semibold tracking-tight text-ink">Create your account</h1>
-      <p className="mt-2 text-sm text-muted">
-        Next you'll describe how you teach — that's what the matching runs on.
-      </p>
-
-      <Card className="mt-6 p-6">
-        <form onSubmit={submit} className="space-y-4">
+    <AuthShell
+      eyebrow="Join EduMatch"
+      title="Build a network around your teaching"
+      description="Create your account, then tell us what your classroom feels like. Your first matches are only one short profile away."
+      footer={
+        <>
+          Already have an account?{" "}
+          <Link to="/login" className="font-semibold text-indigo-600 hover:text-indigo-700">
+            Sign in
+          </Link>
+        </>
+      }
+    >
+      <div className="rounded-2xl bg-white p-6 ring-1 ring-line shadow-sm">
+        <form onSubmit={submit} className="space-y-5">
           <div className="grid grid-cols-2 gap-3">
             <Field label="First name">
               <Input value={form.first_name} onChange={update("first_name")} required />
@@ -66,17 +74,13 @@ export default function Register() {
           </Field>
           <ErrorNote error={error} />
           <Button type="submit" loading={busy} className="w-full">
-            Create account
+            Create account and continue
           </Button>
         </form>
-      </Card>
-
-      <p className="mt-6 text-center text-sm text-muted">
-        Already have an account?{" "}
-        <Link to="/login" className="font-medium text-indigo-600 hover:text-indigo-700">
-          Sign in
-        </Link>
-      </p>
-    </div>
+        <p className="mt-4 text-center text-xs leading-5 text-muted">
+          By continuing, you agree to keep EduMatch a constructive, educator-first community.
+        </p>
+      </div>
+    </AuthShell>
   );
 }

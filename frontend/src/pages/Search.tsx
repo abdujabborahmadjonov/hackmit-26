@@ -11,7 +11,7 @@ import {
 } from "../api/vocab";
 import { TeacherCard } from "../components/TeacherCard";
 import { TeacherCardSkeleton } from "../components/Skeleton";
-import { Button, Card, ErrorNote, Field, Input, Select } from "../components/ui";
+import { Badge, Button, Card, ErrorNote, Field, Input, PageHeader, Select } from "../components/ui";
 
 interface Filters {
   query: string;
@@ -80,31 +80,71 @@ export default function Search() {
   function set<K extends keyof Filters>(key: K, value: Filters[K]) {
     setFilters((current) => ({ ...current, [key]: value }));
   }
+  const activeFilterCount = Object.entries(filters).filter(
+    ([key, value]) => value && !["query", "radius_km", "sort"].includes(key),
+  ).length;
 
   return (
     <div>
-      <h1 className="text-2xl font-semibold tracking-tight text-ink">Search educators</h1>
-      <p className="mt-1 text-sm text-muted">
-        Filters run in Postgres; the free-text box additionally searches meaning, not just words.
-      </p>
+      <PageHeader
+        eyebrow="Discover educators"
+        title="Find the expertise your network needs"
+        description="Describe the kind of educator you want to meet in natural language, then narrow by subject, learner level, location, and classroom context."
+        actions={activeFilterCount > 0 ? <Badge tone="indigo">{activeFilterCount} filters active</Badge> : undefined}
+      />
 
-      <Card className="mt-5 p-5">
+      <Card className="mt-7 overflow-hidden">
         <form
           onSubmit={(event) => {
             event.preventDefault();
             void run(filters);
           }}
-          className="space-y-4"
+          className="space-y-5 p-5 sm:p-6"
         >
-          <Field label="What are you looking for?">
-            <Input
-              value={filters.query}
-              onChange={(e) => set("query", e.target.value)}
-              placeholder="students build real software in teams"
-            />
-          </Field>
+          <div>
+            <label htmlFor="educator-search" className="mb-2 block text-sm font-semibold text-ink">
+              What kind of collaborator are you looking for?
+            </label>
+            <div className="flex flex-col gap-2 sm:flex-row">
+              <div className="relative flex-1">
+                <svg aria-hidden="true" className="absolute left-3.5 top-3 h-5 w-5 text-slate-400" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8">
+                  <circle cx="11" cy="11" r="6" />
+                  <path d="m16 16 4 4" />
+                </svg>
+                <Input
+                  id="educator-search"
+                  className="py-3 pl-11 text-base"
+                  value={filters.query}
+                  onChange={(e) => set("query", e.target.value)}
+                  placeholder="e.g. project-based physics teacher for interdisciplinary units"
+                />
+              </div>
+              <Button type="submit" loading={loading} className="px-6">
+                Search educators
+              </Button>
+            </div>
+            <p className="mt-2 text-xs text-muted">
+              Semantic search understands meaning, so you can describe a classroom rather than guess keywords.
+            </p>
+          </div>
 
-          <div className="grid gap-3 sm:grid-cols-3">
+          <div className="border-t border-line pt-5">
+            <div className="mb-4 flex items-center justify-between">
+              <p className="text-xs font-semibold uppercase tracking-[0.14em] text-muted">
+                Refine your search
+              </p>
+              <button
+                type="button"
+                className="text-xs font-semibold text-indigo-600 hover:text-indigo-700"
+                onClick={() => {
+                  setFilters(EMPTY);
+                  void run(EMPTY);
+                }}
+              >
+                Clear all
+              </button>
+            </div>
+          <div className="grid gap-4 sm:grid-cols-3">
             <Field label="Subject">
               <Select value={filters.subject} onChange={(e) => set("subject", e.target.value)}>
                 <option value="">Any</option>
@@ -204,23 +244,11 @@ export default function Search() {
               </Select>
             </Field>
           </div>
+          </div>
 
-          <div className="flex items-center gap-3">
-            <Button type="submit" loading={loading}>
-              Search
-            </Button>
-            <Button
-              type="button"
-              variant="ghost"
-              onClick={() => {
-                setFilters(EMPTY);
-                void run(EMPTY);
-              }}
-            >
-              Reset
-            </Button>
+          <div className="flex items-center border-t border-line pt-4">
             {data && (
-              <span className="ml-auto text-xs text-muted">
+              <span className="text-xs text-muted">
                 {data.total.toLocaleString()} educators · {Math.round(data.took_ms)} ms ·{" "}
                 {data.engine}
               </span>
@@ -234,13 +262,13 @@ export default function Search() {
       </div>
 
       {loading ? (
-        <div className="mt-4 grid gap-3 sm:grid-cols-2">
+        <div className="mt-6 grid gap-4 sm:grid-cols-2">
           {[0, 1, 2, 3].map((n) => (
             <TeacherCardSkeleton key={n} />
           ))}
         </div>
       ) : (
-        <div className="stagger mt-4 grid gap-3 sm:grid-cols-2">
+        <div className="stagger mt-6 grid gap-4 sm:grid-cols-2">
           {data?.items.map((hit) => (
             <TeacherCard key={hit.teacher.user_id} teacher={hit.teacher} score={hit.score} />
           ))}

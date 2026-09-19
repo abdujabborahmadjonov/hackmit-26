@@ -12,6 +12,7 @@ import {
   ErrorNote,
   Loading,
   ScoreRing,
+  SectionHeading,
   Stars,
 } from "../components/ui";
 import { useAuth } from "../auth/AuthContext";
@@ -105,12 +106,24 @@ export default function TeacherDetail() {
   const isSelf = user?.id === userId;
 
   return (
-    <div className="space-y-5">
-      <Card className="p-6">
+    <div className="space-y-6">
+      <button
+        type="button"
+        onClick={() => navigate(-1)}
+        className="press inline-flex items-center gap-2 text-sm font-medium text-muted hover:text-ink"
+      >
+        <span aria-hidden>←</span> Back to discovery
+      </button>
+
+      <Card className="overflow-hidden">
+        <div className="h-24 bg-gradient-to-r from-indigo-100 via-blue-50 to-emerald-50" />
+        <div className="-mt-8 p-6 sm:p-8">
         <div className="flex flex-wrap items-start gap-4">
-          <Avatar name={name} size={64} />
+          <div className="rounded-full bg-white p-1.5 shadow-sm">
+            <Avatar name={name} size={72} />
+          </div>
           <div className="min-w-0 flex-1">
-            <h1 className="text-xl font-semibold text-ink">{name}</h1>
+            <h1 className="mt-8 text-2xl font-semibold tracking-tight text-ink sm:mt-9">{name}</h1>
             <p className="mt-0.5 text-sm text-muted">
               {[profile.institution, profile.location_name].filter(Boolean).join(" · ")}
               {profile.years_experience ? ` · ${profile.years_experience} years teaching` : ""}
@@ -124,9 +137,12 @@ export default function TeacherDetail() {
           {match && !isSelf && <ScoreRing score={match.match_score} size={64} />}
         </div>
 
-        {profile.bio && <p className="mt-4 text-sm text-ink">{profile.bio}</p>}
+        {profile.bio && <p className="mt-6 max-w-3xl text-sm leading-6 text-ink">{profile.bio}</p>}
         {profile.teaching_style && (
-          <blockquote className="mt-3 border-l-2 border-indigo-200 pl-3 text-sm italic text-ink/85">
+          <blockquote className="mt-4 max-w-3xl rounded-xl bg-indigo-50/70 p-4 text-sm leading-6 text-indigo-950 ring-1 ring-indigo-100">
+            <span className="mb-1 block text-[10px] font-semibold uppercase tracking-wider text-indigo-600">
+              Teaching philosophy
+            </span>
             {profile.teaching_style}
           </blockquote>
         )}
@@ -164,14 +180,18 @@ export default function TeacherDetail() {
           </div>
         )}
         <ErrorNote error={error} />
+        </div>
       </Card>
 
       {match && !isSelf && (
-        <Card className="p-6">
-          <h2 className="text-base font-semibold text-ink">Why you two match</h2>
-          <ul className="mt-3 space-y-1.5">
+        <Card className="p-6 sm:p-7">
+          <SectionHeading
+            title="Why you two match"
+            description="The strongest signals connecting your classrooms."
+          />
+          <ul className="grid gap-2 sm:grid-cols-2">
             {match.reasons.map((reason) => (
-              <li key={reason} className="flex gap-2 text-sm text-ink">
+              <li key={reason} className="flex gap-2 rounded-xl bg-emerald-50/60 p-3 text-sm text-ink ring-1 ring-emerald-100">
                 <span aria-hidden className="mt-0.5 text-emerald-600">
                   ✓
                 </span>
@@ -183,16 +203,17 @@ export default function TeacherDetail() {
         </Card>
       )}
 
-      <Card className="p-6">
-        <h2 className="text-base font-semibold text-ink">
-          Resources from {profile.user?.first_name ?? "this educator"}
-        </h2>
+      <Card className="p-6 sm:p-7">
+        <SectionHeading
+          title={`Resources from ${profile.user?.first_name ?? "this educator"}`}
+          description="Materials and ideas this educator has shared with the community."
+        />
         {resources.length === 0 ? (
           <p className="mt-2 text-sm text-muted">No resources shared yet.</p>
         ) : (
-          <ul className="mt-3 divide-y divide-line">
+          <ul className="mt-3 grid gap-3 sm:grid-cols-2">
             {resources.map((resource) => (
-              <li key={resource.id} className="py-3">
+              <li key={resource.id} className="rounded-xl bg-slate-50 p-4 ring-1 ring-line">
                 <p className="text-sm font-medium text-ink">{resource.title}</p>
                 <p className="mt-0.5 text-sm text-muted">{resource.description}</p>
                 <div className="mt-1.5 flex flex-wrap gap-1.5">
@@ -208,18 +229,21 @@ export default function TeacherDetail() {
         )}
       </Card>
 
-      <Card className="p-6">
-        <h2 className="text-base font-semibold text-ink">Reviews</h2>
+      <Card className="p-6 sm:p-7">
+        <SectionHeading
+          title="Colleague reviews"
+          description="Feedback from educators who have worked together."
+        />
         {!isSelf && (
           <div className="mt-3 rounded-lg bg-slate-50 p-4 ring-1 ring-line">
-            <div className="flex items-center gap-2">
+            <div className="flex flex-wrap items-center gap-2">
               <span className="text-sm font-medium text-ink">Your rating:</span>
               {[1, 2, 3, 4, 5].map((value) => (
                 <button
                   key={value}
                   type="button"
                   onClick={() => setMyRating(value)}
-                  className={value <= myRating ? "text-amber-500" : "text-slate-300"}
+                  className={`press text-xl ${value <= myRating ? "text-amber-500" : "text-slate-300 hover:text-amber-300"}`}
                   aria-label={`${value} stars`}
                 >
                   ★

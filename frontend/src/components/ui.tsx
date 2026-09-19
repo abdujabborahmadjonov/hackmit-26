@@ -20,7 +20,7 @@ export function Button({
   ...props
 }: ButtonProps) {
   const base =
-    "press inline-flex items-center justify-center gap-2 rounded-lg font-medium " +
+    "press inline-flex items-center justify-center gap-2 rounded-xl font-semibold " +
     "focus:outline-none focus-visible:ring-2 focus-visible:ring-indigo-500 focus-visible:ring-offset-2 " +
     "disabled:cursor-not-allowed disabled:opacity-50";
   const variants = {
@@ -29,7 +29,7 @@ export function Button({
     ghost: "text-muted hover:text-ink hover:bg-slate-100",
     danger: "bg-white text-rose-600 ring-1 ring-rose-200 hover:bg-rose-50",
   };
-  const sizes = { sm: "px-3 py-1.5 text-sm", md: "px-4 py-2 text-sm" };
+  const sizes = { sm: "px-3 py-1.5 text-sm", md: "px-4 py-2.5 text-sm" };
   return (
     <button
       className={cx(base, variants[variant], sizes[size], className)}
@@ -55,7 +55,7 @@ export function Card({
   return (
     <div
       className={cx(
-        "rounded-xl bg-white ring-1 ring-line shadow-sm",
+        "rounded-2xl bg-white ring-1 ring-line shadow-sm",
         interactive && "lift hover:ring-slate-300",
         className,
       )}
@@ -94,7 +94,7 @@ export function Input({ className, ...props }: InputHTMLAttributes<HTMLInputElem
   return (
     <input
       className={cx(
-        "w-full rounded-lg bg-white px-3 py-2 text-sm text-ink ring-1 ring-line",
+        "w-full rounded-xl bg-white px-3.5 py-2.5 text-sm text-ink ring-1 ring-line",
         "transition duration-150 placeholder:text-slate-400 hover:ring-slate-300",
         "focus:outline-none focus:ring-2 focus:ring-indigo-500",
         className,
@@ -108,7 +108,7 @@ export function Select({ className, children, ...props }: SelectHTMLAttributes<H
   return (
     <select
       className={cx(
-        "w-full rounded-lg bg-white px-3 py-2 text-sm text-ink ring-1 ring-line",
+        "w-full rounded-xl bg-white px-3.5 py-2.5 text-sm text-ink ring-1 ring-line",
         "transition duration-150 hover:ring-slate-300 focus:outline-none focus:ring-2 focus:ring-indigo-500",
         className,
       )}
@@ -122,7 +122,7 @@ export function Select({ className, children, ...props }: SelectHTMLAttributes<H
 export function Field({ label, hint, children }: { label: string; hint?: string; children: ReactNode }) {
   return (
     <label className="block">
-      <span className="mb-1 block text-sm font-medium text-ink">{label}</span>
+      <span className="mb-1.5 block text-sm font-semibold text-ink">{label}</span>
       {children}
       {hint && <span className="mt-1 block text-xs text-muted">{hint}</span>}
     </label>
@@ -144,7 +144,7 @@ export function Spinner({ className }: { className?: string }) {
 
 export function Loading({ label = "Loading" }: { label?: string }) {
   return (
-    <div className="flex items-center gap-3 py-16 text-muted">
+    <div className="flex min-h-64 items-center justify-center gap-3 py-16 text-muted">
       <Spinner />
       <span className="text-sm">{label}…</span>
     </div>
@@ -166,6 +166,53 @@ export function EmptyState({
       {body && <p className="mx-auto mt-2 max-w-md text-sm text-muted">{body}</p>}
       {action && <div className="mt-5 flex justify-center">{action}</div>}
     </Card>
+  );
+}
+
+export function PageHeader({
+  eyebrow,
+  title,
+  description,
+  actions,
+}: {
+  eyebrow?: string;
+  title: string;
+  description?: string;
+  actions?: ReactNode;
+}) {
+  return (
+    <div className="flex flex-col gap-4 sm:flex-row sm:items-end sm:justify-between">
+      <div className="min-w-0">
+        {eyebrow && (
+          <p className="mb-2 text-[11px] font-semibold uppercase tracking-[0.16em] text-indigo-600">
+            {eyebrow}
+          </p>
+        )}
+        <h1 className="text-3xl font-semibold tracking-[-0.025em] text-ink sm:text-4xl">{title}</h1>
+        {description && <p className="mt-2 max-w-2xl text-sm leading-6 text-muted">{description}</p>}
+      </div>
+      {actions && <div className="flex shrink-0 flex-wrap items-center gap-2">{actions}</div>}
+    </div>
+  );
+}
+
+export function SectionHeading({
+  title,
+  description,
+  trailing,
+}: {
+  title: string;
+  description?: string;
+  trailing?: ReactNode;
+}) {
+  return (
+    <div className="mb-4 flex items-end justify-between gap-4">
+      <div>
+        <h2 className="text-lg font-semibold tracking-tight text-ink">{title}</h2>
+        {description && <p className="mt-1 text-sm text-muted">{description}</p>}
+      </div>
+      {trailing}
+    </div>
   );
 }
 
