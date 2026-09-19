@@ -10,6 +10,7 @@ ELASTICSEARCH_USERNAME / ELASTICSEARCH_PASSWORD. The API key wins if both are se
 
 from __future__ import annotations
 
+import asyncio
 import logging
 from collections.abc import Iterable
 from typing import Any
@@ -78,6 +79,7 @@ class ElasticsearchUnavailable(RuntimeError):
 
 
 _client: Any = None
+_client_loop: Any = None
 
 _ELASTIC_CLOUD_HOST_MARKER = ".es."
 _ELASTIC_CLOUD_DOMAIN = "elastic.cloud"
@@ -112,11 +114,30 @@ def index_create_settings() -> dict[str, Any] | None:
     return {"number_of_shards": 1, "number_of_replicas": 0}
 
 
+def _running_loop() -> Any:
+    try:
+        return asyncio.get_running_loop()
+    except RuntimeError:  # called from sync code
+        return None
+
+
 def get_client() -> Any:
-    """Lazily build a shared AsyncElasticsearch client."""
-    global _client
+    """Lazily build an AsyncElasticsearch client, one per event loop.
+
+    The client owns an aiohttp session bound to the loop that first used it.
+    Handing that session to a second loop raises "Event loop is closed" - which
+    matters anywhere a process runs more than one loop: scripts, workers, and
+    the test suite. So the cache remembers which loop its client belongs to.
+    """
+    global _client, _client_loop
+    loop = _running_loop()
     if _client is not None:
-        return _client
+        stale = _client_loop is not loop or (loop is not None and loop.is_closed())
+        if not stale:
+            return _client
+        logger.debug("Rebuilding the Elasticsearch client for a different event loop")
+        _client = None
+        _client_loop = None
     try:
         from elasticsearch import AsyncElasticsearch
     except ImportError as exc:  # pragma: no cover - dependency is in requirements
@@ -125,14 +146,19 @@ def get_client() -> Any:
         ) from exc
 
     _client = AsyncElasticsearch(settings.elasticsearch_url, **client_kwargs())
+    _client_loop = loop
     return _client
 
 
 async def close_client() -> None:
-    global _client
+    global _client, _client_loop
     if _client is not None:
-        await _client.close()
+        try:
+            await _client.close()
+        except Exception:  # pragma: no cover - the loop may already be gone
+            logger.debug("Elasticsearch client close failed; dropping it anyway")
         _client = None
+        _client_loop = None
 
 
 async def ping() -> bool:
