@@ -92,7 +92,7 @@ class Settings(BaseSettings):
     search_fallback_to_postgres: bool = True
 
     # --- storage ---
-    storage_provider: Literal["local", "s3"] = "local"
+    storage_provider: Literal["local", "s3", "supabase"] = "local"
     storage_local_dir: str = "./storage"
     storage_public_base_url: str = "http://localhost:8000/static/uploads"
     max_upload_size_mb: int = 25
@@ -101,6 +101,11 @@ class Settings(BaseSettings):
     s3_endpoint_url: str = ""
     s3_access_key_id: str = ""
     s3_secret_access_key: str = ""
+    # Supabase Storage (STORAGE_PROVIDER=supabase). Plain REST, so no SDK and
+    # no extra dependency. The service key is a secret - server side only.
+    supabase_url: str = ""
+    supabase_service_key: str = ""
+    supabase_storage_bucket: str = "resources"
 
     # --- http ---
     cors_origins_raw: str = Field(default="*", alias="CORS_ORIGINS")

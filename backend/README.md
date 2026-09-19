@@ -352,7 +352,8 @@ service, so Render configures itself.
    ```
 
    Then **Connect → Session pooler** and copy the URI (port `5432`, host
-   `*.pooler.supabase.com`).
+   `*.pooler.supabase.com`). Also create a **public Storage bucket** named
+   `resources` — Render's free plan has no disk, so uploads live there.
 
 2. **Migrate and seed from your laptop** — Render's free plan has no shell, and
    doing it locally is faster anyway:
@@ -367,17 +368,15 @@ service, so Render configures itself.
 3. **Render** → **New → Blueprint** → pick this repo and the `backend` branch.
    Paste `DATABASE_URL` when prompted; Render generates `JWT_SECRET` itself.
 
-4. After the first deploy, set `STORAGE_PUBLIC_BASE_URL` to
-   `https://<your-service>.onrender.com/static/uploads` and `CORS_ORIGINS` to
-   your frontend's origin.
+4. Render prompts for `SUPABASE_URL` and `SUPABASE_SERVICE_KEY`
+   (Project Settings → API). Set `CORS_ORIGINS` to your frontend's origin.
 
 5. Check it: `https://<your-service>.onrender.com/health` → `{"status":"ok"}`,
    and `/docs` for the live API.
 
-**Free-tier trade-offs.** The service sleeps after 15 minutes idle (~30 s cold
-start — wake it before judging) and has no persistent disk, so *uploaded files*
-are lost on restart while resource metadata in Postgres survives. `plan: starter`
-plus the commented-out `disk:` block in `render.yaml` fixes both.
+**Free-tier trade-off.** The service sleeps after 15 minutes idle (~30 s cold
+start — wake it before judging). `plan: starter` removes that. Uploads are safe
+either way because they go to Supabase Storage, not the container's disk.
 
 Prefer one dashboard? Uncomment the `databases:` block in `render.yaml` to let
 Render host Postgres too.
@@ -476,7 +475,7 @@ authorisation on every protected route, and the demo data generator.
 | `EMBEDDING_DIM` | `384` | Vector width (schema-affecting) |
 | `SEARCH_PROVIDER` | `postgres` | `postgres` · `elasticsearch` |
 | `ELASTICSEARCH_URL` | `http://localhost:9200` | Cluster endpoint |
-| `STORAGE_PROVIDER` | `local` | `local` · `s3` |
+| `STORAGE_PROVIDER` | `local` | `local` · `supabase` · `s3` |
 | `MAX_UPLOAD_SIZE_MB` | `25` | Upload ceiling |
 | `CORS_ORIGINS` | `*` | Comma-separated origins |
 | `RATE_LIMIT_PER_MINUTE` / `AUTH_RATE_LIMIT_PER_MINUTE` | `120` / `20` | Per-IP limits |

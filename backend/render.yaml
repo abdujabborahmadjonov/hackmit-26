@@ -38,14 +38,18 @@ services:
         value: "384"
       - key: SEARCH_PROVIDER
         value: postgres
+      # Render's free plan has no persistent disk, so uploads go to Supabase
+      # Storage. Create a PUBLIC bucket named "resources" first.
       - key: STORAGE_PROVIDER
-        value: local
-      - key: STORAGE_LOCAL_DIR
-        value: /app/storage
-      # Set to https://<your-service>.onrender.com/static/uploads after the
-      # first deploy so uploaded files get absolute URLs.
-      - key: STORAGE_PUBLIC_BASE_URL
+        value: supabase
+      - key: SUPABASE_URL
         sync: false
+      # Paste the service_role key (Project Settings -> API). Secret: it is
+      # never sent to the browser, only used server side.
+      - key: SUPABASE_SERVICE_KEY
+        sync: false
+      - key: SUPABASE_STORAGE_BUCKET
+        value: resources
       # Replace with your frontend's origin before demo day.
       - key: CORS_ORIGINS
         value: "*"
@@ -64,10 +68,11 @@ services:
 #     user: edumatch
 #     postgresMajorVersion: "16"
 
-# --- Optional: persist uploaded files ----------------------------------------
-# Render's free plan has no persistent disk, so uploads vanish on restart
-# (resource *metadata* is in Postgres and survives). To keep files, move the
-# service to `plan: starter` and add:
+# --- Optional: local disk instead of Supabase Storage ------------------------
+# Set STORAGE_PROVIDER=local with STORAGE_LOCAL_DIR=/app/storage and
+# STORAGE_PUBLIC_BASE_URL=https://<service>.onrender.com/static/uploads, then
+# move to `plan: starter` and add a disk (the free plan has none, so files
+# would not survive a restart):
 #
 #     disk:
 #       name: uploads

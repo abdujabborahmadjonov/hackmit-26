@@ -114,12 +114,98 @@ class S3StorageBackend:
         await asyncio.to_thread(_delete)
 
 
+class SupabaseStorageBackend:
+    """Supabase Storage over its REST API.
+
+    The right pairing for a host without a persistent disk: files leave the
+    process entirely, so a restart cannot lose them.
+    """
+
+    name = "supabase"
+
+    def __init__(self) -> None:
+        if not settings.supabase_url or not settings.supabase_service_key:
+            raise StorageError(
+                "STORAGE_PROVIDER=supabase requires SUPABASE_URL and SUPABASE_SERVICE_KEY"
+            )
+        self.base_url = settings.supabase_url.rstrip("/")
+        self.bucket = settings.supabase_storage_bucket
+        self.key = settings.supabase_service_key
+
+    @property
+    def public_prefix(self) -> str:
+        return f"{self.base_url}/storage/v1/object/public/{self.bucket}/"
+
+    def object_url(self, path: str) -> str:
+        return f"{self.public_prefix}{path}"
+
+    @staticmethod
+    def object_path(filename: str) -> str:
+        return f"{uuid.uuid4().hex}_{_safe_name(filename)}"
+
+    async def save(self, data: bytes, filename: str, content_type: str) -> str:
+        import httpx
+
+        path = self.object_path(filename)
+        try:
+            async with httpx.AsyncClient(timeout=30.0) as client:
+                response = await client.post(
+                    f"{self.base_url}/storage/v1/object/{self.bucket}/{path}",
+                    content=data,
+                    headers={
+                        "Authorization": f"Bearer {self.key}",
+                        "Content-Type": content_type,
+                        "x-upsert": "false",
+                    },
+                )
+                response.raise_for_status()
+        except httpx.HTTPStatusError as exc:
+            raise StorageError(
+                f"Supabase Storage rejected the upload ({exc.response.status_code}). "
+                "Check that the bucket exists and is public."
+            ) from exc
+        except httpx.HTTPError as exc:
+            raise StorageError(f"Supabase Storage is unreachable: {exc}") from exc
+        return self.object_url(path)
+
+    async def delete(self, url: str) -> None:
+        import httpx
+
+        if not url.startswith(self.public_prefix):
+            raise StorageError("That URL does not belong to this Supabase bucket")
+        path = url[len(self.public_prefix) :]
+        try:
+            async with httpx.AsyncClient(timeout=15.0) as client:
+                response = await client.delete(
+                    f"{self.base_url}/storage/v1/object/{self.bucket}/{path}",
+                    headers={"Authorization": f"Bearer {self.key}"},
+                )
+                # A missing object is already the state we want.
+                if response.status_code not in (200, 204, 404):
+                    response.raise_for_status()
+        except httpx.HTTPError as exc:
+            raise StorageError(f"Could not delete from Supabase Storage: {exc}") from exc
+
+
+_BACKENDS: dict[str, type] = {
+    "local": LocalStorageBackend,
+    "s3": S3StorageBackend,
+    "supabase": SupabaseStorageBackend,
+}
+
 _backend: StorageBackend | None = None
 
 
 def get_storage() -> StorageBackend:
     global _backend
     if _backend is None:
-        _backend = S3StorageBackend() if settings.storage_provider == "s3" else LocalStorageBackend()
+        factory = _BACKENDS.get(settings.storage_provider, LocalStorageBackend)
+        _backend = factory()
         logger.info("Storage backend: %s", _backend.name)
     return _backend
+
+
+def reset_storage() -> None:
+    """Test helper: drop the cached backend so a settings change takes effect."""
+    global _backend
+    _backend = None
