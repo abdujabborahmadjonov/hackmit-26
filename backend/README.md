@@ -339,24 +339,48 @@ on `$PORT`, so any Docker host works. `DATABASE_URL` is normalised
 automatically — paste the `postgres://…?sslmode=require` string a managed
 provider gives you and the app rewrites it for asyncpg.
 
-### Render (blueprint included)
+### Render + Supabase (the deployed setup)
 
-`render.yaml` provisions the API plus a managed Postgres and wires them
-together:
+Supabase hosts Postgres; Render runs the container. `render.yaml` describes the
+service, so Render configures itself.
 
-1. Push the branch to GitHub.
-2. Render → **New → Blueprint** → select this repo.
-3. Render creates `edumatch-api` + `edumatch-db`, generates `JWT_SECRET`, and
-   injects `DATABASE_URL`. The first deploy migrates the schema itself.
-4. Seed demo data from the service shell:
-   `python scripts/generate_demo_data.py --scale 0.1`
-5. Set `STORAGE_PUBLIC_BASE_URL` to
+1. **Supabase** → new project → **SQL Editor**:
+
+   ```sql
+   create extension if not exists vector;
+   create extension if not exists pg_trgm;
+   ```
+
+   Then **Connect → Session pooler** and copy the URI (port `5432`, host
+   `*.pooler.supabase.com`).
+
+2. **Migrate and seed from your laptop** — Render's free plan has no shell, and
+   doing it locally is faster anyway:
+
+   ```bash
+   cd backend
+   export DATABASE_URL="<the Supabase session-pooler URI>"
+   alembic upgrade head
+   python scripts/generate_demo_data.py --scale 0.1
+   ```
+
+3. **Render** → **New → Blueprint** → pick this repo and the `backend` branch.
+   Paste `DATABASE_URL` when prompted; Render generates `JWT_SECRET` itself.
+
+4. After the first deploy, set `STORAGE_PUBLIC_BASE_URL` to
    `https://<your-service>.onrender.com/static/uploads` and `CORS_ORIGINS` to
-   your frontend origin.
+   your frontend's origin.
 
-If `CREATE EXTENSION vector` is refused on the database plan you picked, point
-`DATABASE_URL` at a [Neon](https://neon.tech) database instead (pgvector is one
-click there) and delete the `databases:` block.
+5. Check it: `https://<your-service>.onrender.com/health` → `{"status":"ok"}`,
+   and `/docs` for the live API.
+
+**Free-tier trade-offs.** The service sleeps after 15 minutes idle (~30 s cold
+start — wake it before judging) and has no persistent disk, so *uploaded files*
+are lost on restart while resource metadata in Postgres survives. `plan: starter`
+plus the commented-out `disk:` block in `render.yaml` fixes both.
+
+Prefer one dashboard? Uncomment the `databases:` block in `render.yaml` to let
+Render host Postgres too.
 
 ### Supabase (database only)
 

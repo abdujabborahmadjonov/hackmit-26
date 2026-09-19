@@ -1,28 +1,29 @@
-# Render blueprint: managed Postgres + the API, from this repo.
+# Render blueprint for the EduMatch API.
 #
 #   1. Push this branch to GitHub.
 #   2. Render dashboard -> New -> Blueprint -> pick this repo.
-#   3. Render creates both services and wires DATABASE_URL automatically.
+#   3. Paste your DATABASE_URL when Render asks (Supabase: Connect ->
+#      Session pooler). Render generates JWT_SECRET itself.
 #
 # Migrations run on every boot (see the Dockerfile CMD), so the first deploy
-# creates the schema by itself. Seed demo data afterwards from the service
-# shell:  python scripts/generate_demo_data.py --scale 0.1
+# creates the schema. Seed demo data from your laptop with the same
+# DATABASE_URL:  python scripts/generate_demo_data.py --scale 0.1
 services:
   - type: web
     name: edumatch-api
     runtime: docker
     rootDir: backend
     dockerfilePath: ./Dockerfile
-    plan: starter
+    plan: free
     region: oregon
     healthCheckPath: /health
     autoDeploy: true
     envVars:
+      # Prompted at deploy time. Supabase/Neon postgres:// URLs are rewritten
+      # for asyncpg automatically - paste the string as given.
       - key: DATABASE_URL
-        fromDatabase:
-          name: edumatch-db
-          property: connectionString
-      # Render generates this once and keeps it secret. Never hard-code it.
+        sync: false
+      # Generated once by Render and kept secret. Never hard-code it.
       - key: JWT_SECRET
         generateValue: true
       - key: ENVIRONMENT
@@ -30,7 +31,7 @@ services:
       - key: DEBUG
         value: "false"
       - key: WEB_CONCURRENCY
-        value: "2"
+        value: "1"
       - key: EMBEDDING_PROVIDER
         value: hashing
       - key: EMBEDDING_DIM
@@ -41,21 +42,34 @@ services:
         value: local
       - key: STORAGE_LOCAL_DIR
         value: /app/storage
-      # Set this to https://<your-service>.onrender.com/static/uploads after
-      # the first deploy so uploaded files get absolute URLs.
+      # Set to https://<your-service>.onrender.com/static/uploads after the
+      # first deploy so uploaded files get absolute URLs.
       - key: STORAGE_PUBLIC_BASE_URL
         sync: false
       # Replace with your frontend's origin before demo day.
       - key: CORS_ORIGINS
         value: "*"
-    disk:
-      name: uploads
-      mountPath: /app/storage
-      sizeGB: 1
 
-databases:
-  - name: edumatch-db
-    plan: basic-256mb
-    databaseName: edumatch
-    user: edumatch
-    postgresMajorVersion: "16"
+# --- Optional: let Render host Postgres instead of Supabase ------------------
+# Uncomment this block AND swap the DATABASE_URL entry above for:
+#       - key: DATABASE_URL
+#         fromDatabase:
+#           name: edumatch-db
+#           property: connectionString
+#
+# databases:
+#   - name: edumatch-db
+#     plan: free            # free plan expires after 30 days
+#     databaseName: edumatch
+#     user: edumatch
+#     postgresMajorVersion: "16"
+
+# --- Optional: persist uploaded files ----------------------------------------
+# Render's free plan has no persistent disk, so uploads vanish on restart
+# (resource *metadata* is in Postgres and survives). To keep files, move the
+# service to `plan: starter` and add:
+#
+#     disk:
+#       name: uploads
+#       mountPath: /app/storage
+#       sizeGB: 1
