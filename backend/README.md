@@ -19,6 +19,22 @@ likely to collaborate well with — and explains every match.
 
 ---
 
+## Live deployment
+
+| | |
+| --- | --- |
+| API | <https://edumatch-api-asbp.onrender.com> |
+| Interactive docs | <https://edumatch-api-asbp.onrender.com/docs> |
+| Database | Supabase Postgres (`us-west-2`), pgvector 0.8.2 |
+| Demo login | `demo_teacher@example.com` / `DemoPassword123!` |
+
+The free Render instance sleeps after 15 minutes idle and takes ~50 s to wake.
+**Before demoing, wake it first:**
+
+```bash
+curl https://edumatch-api-asbp.onrender.com/health   # {"status":"ok","database":"ok"}
+```
+
 ## Quick start (Docker)
 
 ```bash
@@ -402,8 +418,9 @@ You do **not** need Supabase Auth or Storage — EduMatch issues its own JWTs.
    `*.pooler.supabase.com` host). Use it as `DATABASE_URL` — the `postgres://`
    scheme and `?sslmode=require` are rewritten for you.
 
-   *Why the session pooler:* the direct connection is IPv6-only unless you buy
-   the IPv4 add-on, and most app hosts are IPv4. If you use the **transaction**
+   *Why the session pooler:* the direct connection (`db.<ref>.supabase.co`) has
+   no A record at all - it is IPv6-only unless you buy the IPv4 add-on - and
+   Render is IPv4, so it fails at DNS with `Name or service not known`. If you use the **transaction**
    pooler (port `6543`) instead, also set `DB_DISABLE_PREPARED_STATEMENTS=true`
    — that mode multiplexes sessions and breaks server-side prepared statements.
 
