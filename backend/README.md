@@ -358,6 +358,36 @@ If `CREATE EXTENSION vector` is refused on the database plan you picked, point
 `DATABASE_URL` at a [Neon](https://neon.tech) database instead (pgvector is one
 click there) and delete the `databases:` block.
 
+### Supabase (database only)
+
+Supabase gives you the Postgres; run the API anywhere (Render, Railway, Fly).
+You do **not** need Supabase Auth or Storage — EduMatch issues its own JWTs.
+
+1. Create a project, then in **SQL Editor** run:
+
+   ```sql
+   create extension if not exists vector;
+   create extension if not exists pg_trgm;
+   ```
+
+2. **Connect → Session pooler** and copy that URI (port `5432` on a
+   `*.pooler.supabase.com` host). Use it as `DATABASE_URL` — the `postgres://`
+   scheme and `?sslmode=require` are rewritten for you.
+
+   *Why the session pooler:* the direct connection is IPv6-only unless you buy
+   the IPv4 add-on, and most app hosts are IPv4. If you use the **transaction**
+   pooler (port `6543`) instead, also set `DB_DISABLE_PREPARED_STATEMENTS=true`
+   — that mode multiplexes sessions and breaks server-side prepared statements.
+
+3. Deploy the API as usual. Migrations run on boot.
+
+If a migration fails with `type "vector" does not exist`, Supabase installed the
+extension into its `extensions` schema; fix the lookup path once:
+
+```sql
+alter database postgres set search_path to public, extensions;
+```
+
 ### Railway / Fly.io / Cloud Run
 
 Same image, no blueprint needed:
@@ -413,7 +443,8 @@ authorisation on every protected route, and the demo data generator.
 
 | Variable | Default | Purpose |
 | --- | --- | --- |
-| `DATABASE_URL` | `postgresql+asyncpg://edumatch:edumatch@localhost:5432/edumatch` | Async Postgres DSN |
+| `DATABASE_URL` | `postgresql+asyncpg://edumatch:edumatch@localhost:5432/edumatch` | Async Postgres DSN. `postgres://…?sslmode=require` strings from managed providers are rewritten automatically. |
+| `DB_DISABLE_PREPARED_STATEMENTS` | `false` | Set for transaction-mode poolers (Supabase :6543, PgBouncer) |
 | `JWT_SECRET` | *(change it)* | HS256 signing key |
 | `ACCESS_TOKEN_EXPIRE_MINUTES` | `10080` | Token lifetime |
 | `EMBEDDING_PROVIDER` | `hashing` | `hashing` · `openai` · `voyage` |

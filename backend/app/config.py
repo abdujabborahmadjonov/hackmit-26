@@ -64,6 +64,10 @@ class Settings(BaseSettings):
     db_pool_size: int = 10
     db_max_overflow: int = 20
     db_echo: bool = False
+    # Transaction-mode connection poolers (Supabase Supavisor on port 6543,
+    # PgBouncer) multiplex one server session across clients, which breaks
+    # server-side prepared statements. Set this when connecting through one.
+    db_disable_prepared_statements: bool = False
 
     # --- auth ---
     jwt_secret: str = "insecure-development-secret-change-me"

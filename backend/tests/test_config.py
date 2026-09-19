@@ -80,3 +80,22 @@ def test_cors_origins_parsing() -> None:
 def test_production_flag() -> None:
     assert Settings(_env_file=None, environment="production").is_production is True
     assert Settings(_env_file=None, environment="development").is_production is False
+
+
+def test_pooler_connect_args(monkeypatch) -> None:
+    """Transaction poolers (Supabase:6543, PgBouncer) need prepared statements off."""
+    from app.config import settings as live_settings
+    from app.database import connect_args_for
+
+    url = "postgresql+asyncpg://user:pass@aws-0-us-east-1.pooler.supabase.com:6543/postgres"
+
+    monkeypatch.setattr(live_settings, "db_disable_prepared_statements", False)
+    assert connect_args_for(url) == {}
+
+    monkeypatch.setattr(live_settings, "db_disable_prepared_statements", True)
+    assert connect_args_for(url) == {
+        "prepared_statement_cache_size": 0,
+        "statement_cache_size": 0,
+    }
+    # Irrelevant for non-asyncpg URLs.
+    assert connect_args_for("postgresql://user:pass@host/db") == {}
