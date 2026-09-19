@@ -26,6 +26,7 @@ import subprocess
 import sys
 import time
 from pathlib import Path
+from urllib.parse import quote
 
 BACKEND = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(BACKEND))
@@ -60,6 +61,41 @@ def redact(url: str) -> str:
     return re.sub(r"://([^:/@]+):([^@]+)@", r"://\1:••••••@", url)
 
 
+PLACEHOLDERS = ("[YOUR-PASSWORD]", "YOUR-PASSWORD", "[PASSWORD]", "password")
+
+# scheme://user:password@host... - password is everything up to the LAST '@',
+# because a password may legitimately contain one.
+_URL_RE = re.compile(r"^(?P<scheme>[a-z+]+)://(?P<user>[^:/@]+):(?P<password>.*)@(?P<rest>.+)$")
+
+
+def fix_password(url: str) -> str:
+    """Percent-encode the password, prompting for it if it is still a placeholder.
+
+    Supabase passwords routinely contain @ # ? / & - characters that silently
+    corrupt a URL. Encoding here means the user never has to think about it.
+    """
+    match = _URL_RE.match(url)
+    if not match:
+        return url
+    password = match.group("password")
+
+    if password in PLACEHOLDERS or not password:
+        print(
+            f"\n  {YELLOW}!{RESET} The string still has the placeholder password in it."
+            f"\n    {DIM}Supabase -> Connect -> Reset database password, then paste it here.{RESET}"
+        )
+        password = getpass.getpass("  Database password: ").strip()
+        if not password:
+            return url
+
+    encoded = quote(password, safe="")
+    if encoded != password:
+        ok("Password contained special characters - percent-encoded for the URL")
+    return (
+        f"{match.group('scheme')}://{match.group('user')}:{encoded}@{match.group('rest')}"
+    )
+
+
 def libpq_dsn(url: str) -> str:
     """asyncpg.connect() wants the plain libpq form."""
     return url.replace("+asyncpg", "", 1)
@@ -91,10 +127,18 @@ async def prepare(url: str) -> bool:
         conn = await asyncpg.connect(libpq_dsn(url), timeout=20)
     except Exception as exc:
         fail(f"Could not connect: {type(exc).__name__}: {exc}")
-        print(
-            f"\n  {DIM}Common causes: wrong password, the direct (IPv6) host,\n"
-            f"  or a missing ?sslmode=require.{RESET}"
-        )
+        if "password authentication failed" in str(exc):
+            print(
+                f"\n  {DIM}The host and user are right, so this is the password itself.\n"
+                "  It is the DATABASE password, not your Supabase account password.\n"
+                "  Get a fresh one: Connect -> Reset database password, copy it,\n"
+                f"  and run this script again.{RESET}"
+            )
+        else:
+            print(
+                f"\n  {DIM}Common causes: the direct (IPv6) host instead of the pooler,\n"
+                f"  a missing ?sslmode=require, or a firewall.{RESET}"
+            )
         return False
 
     try:
@@ -238,6 +282,7 @@ async def main() -> int:
         fail("That does not look like a Postgres URL. It should start with postgresql://")
         return 1
 
+    url = fix_password(url)
     check_host(url)
     if not await prepare(url):
         return 1
