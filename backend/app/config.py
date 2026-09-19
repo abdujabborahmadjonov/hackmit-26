@@ -31,7 +31,22 @@ def normalise_database_url(url: str) -> str:
     if url.startswith("postgresql://"):
         url = "postgresql+asyncpg://" + url[len("postgresql://") :]
 
-    parts = urlsplit(url)
+    if "[YOUR-PASSWORD]" in url or "[PASSWORD]" in url:
+        raise ValueError(
+            "DATABASE_URL still contains the [YOUR-PASSWORD] placeholder. Paste the "
+            "real password from Supabase (Connect -> Session pooler, or Settings -> "
+            "Database -> Reset database password)."
+        )
+
+    try:
+        parts = urlsplit(url)
+        parts.port  # triggers host/port validation
+    except ValueError as exc:
+        raise ValueError(
+            f"DATABASE_URL could not be parsed ({exc}). If the password contains "
+            "@ : / ? # or %, percent-encode it - or generate one without them."
+        ) from exc
+
     if not parts.query:
         return url
 

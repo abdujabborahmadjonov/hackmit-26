@@ -114,3 +114,17 @@ def test_alembic_url_escapes_percent_signs() -> None:
     assert Settings(_env_file=None, database_url="postgresql://u:simple@h/db").alembic_url == (
         "postgresql+asyncpg://u:simple@h/db"
     )
+
+
+def test_placeholder_password_is_reported_clearly() -> None:
+    """The commonest deploy mistake deserves a sentence, not a stack trace."""
+    url = "postgresql://postgres:[YOUR-PASSWORD]@db.abcdefgh.supabase.co:5432/postgres"
+    with pytest.raises(ValueError, match=r"\[YOUR-PASSWORD\] placeholder"):
+        normalise_database_url(url)
+
+
+def test_ipv6_hosts_still_work() -> None:
+    """Brackets are legal around an IPv6 host - do not reject those."""
+    assert normalise_database_url("postgresql://user:pass@[::1]:5432/edumatch") == (
+        "postgresql+asyncpg://user:pass@[::1]:5432/edumatch"
+    )
