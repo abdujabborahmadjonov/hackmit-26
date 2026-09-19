@@ -216,12 +216,25 @@ export default function TeacherDetail() {
               <li key={resource.id} className="rounded-xl bg-slate-50 p-4 ring-1 ring-line">
                 <p className="text-sm font-medium text-ink">{resource.title}</p>
                 <p className="mt-0.5 text-sm text-muted">{resource.description}</p>
-                <div className="mt-1.5 flex flex-wrap gap-1.5">
+                <div className="mt-1.5 flex flex-wrap items-center gap-1.5">
+                  {resource.resource_type && (
+                    <Badge tone="indigo">{humanize(resource.resource_type)}</Badge>
+                  )}
                   {resource.subject && <Badge tone="emerald">{humanize(resource.subject)}</Badge>}
                   {resource.education_level && (
                     <Badge tone="amber">{humanize(resource.education_level)}</Badge>
                   )}
                   {resource.difficulty && <Badge>{humanize(resource.difficulty)}</Badge>}
+                  {resource.file_url && (
+                    <a
+                      href={resource.file_url}
+                      target="_blank"
+                      rel="noreferrer"
+                      className="text-xs font-medium text-indigo-600 hover:text-indigo-700"
+                    >
+                      Download
+                    </a>
+                  )}
                 </div>
               </li>
             ))}
