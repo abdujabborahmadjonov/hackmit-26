@@ -3,6 +3,8 @@
 from __future__ import annotations
 
 import json
+import logging
+import re
 from functools import lru_cache
 from typing import Literal
 from urllib.parse import parse_qsl, urlencode, urlsplit, urlunsplit
@@ -46,6 +48,17 @@ def normalise_database_url(url: str) -> str:
             f"DATABASE_URL could not be parsed ({exc}). If the password contains "
             "@ : / ? # or %, percent-encode it - or generate one without them."
         ) from exc
+
+    # Supabase's direct host has no A record. It works from a laptop and fails
+    # on every IPv4-only platform (Render, Fly, Railway) with a DNS error that
+    # says nothing about the cause.
+    if re.match(r"^db\.[a-z0-9]+\.supabase\.co$", parts.hostname or ""):
+        logging.getLogger(__name__).warning(
+            "DATABASE_URL uses Supabase's direct connection (%s), which is "
+            "IPv6-only. If this host is IPv4-only the connection will fail with "
+            "'Name or service not known'. Use Connect -> Session pooler instead.",
+            parts.hostname,
+        )
 
     if not parts.query:
         return url

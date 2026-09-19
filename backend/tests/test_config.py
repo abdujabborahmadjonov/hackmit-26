@@ -128,3 +128,17 @@ def test_ipv6_hosts_still_work() -> None:
     assert normalise_database_url("postgresql://user:pass@[::1]:5432/edumatch") == (
         "postgresql+asyncpg://user:pass@[::1]:5432/edumatch"
     )
+
+
+def test_direct_supabase_host_warns(caplog) -> None:
+    """The IPv6-only host is legal but doomed on IPv4 platforms - say so."""
+    with caplog.at_level("WARNING"):
+        normalise_database_url("postgresql://postgres:secret@db.abcdefgh.supabase.co:5432/postgres")
+    assert "Session pooler" in caplog.text
+
+    caplog.clear()
+    with caplog.at_level("WARNING"):
+        normalise_database_url(
+            "postgresql://postgres.abcdefgh:secret@aws-0-us-west-2.pooler.supabase.com:5432/postgres"
+        )
+    assert caplog.text == ""
