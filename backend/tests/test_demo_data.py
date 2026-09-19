@@ -73,12 +73,11 @@ async def test_content_is_internally_consistent(generated, db_session):
             select(
                 TeacherProfile.education_levels,
                 TeacherProfile.fields_of_expertise,
-                TeacherProfile.teaching_methods,
                 TeacherProfile.class_size,
             )
         )
     ).all()
-    for levels, expertise, methods, class_size in rows:
+    for levels, expertise, class_size in rows:
         if "elementary" in levels:
             assert not (graduate_only & set(expertise or []))
             assert class_size is None or class_size <= 30
