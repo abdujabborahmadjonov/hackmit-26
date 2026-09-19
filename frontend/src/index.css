@@ -1,0 +1,43 @@
+@import "tailwindcss";
+
+@theme {
+  --font-sans: "Inter", ui-sans-serif, system-ui, -apple-system, "Segoe UI", sans-serif;
+  --color-ink: oklch(0.24 0.02 265);
+  --color-muted: oklch(0.55 0.02 265);
+  --color-paper: oklch(0.985 0.003 265);
+  --color-line: oklch(0.91 0.006 265);
+}
+
+html {
+  background: var(--color-paper);
+  color: var(--color-ink);
+  -webkit-font-smoothing: antialiased;
+}
+
+body {
+  margin: 0;
+  min-height: 100vh;
+}
+
+/* Score ring: one CSS variable drives the sweep, so React only sets a number. */
+.score-ring {
+  background: conic-gradient(
+    var(--ring-colour) calc(var(--score) * 360deg),
+    oklch(0.93 0.005 265) 0
+  );
+}
+
+@keyframes rise {
+  from {
+    opacity: 0;
+    transform: translateY(6px);
+  }
+  to {
+    opacity: 1;
+    transform: none;
+  }
+}
+
+.rise {
+  animation: rise 0.28s ease-out both;
+}
