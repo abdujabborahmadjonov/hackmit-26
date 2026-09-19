@@ -77,6 +77,26 @@ def test_cors_origins_parsing() -> None:
     ]
 
 
+def test_elasticsearch_api_key_is_loaded(monkeypatch) -> None:
+    monkeypatch.setenv("ELASTICSEARCH_API_KEY", "id:encoded-key")
+    monkeypatch.setenv(
+        "ELASTICSEARCH_URL",
+        "https://my-vectordb-project-b04eea.es.us-central1.gcp.elastic.cloud:443",
+    )
+    monkeypatch.setenv("SEARCH_PROVIDER", "elasticsearch")
+    loaded = Settings(_env_file=None)
+    assert loaded.search_provider == "elasticsearch"
+    assert loaded.elasticsearch_api_key == "id:encoded-key"
+    assert loaded.elasticsearch_url.endswith("elastic.cloud:443")
+
+
+def test_elasticsearch_api_key_accepts_elastic_cloud_aliases(monkeypatch) -> None:
+    monkeypatch.delenv("ELASTICSEARCH_API_KEY", raising=False)
+    monkeypatch.setenv("ELASTIC_API_KEY", "alias-key")
+    loaded = Settings(_env_file=None)
+    assert loaded.elasticsearch_api_key == "alias-key"
+
+
 def test_production_flag() -> None:
     assert Settings(_env_file=None, environment="production").is_production is True
     assert Settings(_env_file=None, environment="development").is_production is False

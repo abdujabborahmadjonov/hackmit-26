@@ -2,7 +2,12 @@
 #
 #     docker compose up --build
 #
-# Optional Elasticsearch engine (SEARCH_PROVIDER=elasticsearch):
+# Optional Elasticsearch engine (SEARCH_PROVIDER=elasticsearch).
+#
+# Elastic Cloud: set SEARCH_PROVIDER, ELASTICSEARCH_URL and ELASTICSEARCH_API_KEY
+# in .env (compose interpolates them into the backend service).
+#
+# Local cluster:
 #
 #     docker compose --profile elasticsearch up --build
 #
@@ -41,11 +46,21 @@ services:
       EMBEDDING_API_KEY: ${EMBEDDING_API_KEY:-}
       EMBEDDING_DIM: ${EMBEDDING_DIM:-384}
       SEARCH_PROVIDER: ${SEARCH_PROVIDER:-postgres}
-      ELASTICSEARCH_URL: http://elasticsearch:9200
+      ELASTICSEARCH_URL: ${ELASTICSEARCH_URL:-http://elasticsearch:9200}
+      ELASTICSEARCH_API_KEY: ${ELASTICSEARCH_API_KEY:-${ELASTIC_API_KEY:-${ES_API_KEY:-}}}
+      ELASTICSEARCH_USERNAME: ${ELASTICSEARCH_USERNAME:-}
+      ELASTICSEARCH_PASSWORD: ${ELASTICSEARCH_PASSWORD:-}
       STORAGE_PROVIDER: local
       STORAGE_LOCAL_DIR: /app/storage
       STORAGE_PUBLIC_BASE_URL: http://localhost:8000/static/uploads
       CORS_ORIGINS: ${CORS_ORIGINS:-*}
+      REC_CANDIDATE_POOL: ${REC_CANDIDATE_POOL:-300}
+      REC_WEIGHT_SEMANTIC: ${REC_WEIGHT_SEMANTIC:-0.30}
+      REC_WEIGHT_EXPERTISE: ${REC_WEIGHT_EXPERTISE:-0.20}
+      REC_WEIGHT_EDUCATION: ${REC_WEIGHT_EDUCATION:-0.15}
+      REC_WEIGHT_TEACHING_LEVEL: ${REC_WEIGHT_TEACHING_LEVEL:-0.15}
+      REC_WEIGHT_LOCATION: ${REC_WEIGHT_LOCATION:-0.10}
+      REC_WEIGHT_CLASS_SIZE: ${REC_WEIGHT_CLASS_SIZE:-0.10}
     ports:
       - "8000:8000"
     volumes:

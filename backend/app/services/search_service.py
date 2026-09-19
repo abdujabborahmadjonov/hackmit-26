@@ -519,6 +519,13 @@ class ElasticsearchSearchBackend:
                 )
             )
 
+        if ordered_ids and not hits:
+            logger.warning(
+                "Elasticsearch returned %d teacher hits but none exist in Postgres. "
+                "Reindex with: python scripts/reindex_elasticsearch.py",
+                len(ordered_ids),
+            )
+
         return SearchOutcome(
             hits=hits,
             total=int(total),
@@ -598,6 +605,12 @@ class ElasticsearchSearchBackend:
             for rid in ordered_ids
             if rid in resources
         ]
+        if ordered_ids and not hits:
+            logger.warning(
+                "Elasticsearch returned %d resource hits but none exist in Postgres. "
+                "Reindex with: python scripts/reindex_elasticsearch.py",
+                len(ordered_ids),
+            )
         return SearchOutcome(
             hits=hits,
             total=int(total),
