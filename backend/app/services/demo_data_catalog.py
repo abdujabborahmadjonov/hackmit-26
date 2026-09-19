@@ -867,6 +867,8 @@ RESOURCE_KINDS = {
     "reading": "reading pack",
     "video_guide": "video guide",
     "rubric": "rubric",
+    "syllabus": "syllabus",
+    "homework": "homework set",
 }
 
 TOPICS: dict[str, list[str]] = {

@@ -63,6 +63,8 @@ RESOURCE_TYPES: list[str] = [
     "reading",
     "video_guide",
     "rubric",
+    "syllabus",
+    "homework",
 ]
 
 DIFFICULTIES: list[str] = ["beginner", "intermediate", "advanced"]

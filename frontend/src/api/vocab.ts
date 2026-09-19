@@ -55,6 +55,33 @@ export const INSTITUTION_TYPES = [
   "independent",
 ] as const;
 
+export const RESOURCE_TYPES = [
+  "lesson_plan",
+  "worksheet",
+  "slide_deck",
+  "assessment",
+  "project_brief",
+  "reading",
+  "video_guide",
+  "rubric",
+  "syllabus",
+  "homework",
+] as const;
+
+export const DIFFICULTIES = ["beginner", "intermediate", "advanced"] as const;
+
+export const ALLOWED_UPLOAD_EXTENSIONS = [
+  ".pdf",
+  ".ppt",
+  ".pptx",
+  ".doc",
+  ".docx",
+  ".txt",
+  ".png",
+  ".jpg",
+  ".jpeg",
+] as const;
+
 /** Cities the demo data is spread across, for the geographic filter. */
 export const CITIES: { name: string; lat: number; lon: number }[] = [
   { name: "Boston, Massachusetts", lat: 42.36, lon: -71.06 },
