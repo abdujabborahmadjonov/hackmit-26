@@ -1,0 +1,36 @@
+# --- web ---
+fastapi==0.115.6
+uvicorn[standard]==0.34.0
+python-multipart==0.0.20
+
+# --- data ---
+sqlalchemy[asyncio]==2.0.36
+asyncpg==0.30.0
+alembic==1.14.0
+pgvector==0.3.6
+greenlet==3.1.1
+
+# --- validation / settings ---
+pydantic==2.10.4
+pydantic-settings==2.7.0
+email-validator==2.2.0
+
+# --- auth ---
+pyjwt==2.10.1
+argon2-cffi==23.1.0
+
+# --- search engine (optional backend, SEARCH_PROVIDER=elasticsearch) ---
+elasticsearch[async]==8.17.0
+
+# --- embeddings / http ---
+httpx==0.28.1
+
+# --- demo data ---
+faker==33.1.0
+
+# --- tests ---
+pytest==8.3.4
+pytest-asyncio==0.25.0
+
+# Optional: S3-compatible storage (STORAGE_PROVIDER=s3)
+# boto3==1.35.90
