@@ -12,7 +12,7 @@ import {
   scoreWith,
   type Weights,
 } from "../components/WeightStudio";
-import { Badge, Button, Card, ErrorNote, PageHeader } from "../components/ui";
+import { Button, Card, ErrorNote, PageHeader } from "../components/ui";
 
 /** How many candidates to pull. We show ten, but re-weighting only makes sense
  *  if there are others that can overtake them. */
@@ -143,7 +143,7 @@ export default function Recommendations() {
       )}
 
       {data && !loading && (
-        <div className="mt-6 grid grid-cols-3 gap-2 sm:gap-3">
+        <div className="mt-6 grid grid-cols-2 gap-2 sm:gap-3">
           <Card className="p-3 sm:p-4">
             <p className="text-xs text-muted">Candidates considered</p>
             <p className="mt-1 text-2xl font-semibold text-ink">{data.candidate_pool_size}</p>
@@ -153,13 +153,6 @@ export default function Recommendations() {
             <p className="mt-1 text-2xl font-semibold text-ink">
               {ranked[0] ? `${Math.round(ranked[0].localScore * 100)}%` : "—"}
             </p>
-          </Card>
-          <Card className="p-3 sm:p-4">
-            <p className="text-xs text-muted">Ranking speed</p>
-            <div className="mt-1 flex items-center gap-2">
-              <p className="text-2xl font-semibold text-ink">{Math.round(data.took_ms)} ms</p>
-              {changed && <Badge tone="indigo">Re-ranked live</Badge>}
-            </div>
           </Card>
         </div>
       )}
