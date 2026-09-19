@@ -150,7 +150,7 @@ async def submit_feedback(
         feedback = RecommendationFeedback(payload.feedback)
     except ValueError:
         raise HTTPException(
-            status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
+            status_code=status.HTTP_422_UNPROCESSABLE_CONTENT,
             detail=f"feedback must be one of {[f.value for f in RecommendationFeedback]}",
         ) from None
 
