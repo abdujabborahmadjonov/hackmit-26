@@ -171,6 +171,99 @@ def test_local_index_settings_pin_zero_replicas(monkeypatch):
     assert es.index_create_settings() == {"number_of_shards": 1, "number_of_replicas": 0}
 
 
+def test_staging_index_name_does_not_collide_with_the_live_name():
+    assert es.staging_index_name("edumatch_teachers", "99") == "edumatch_teachers__99"
+
+
+class _FakeIndices:
+    def __init__(self) -> None:
+        self.concrete: set[str] = set()
+        self.aliases: dict[str, set[str]] = {}
+        self.deleted: list[str] = []
+        self.update_calls: list[list] = []
+        self.put_alias_calls: list[tuple[str, str]] = []
+
+    async def exists(self, index: str) -> bool:
+        return index in self.concrete or index in self.aliases
+
+    async def exists_alias(self, name: str) -> bool:
+        return name in self.aliases
+
+    async def get_alias(self, name: str) -> dict:
+        return {idx: {"aliases": {name: {}}} for idx in self.aliases.get(name, set())}
+
+    async def delete(self, index: str, ignore_unavailable: bool = True) -> None:
+        self.deleted.append(index)
+        self.concrete.discard(index)
+
+    async def put_alias(self, index: str, name: str) -> None:
+        self.put_alias_calls.append((index, name))
+        self.aliases.setdefault(name, set()).add(index)
+
+    async def update_aliases(self, actions: list) -> None:
+        self.update_calls.append(actions)
+        for action in actions:
+            if "remove" in action:
+                self.aliases.get(action["remove"]["alias"], set()).discard(
+                    action["remove"]["index"]
+                )
+            if "add" in action:
+                alias = action["add"]["alias"]
+                self.aliases.setdefault(alias, set()).add(action["add"]["index"])
+
+
+class _FakeClient:
+    def __init__(self) -> None:
+        self.indices = _FakeIndices()
+        self.bulk_payload: dict = {"errors": False, "items": []}
+
+    async def bulk(self, operations, refresh=False):
+        return self.bulk_payload
+
+
+async def test_promote_concrete_index_only_deletes_live_at_swap(monkeypatch):
+    fake = _FakeClient()
+    fake.indices.concrete.add("edumatch_teachers")
+    monkeypatch.setattr(es, "get_client", lambda: fake)
+
+    await es.promote_index("edumatch_teachers", "edumatch_teachers__new")
+
+    assert fake.indices.deleted == ["edumatch_teachers"]
+    assert fake.indices.put_alias_calls == [("edumatch_teachers__new", "edumatch_teachers")]
+
+
+async def test_promote_alias_is_an_atomic_swap(monkeypatch):
+    fake = _FakeClient()
+    fake.indices.aliases["edumatch_teachers"] = {"edumatch_teachers__old"}
+    monkeypatch.setattr(es, "get_client", lambda: fake)
+
+    await es.promote_index("edumatch_teachers", "edumatch_teachers__new")
+
+    assert fake.indices.update_calls == [
+        [
+            {"remove": {"index": "edumatch_teachers__old", "alias": "edumatch_teachers"}},
+            {"add": {"index": "edumatch_teachers__new", "alias": "edumatch_teachers"}},
+        ]
+    ]
+    assert fake.indices.deleted == ["edumatch_teachers__old"]
+    assert fake.indices.put_alias_calls == []
+
+
+async def test_bulk_index_raises_when_the_rebuild_must_not_continue(monkeypatch):
+    fake = _FakeClient()
+    fake.bulk_payload = {
+        "errors": True,
+        "items": [{"index": {"error": {"type": "mapper_parsing_exception"}}}],
+    }
+    monkeypatch.setattr(es, "get_client", lambda: fake)
+
+    count = await es.bulk_index("idx", [("1", {"title": "x"})])
+    assert count == 1
+
+    with pytest.raises(es.ElasticsearchUnavailable, match="Bulk indexing"):
+        await es.bulk_index("idx", [("1", {"title": "x"})], raise_on_error=True)
+
+
 def test_sort_clauses():
     assert ElasticsearchSearchBackend._sort_clause(TeacherSearchQuery(sort="rating")) == [
         {"average_rating": "desc"},

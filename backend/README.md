@@ -58,8 +58,11 @@ docker compose exec backend python scripts/generate_demo_data.py
 
 ### With the Elasticsearch engine
 
-Elastic Cloud is the intended backend. Put these in `backend/.env` (the API
-key is never committed):
+Elastic Cloud is the intended backend **after** Postgres has been copied into
+it. Render stays on `SEARCH_PROVIDER=postgres` until that one-time reindex
+runs; boot only creates empty indices and would otherwise serve zero hits.
+
+Locally, put these in `backend/.env` (the API key is never committed):
 
 ```
 SEARCH_PROVIDER=elasticsearch
@@ -70,6 +73,17 @@ ELASTICSEARCH_API_KEY=<your encoded API key>
 ```bash
 docker compose up --build
 docker compose exec backend python scripts/reindex_elasticsearch.py
+```
+
+The reindex writes into staging indices and aliases the live names over only
+after a successful refresh, so a failed bulk load leaves the previous search
+index in place.
+
+Production cutover (same script, production `DATABASE_URL` + API key):
+
+```bash
+python scripts/reindex_elasticsearch.py
+# then set SEARCH_PROVIDER=elasticsearch on the Render service
 ```
 
 For a local cluster instead: `docker compose --profile elasticsearch up --build`
@@ -476,7 +490,7 @@ For Fly, enable pgvector once with
 | TLS | terminate HTTPS at the platform's proxy (all of the above do this for you) |
 | Uploads | local disk needs a persistent volume; otherwise set `STORAGE_PROVIDER=s3` |
 | Rate limiting | in-process, so it is per worker — move it to Redis before scaling out |
-| Elasticsearch | set `SEARCH_PROVIDER=elasticsearch`, `ELASTICSEARCH_URL`, and `ELASTICSEARCH_API_KEY` (Elastic Cloud), then run `scripts/reindex_elasticsearch.py` |
+| Elasticsearch | keep `SEARCH_PROVIDER=postgres` until `scripts/reindex_elasticsearch.py` has copied existing rows; then set `SEARCH_PROVIDER=elasticsearch` with `ELASTICSEARCH_URL` and `ELASTICSEARCH_API_KEY` |
 
 ---
 

@@ -143,44 +143,77 @@ async def ping() -> bool:
         return False
 
 
-async def ensure_indices() -> None:
-    """Create both indices with their mappings if they do not exist yet."""
+async def create_index(index: str, mapping: dict[str, Any], *, replace: bool = False) -> None:
+    """Create one index. `replace=True` drops a leftover staging index of the same name."""
     client = get_client()
+    if await client.indices.exists(index=index):
+        if not replace:
+            return
+        await client.indices.delete(index=index, ignore_unavailable=True)
     create_settings = index_create_settings()
+    create_kwargs: dict[str, Any] = {"index": index, "mappings": mapping}
+    if create_settings is not None:
+        create_kwargs["settings"] = create_settings
+    try:
+        await client.indices.create(**create_kwargs)
+    except Exception as exc:
+        # Elastic Cloud Serverless rejects shard/replica settings. Retry bare.
+        if create_settings is None or await client.indices.exists(index=index):
+            raise
+        logger.warning(
+            "Creating %s with explicit shard settings failed (%s); retrying without them",
+            index,
+            exc,
+        )
+        await client.indices.create(index=index, mappings=mapping)
+    logger.info("Created Elasticsearch index %s", index)
+
+
+async def ensure_indices() -> None:
+    """Create both live indices with their mappings if they do not exist yet."""
     for index, mapping in (
         (settings.elasticsearch_teacher_index, TEACHER_MAPPING),
         (settings.elasticsearch_resource_index, RESOURCE_MAPPING),
     ):
-        if await client.indices.exists(index=index):
-            continue
-        create_kwargs: dict[str, Any] = {"index": index, "mappings": mapping}
-        if create_settings is not None:
-            create_kwargs["settings"] = create_settings
-        try:
-            await client.indices.create(**create_kwargs)
-        except Exception as exc:
-            # Elastic Cloud Serverless rejects shard/replica settings. Retry bare.
-            if create_settings is None or await client.indices.exists(index=index):
-                raise
-            logger.warning(
-                "Creating %s with explicit shard settings failed (%s); retrying without them",
-                index,
-                exc,
-            )
-            await client.indices.create(index=index, mappings=mapping)
-        logger.info("Created Elasticsearch index %s", index)
+        await create_index(index, mapping)
 
 
-async def recreate_indices() -> None:
-    """Drop and recreate both indices so a reindex cannot mix in stale IDs."""
+def staging_index_name(live: str, token: str) -> str:
+    """Physical index used while a rebuild is in flight. The live name is untouched."""
+    return f"{live}__{token}"
+
+
+async def delete_index(index: str) -> None:
+    await get_client().indices.delete(index=index, ignore_unavailable=True)
+    logger.info("Dropped Elasticsearch index %s", index)
+
+
+async def promote_index(live: str, staging: str) -> None:
+    """Point the live name at a fully built staging index.
+
+    The previous index (or alias target) stays searchable until this swap.
+    If `live` is already an alias, the cutover is a single `_aliases` request.
+    If `live` is a concrete index (first rebuild after an older deploy), it is
+    deleted only after staging is ready, then replaced with an alias.
+    """
     client = get_client()
-    for index in (
-        settings.elasticsearch_teacher_index,
-        settings.elasticsearch_resource_index,
-    ):
-        await client.indices.delete(index=index, ignore_unavailable=True)
-        logger.info("Dropped Elasticsearch index %s", index)
-    await ensure_indices()
+    if await client.indices.exists_alias(name=live):
+        current = await client.indices.get_alias(name=live)
+        old_indices = [name for name in current if name != staging]
+        actions: list[dict[str, Any]] = [
+            {"remove": {"index": old, "alias": live}} for old in old_indices
+        ]
+        actions.append({"add": {"index": staging, "alias": live}})
+        await client.indices.update_aliases(actions=actions)
+        for old in old_indices:
+            await delete_index(old)
+        logger.info("Aliased %s -> %s", live, staging)
+        return
+
+    if await client.indices.exists(index=live):
+        await client.indices.delete(index=live, ignore_unavailable=True)
+    await client.indices.put_alias(index=staging, name=live)
+    logger.info("Aliased %s -> %s", live, staging)
 
 
 # --------------------------------------------------------------------------- #
@@ -286,7 +319,12 @@ async def delete_resource(resource_id) -> None:
         logger.warning("Elasticsearch resource delete failed for %s: %s", resource_id, exc)
 
 
-async def bulk_index(index: str, documents: Iterable[tuple[str, dict[str, Any]]]) -> int:
+async def bulk_index(
+    index: str,
+    documents: Iterable[tuple[str, dict[str, Any]]],
+    *,
+    raise_on_error: bool = False,
+) -> int:
     """Bulk index (doc_id, document) pairs. Returns the number of documents sent."""
     client = get_client()
     operations: list[dict[str, Any]] = []
@@ -303,11 +341,14 @@ async def bulk_index(index: str, documents: Iterable[tuple[str, dict[str, Any]]]
             (item for item in response["items"] if item.get("index", {}).get("error")), None
         )
         logger.error("Bulk indexing reported errors, first: %s", first)
+        if raise_on_error:
+            raise ElasticsearchUnavailable(f"Bulk indexing into {index} reported errors: {first}")
     return count
 
 
-async def refresh_indices() -> None:
-    client = get_client()
-    await client.indices.refresh(
-        index=f"{settings.elasticsearch_teacher_index},{settings.elasticsearch_resource_index}"
+async def refresh_indices(*names: str) -> None:
+    indices = names or (
+        settings.elasticsearch_teacher_index,
+        settings.elasticsearch_resource_index,
     )
+    await get_client().indices.refresh(index=",".join(indices))
