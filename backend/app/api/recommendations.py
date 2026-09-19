@@ -77,6 +77,7 @@ async def get_recommendations(
         Recommendation(
             teacher=profile_summary(item.profile, item.user, item.breakdown.distance_km),
             match_score=round(item.breakdown.total, 4),
+            components={k: round(v, 4) for k, v in item.breakdown.components.items()},
             reasons=item.reasons,
             explanation=[MatchReason(**entry) for entry in item.explanation],
             distance_km=round(item.breakdown.distance_km, 1)
@@ -128,6 +129,7 @@ async def explain_match(user_id: uuid.UUID, current_user: CurrentUser, db: DB) -
     return Recommendation(
         teacher=profile_summary(candidate, user, breakdown.distance_km),
         match_score=round(breakdown.total, 4),
+        components={k: round(v, 4) for k, v in breakdown.components.items()},
         reasons=reasons,
         explanation=[MatchReason(**entry) for entry in explanation],
         distance_km=round(breakdown.distance_km, 1) if breakdown.distance_km is not None else None,

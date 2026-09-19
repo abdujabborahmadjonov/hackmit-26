@@ -55,6 +55,15 @@ class Recommendation(BaseModel):
 
     teacher: ProfileSummary
     match_score: float = Field(ge=0.0, le=1.0)
+    components: dict[str, float] = Field(
+        default_factory=dict,
+        description=(
+            "Every component score, 0-1, keyed by factor. Unlike `explanation` "
+            "this is complete - including factors too weak to be worth showing - "
+            "so a client can re-rank under different weights without another "
+            "round trip."
+        ),
+    )
     reasons: list[str] = Field(default_factory=list, description="Short display strings")
     explanation: list[MatchReason] = Field(
         default_factory=list, description="Structured breakdown for a 'Why this match?' panel"

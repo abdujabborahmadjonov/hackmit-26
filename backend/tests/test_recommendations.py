@@ -215,3 +215,35 @@ async def test_feedback_is_recorded(client):
         headers=cohort["alice"]["headers"],
     )
     assert bad.status_code == 422
+
+
+async def test_every_component_is_returned_for_client_side_reranking(client):
+    """`explanation` shows the highlights; `components` must be complete."""
+    cohort = await seed_cohort(client)
+    body = (await client.get("/recommendations", headers=cohort["alice"]["headers"])).json()
+
+    for item in body["items"]:
+        assert set(item["components"]) == {
+            "semantic",
+            "expertise",
+            "education",
+            "teaching_level",
+            "location",
+            "class_size",
+        }
+        assert all(0.0 <= value <= 1.0 for value in item["components"].values())
+
+    top = body["items"][0]
+    # The published score is those components under the published weights.
+    recomputed = sum(top["components"][k] * body["weights"][k] for k in top["components"])
+    assert recomputed == pytest.approx(top["match_score"], abs=1e-3)
+
+
+async def test_explain_endpoint_also_returns_components(client):
+    cohort = await seed_cohort(client)
+    listed = (await client.get("/recommendations", headers=cohort["alice"]["headers"])).json()
+    target = listed["items"][0]["teacher"]["user_id"]
+    explained = (
+        await client.get(f"/recommendations/{target}/explain", headers=cohort["alice"]["headers"])
+    ).json()
+    assert explained["components"] == listed["items"][0]["components"]
