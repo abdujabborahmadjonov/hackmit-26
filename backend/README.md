@@ -376,7 +376,7 @@ request to `main` and on every push to `main`:
 | --- | --- |
 | **Lint** | `ruff check`, requirements pinned with `==`, no committed `.env` |
 | **Unit tests** | The app imports, the OpenAPI schema is complete, and `pytest -m "not integration"` passes with no services running |
-| **Tests + coverage** | The whole suite against `pgvector/pgvector:pg16`, failing under **75%** line coverage (currently ~78%); JUnit + HTML/XML coverage are uploaded as artifacts |
+| **Tests + coverage** | The whole suite against `pgvector/pgvector:pg16`, failing under **72%** coverage (currently ~75.5%; the Elasticsearch backend is covered by the job below, not this one); JUnit + HTML/XML coverage are uploaded as artifacts |
 | **Migrations** | `alembic upgrade head`, `alembic check` (models and migrations agree), exactly one head, and a `downgrade base` → `upgrade head` round trip |
 | **Search engine** | `tests/test_search_elasticsearch.py` against a real Elasticsearch 8.17 cluster, after asserting the cluster is actually up so the tests cannot silently skip |
 | **Docker** | Builds the image, boots the compose stack, seeds demo data, runs `scripts/smoke_test.sh`, and checks the container is not running as root |
