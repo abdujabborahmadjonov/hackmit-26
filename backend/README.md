@@ -332,6 +332,64 @@ curl -s "http://localhost:8000/search/teachers?query=students%20build%20real%20s
 
 ---
 
+## Deploying
+
+The image is self-contained: it runs `alembic upgrade head` on boot and listens
+on `$PORT`, so any Docker host works. `DATABASE_URL` is normalised
+automatically — paste the `postgres://…?sslmode=require` string a managed
+provider gives you and the app rewrites it for asyncpg.
+
+### Render (blueprint included)
+
+`render.yaml` provisions the API plus a managed Postgres and wires them
+together:
+
+1. Push the branch to GitHub.
+2. Render → **New → Blueprint** → select this repo.
+3. Render creates `edumatch-api` + `edumatch-db`, generates `JWT_SECRET`, and
+   injects `DATABASE_URL`. The first deploy migrates the schema itself.
+4. Seed demo data from the service shell:
+   `python scripts/generate_demo_data.py --scale 0.1`
+5. Set `STORAGE_PUBLIC_BASE_URL` to
+   `https://<your-service>.onrender.com/static/uploads` and `CORS_ORIGINS` to
+   your frontend origin.
+
+If `CREATE EXTENSION vector` is refused on the database plan you picked, point
+`DATABASE_URL` at a [Neon](https://neon.tech) database instead (pgvector is one
+click there) and delete the `databases:` block.
+
+### Railway / Fly.io / Cloud Run
+
+Same image, no blueprint needed:
+
+```bash
+# Railway: add a Postgres plugin, then
+railway up                      # detects backend/Dockerfile
+
+# Fly.io
+fly launch --dockerfile backend/Dockerfile --no-deploy
+fly postgres create && fly postgres attach <db-name>
+fly secrets set JWT_SECRET=$(python3 -c "import secrets;print(secrets.token_urlsafe(48))")
+fly deploy
+```
+
+For Fly, enable pgvector once with
+`fly postgres connect -a <db-name>` then `CREATE EXTENSION vector;`.
+
+### Production checklist
+
+| | |
+| --- | --- |
+| `JWT_SECRET` | fresh random value, injected as a secret — never the example one |
+| `ENVIRONMENT` / `DEBUG` | `production` / `false` |
+| `CORS_ORIGINS` | your frontend origin, not `*` |
+| TLS | terminate HTTPS at the platform's proxy (all of the above do this for you) |
+| Uploads | local disk needs a persistent volume; otherwise set `STORAGE_PROVIDER=s3` |
+| Rate limiting | in-process, so it is per worker — move it to Redis before scaling out |
+| Elasticsearch | optional; set `SEARCH_PROVIDER=elasticsearch` + `ELASTICSEARCH_URL`, then run `scripts/reindex_elasticsearch.py` |
+
+---
+
 ## Tests
 
 ```bash

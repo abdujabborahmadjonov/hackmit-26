@@ -1,0 +1,61 @@
+# Render blueprint: managed Postgres + the API, from this repo.
+#
+#   1. Push this branch to GitHub.
+#   2. Render dashboard -> New -> Blueprint -> pick this repo.
+#   3. Render creates both services and wires DATABASE_URL automatically.
+#
+# Migrations run on every boot (see the Dockerfile CMD), so the first deploy
+# creates the schema by itself. Seed demo data afterwards from the service
+# shell:  python scripts/generate_demo_data.py --scale 0.1
+services:
+  - type: web
+    name: edumatch-api
+    runtime: docker
+    rootDir: backend
+    dockerfilePath: ./Dockerfile
+    plan: starter
+    region: oregon
+    healthCheckPath: /health
+    autoDeploy: true
+    envVars:
+      - key: DATABASE_URL
+        fromDatabase:
+          name: edumatch-db
+          property: connectionString
+      # Render generates this once and keeps it secret. Never hard-code it.
+      - key: JWT_SECRET
+        generateValue: true
+      - key: ENVIRONMENT
+        value: production
+      - key: DEBUG
+        value: "false"
+      - key: WEB_CONCURRENCY
+        value: "2"
+      - key: EMBEDDING_PROVIDER
+        value: hashing
+      - key: EMBEDDING_DIM
+        value: "384"
+      - key: SEARCH_PROVIDER
+        value: postgres
+      - key: STORAGE_PROVIDER
+        value: local
+      - key: STORAGE_LOCAL_DIR
+        value: /app/storage
+      # Set this to https://<your-service>.onrender.com/static/uploads after
+      # the first deploy so uploaded files get absolute URLs.
+      - key: STORAGE_PUBLIC_BASE_URL
+        sync: false
+      # Replace with your frontend's origin before demo day.
+      - key: CORS_ORIGINS
+        value: "*"
+    disk:
+      name: uploads
+      mountPath: /app/storage
+      sizeGB: 1
+
+databases:
+  - name: edumatch-db
+    plan: basic-256mb
+    databaseName: edumatch
+    user: edumatch
+    postgresMajorVersion: "16"

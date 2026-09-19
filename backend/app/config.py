@@ -5,9 +5,46 @@ from __future__ import annotations
 import json
 from functools import lru_cache
 from typing import Literal
+from urllib.parse import parse_qsl, urlencode, urlsplit, urlunsplit
 
-from pydantic import Field
+from pydantic import Field, field_validator
 from pydantic_settings import BaseSettings, SettingsConfigDict
+
+# libpq accepts these; asyncpg rejects them outright. Managed Postgres
+# providers (Neon, Supabase, Render, Heroku) put them in the URL they hand you.
+_LIBPQ_ONLY_PARAMS = frozenset(
+    {"channel_binding", "options", "target_session_attrs", "connect_timeout", "gssencmode"}
+)
+
+
+def normalise_database_url(url: str) -> str:
+    """Turn any Postgres URL into one the asyncpg driver accepts.
+
+    Managed databases hand out `postgres://user:pass@host/db?sslmode=require`;
+    SQLAlchemy needs the `+asyncpg` scheme and asyncpg spells the TLS option
+    `ssl`. Doing this here means a deploy is a copy-paste, not a debugging
+    session.
+    """
+    url = url.strip()
+    if url.startswith("postgres://"):
+        url = "postgresql://" + url[len("postgres://") :]
+    if url.startswith("postgresql://"):
+        url = "postgresql+asyncpg://" + url[len("postgresql://") :]
+
+    parts = urlsplit(url)
+    if not parts.query:
+        return url
+
+    kept: list[tuple[str, str]] = []
+    for key, value in parse_qsl(parts.query, keep_blank_values=True):
+        lowered = key.lower()
+        if lowered == "sslmode":
+            kept.append(("ssl", value))
+        elif lowered in _LIBPQ_ONLY_PARAMS:
+            continue
+        else:
+            kept.append((key, value))
+    return urlunsplit(parts._replace(query=urlencode(kept)))
 
 
 class Settings(BaseSettings):
@@ -79,6 +116,11 @@ class Settings(BaseSettings):
     # Optional JSON override, e.g. {"high_school": {"university": 0.4}}
     education_compatibility_json: str = ""
 
+    @field_validator("database_url", mode="after")
+    @classmethod
+    def _normalise_database_url(cls, value: str) -> str:
+        return normalise_database_url(value)
+
     @property
     def cors_origins(self) -> list[str]:
         raw = self.cors_origins_raw.strip()
@@ -90,6 +132,10 @@ class Settings(BaseSettings):
     def sync_database_url(self) -> str:
         """psycopg/libpq style URL (used by tooling that cannot speak asyncpg)."""
         return self.database_url.replace("+asyncpg", "")
+
+    @property
+    def is_production(self) -> bool:
+        return self.environment == "production"
 
     @property
     def max_upload_size_bytes(self) -> int:
