@@ -88,7 +88,7 @@ backend/
 │   └── utils/                  auth (JWT/Argon2), geo (haversine), rate limiting
 ├── migrations/                 Alembic (async)
 ├── scripts/                    generate_demo_data.py · reindex_elasticsearch.py
-│                               benchmark_recommendations.py
+│                               benchmark_recommendations.py · setup_remote_db.py
 ├── tests/                      pytest suite (unit + API integration)
 ├── Dockerfile · docker-compose.yml · requirements.txt · .env.example
 ```
@@ -355,15 +355,18 @@ service, so Render configures itself.
    `*.pooler.supabase.com`). Also create a **public Storage bucket** named
    `resources` — Render's free plan has no disk, so uploads live there.
 
-2. **Migrate and seed from your laptop** — Render's free plan has no shell, and
-   doing it locally is faster anyway:
+2. **Point the app at it, in one command.** Render's free plan has no shell, so
+   migrate and seed from your laptop:
 
    ```bash
    cd backend
-   export DATABASE_URL="<the Supabase session-pooler URI>"
-   alembic upgrade head
-   python scripts/generate_demo_data.py --scale 0.1
+   python scripts/setup_remote_db.py
    ```
+
+   It prompts for the connection string (input hidden, password never printed),
+   then enables the extensions, writes `.env`, runs the migrations, seeds demo
+   data and verifies that Alice's top match is Bob on *your* database. It also
+   warns you if you pasted the IPv6-only direct URL or the transaction pooler.
 
 3. **Render** → **New → Blueprint** → pick this repo and the `backend` branch.
    Paste `DATABASE_URL` when prompted; Render generates `JWT_SECRET` itself.
