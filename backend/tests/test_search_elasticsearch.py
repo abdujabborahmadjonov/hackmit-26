@@ -1,7 +1,8 @@
 """Elasticsearch engine.
 
 The query-building tests run everywhere. The end-to-end test only runs when a
-cluster is actually reachable (docker compose --profile elasticsearch up -d).
+cluster is actually reachable (Elastic Cloud via ELASTICSEARCH_API_KEY, or
+`docker compose --profile elasticsearch up -d`).
 """
 
 from __future__ import annotations
@@ -24,15 +25,24 @@ ES_URL = os.getenv("ELASTICSEARCH_URL", settings.elasticsearch_url)
 
 
 def _cluster_reachable() -> bool:
+    """Use the configured auth (API key / basic auth) so Elastic Cloud counts.
+
+    A dedicated short-timeout client keeps collection fast when the cluster is down.
+    """
+
     async def check() -> bool:
         try:
-            import httpx
-
-            async with httpx.AsyncClient(timeout=2.0) as client:
-                response = await client.get(f"{ES_URL}/_cluster/health")
-                return response.status_code == 200
+            from elasticsearch import AsyncElasticsearch
+        except ImportError:
+            return False
+        kwargs = {**es.client_kwargs(), "request_timeout": 2, "max_retries": 0, "retry_on_timeout": False}
+        client = AsyncElasticsearch(ES_URL, **kwargs)
+        try:
+            return bool(await client.ping())
         except Exception:
             return False
+        finally:
+            await client.close()
 
     return asyncio.run(check())
 
@@ -40,8 +50,8 @@ def _cluster_reachable() -> bool:
 requires_elasticsearch = pytest.mark.skipif(
     not _cluster_reachable(),
     reason=(
-        f"Elasticsearch not reachable at {ES_URL}. Start it with: "
-        "docker compose --profile elasticsearch up -d elasticsearch"
+        f"Elasticsearch not reachable at {ES_URL}. For Elastic Cloud set "
+        "ELASTICSEARCH_API_KEY; locally: docker compose --profile elasticsearch up -d elasticsearch"
     ),
 )
 
@@ -119,6 +129,46 @@ def test_geo_filter_uses_geo_distance():
     assert filters == [
         {"geo_distance": {"distance": "25km", "location": {"lat": 42.36, "lon": -71.06}}}
     ]
+
+
+def test_client_kwargs_prefer_api_key(monkeypatch):
+    monkeypatch.setattr(settings, "elasticsearch_api_key", "id:secret")
+    monkeypatch.setattr(settings, "elasticsearch_username", "elastic")
+    monkeypatch.setattr(settings, "elasticsearch_password", "pwd")
+    kwargs = es.client_kwargs()
+    assert kwargs["api_key"] == "id:secret"
+    assert "basic_auth" not in kwargs
+
+
+def test_client_kwargs_basic_auth_without_api_key(monkeypatch):
+    monkeypatch.setattr(settings, "elasticsearch_api_key", "  ")
+    monkeypatch.setattr(settings, "elasticsearch_username", "elastic")
+    monkeypatch.setattr(settings, "elasticsearch_password", "pwd")
+    assert es.client_kwargs()["basic_auth"] == ("elastic", "pwd")
+
+
+def test_client_kwargs_unauthenticated_local_cluster(monkeypatch):
+    monkeypatch.setattr(settings, "elasticsearch_api_key", "")
+    monkeypatch.setattr(settings, "elasticsearch_username", "")
+    kwargs = es.client_kwargs()
+    assert "api_key" not in kwargs
+    assert "basic_auth" not in kwargs
+
+
+def test_cloud_index_settings_leave_replicas_to_the_cluster(monkeypatch):
+    monkeypatch.setattr(
+        settings,
+        "elasticsearch_url",
+        "https://my-vectordb-project-b04eea.es.us-central1.gcp.elastic.cloud:443",
+    )
+    assert es.is_cloud_endpoint() is True
+    assert es.index_create_settings() is None
+
+
+def test_local_index_settings_pin_zero_replicas(monkeypatch):
+    monkeypatch.setattr(settings, "elasticsearch_url", "http://localhost:9200")
+    assert es.is_cloud_endpoint() is False
+    assert es.index_create_settings() == {"number_of_shards": 1, "number_of_replicas": 0}
 
 
 def test_sort_clauses():

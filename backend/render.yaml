@@ -41,7 +41,12 @@ services:
       - key: EMBEDDING_DIM
         value: "384"
       - key: SEARCH_PROVIDER
-        value: postgres
+        value: elasticsearch
+      - key: ELASTICSEARCH_URL
+        value: https://my-vectordb-project-b04eea.es.us-central1.gcp.elastic.cloud:443
+      # Elastic Cloud API key (Deployment -> Security -> API keys). Secret.
+      - key: ELASTICSEARCH_API_KEY
+        sync: false
       # Render's free plan has no persistent disk, so uploads go to Supabase
       # Storage. Create a PUBLIC bucket named "resources" first.
       - key: STORAGE_PROVIDER

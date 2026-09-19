@@ -210,6 +210,8 @@ async def test_search_is_public(client):
 
 
 async def test_engine_status_endpoint(client):
+    from app.config import settings
+
     response = await client.get("/search/engine")
     assert response.status_code == 200
-    assert response.json()["provider"] == "postgres"
+    assert response.json()["provider"] == settings.search_provider

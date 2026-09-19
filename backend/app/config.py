@@ -9,7 +9,7 @@ from functools import lru_cache
 from typing import Literal
 from urllib.parse import parse_qsl, urlencode, urlsplit, urlunsplit
 
-from pydantic import Field, field_validator
+from pydantic import AliasChoices, Field, field_validator
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
 # libpq accepts these; asyncpg rejects them outright. Managed Postgres
@@ -79,7 +79,11 @@ class Settings(BaseSettings):
     """All runtime configuration. Secrets come from the environment only."""
 
     model_config = SettingsConfigDict(
-        env_file=".env", env_file_encoding="utf-8", extra="ignore", case_sensitive=False
+        env_file=".env",
+        env_file_encoding="utf-8",
+        extra="ignore",
+        case_sensitive=False,
+        populate_by_name=True,
     )
 
     # --- app ---
@@ -111,8 +115,13 @@ class Settings(BaseSettings):
     # --- search ---
     search_provider: Literal["postgres", "elasticsearch"] = "postgres"
     elasticsearch_url: str = "http://localhost:9200"
+    elasticsearch_api_key: str = Field(
+        default="",
+        repr=False,
+        validation_alias=AliasChoices("ELASTICSEARCH_API_KEY", "ELASTIC_API_KEY", "ES_API_KEY"),
+    )
     elasticsearch_username: str = ""
-    elasticsearch_password: str = ""
+    elasticsearch_password: str = Field(default="", repr=False)
     elasticsearch_teacher_index: str = "edumatch_teachers"
     elasticsearch_resource_index: str = "edumatch_resources"
     # When true a failing Elasticsearch falls back to the Postgres backend

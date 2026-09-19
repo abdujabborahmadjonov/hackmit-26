@@ -3,6 +3,9 @@
 Enabled with SEARCH_PROVIDER=elasticsearch. Postgres stays the system of
 record; Elasticsearch is a derived index that gives us BM25 relevance,
 geo_distance filtering and kNN vector search in a single query.
+
+Auth: Elastic Cloud uses ELASTICSEARCH_API_KEY; self-hosted clusters can use
+ELASTICSEARCH_USERNAME / ELASTICSEARCH_PASSWORD. The API key wins if both are set.
 """
 
 from __future__ import annotations
@@ -76,6 +79,38 @@ class ElasticsearchUnavailable(RuntimeError):
 
 _client: Any = None
 
+_ELASTIC_CLOUD_HOST_MARKER = ".es."
+_ELASTIC_CLOUD_DOMAIN = "elastic.cloud"
+
+
+def is_cloud_endpoint(url: str | None = None) -> bool:
+    """True for Elastic Cloud / HTTPS-managed clusters (API key + cluster-managed replicas)."""
+    host = (url or settings.elasticsearch_url).lower()
+    return _ELASTIC_CLOUD_DOMAIN in host or _ELASTIC_CLOUD_HOST_MARKER in host
+
+
+def client_kwargs() -> dict[str, Any]:
+    """Auth and transport options. API keys win over basic auth (Elastic Cloud)."""
+    kwargs: dict[str, Any] = {
+        "request_timeout": 15,
+        "retry_on_timeout": True,
+        "max_retries": 2,
+    }
+    api_key = settings.elasticsearch_api_key.strip()
+    username = settings.elasticsearch_username.strip()
+    if api_key:
+        kwargs["api_key"] = api_key
+    elif username:
+        kwargs["basic_auth"] = (username, settings.elasticsearch_password)
+    return kwargs
+
+
+def index_create_settings() -> dict[str, Any] | None:
+    """Shard/replica hints. Cloud and serverless manage these; local single-node needs 0 replicas."""
+    if is_cloud_endpoint():
+        return None
+    return {"number_of_shards": 1, "number_of_replicas": 0}
+
 
 def get_client() -> Any:
     """Lazily build a shared AsyncElasticsearch client."""
@@ -89,10 +124,7 @@ def get_client() -> Any:
             "The 'elasticsearch' package is not installed but SEARCH_PROVIDER=elasticsearch"
         ) from exc
 
-    kwargs: dict[str, Any] = {"request_timeout": 10, "retry_on_timeout": True, "max_retries": 2}
-    if settings.elasticsearch_username:
-        kwargs["basic_auth"] = (settings.elasticsearch_username, settings.elasticsearch_password)
-    _client = AsyncElasticsearch(settings.elasticsearch_url, **kwargs)
+    _client = AsyncElasticsearch(settings.elasticsearch_url, **client_kwargs())
     return _client
 
 
@@ -114,17 +146,41 @@ async def ping() -> bool:
 async def ensure_indices() -> None:
     """Create both indices with their mappings if they do not exist yet."""
     client = get_client()
+    create_settings = index_create_settings()
     for index, mapping in (
         (settings.elasticsearch_teacher_index, TEACHER_MAPPING),
         (settings.elasticsearch_resource_index, RESOURCE_MAPPING),
     ):
-        if not await client.indices.exists(index=index):
-            await client.indices.create(
-                index=index,
-                mappings=mapping,
-                settings={"number_of_shards": 1, "number_of_replicas": 0},
+        if await client.indices.exists(index=index):
+            continue
+        create_kwargs: dict[str, Any] = {"index": index, "mappings": mapping}
+        if create_settings is not None:
+            create_kwargs["settings"] = create_settings
+        try:
+            await client.indices.create(**create_kwargs)
+        except Exception as exc:
+            # Elastic Cloud Serverless rejects shard/replica settings. Retry bare.
+            if create_settings is None or await client.indices.exists(index=index):
+                raise
+            logger.warning(
+                "Creating %s with explicit shard settings failed (%s); retrying without them",
+                index,
+                exc,
             )
-            logger.info("Created Elasticsearch index %s", index)
+            await client.indices.create(index=index, mappings=mapping)
+        logger.info("Created Elasticsearch index %s", index)
+
+
+async def recreate_indices() -> None:
+    """Drop and recreate both indices so a reindex cannot mix in stale IDs."""
+    client = get_client()
+    for index in (
+        settings.elasticsearch_teacher_index,
+        settings.elasticsearch_resource_index,
+    ):
+        await client.indices.delete(index=index, ignore_unavailable=True)
+        logger.info("Dropped Elasticsearch index %s", index)
+    await ensure_indices()
 
 
 # --------------------------------------------------------------------------- #

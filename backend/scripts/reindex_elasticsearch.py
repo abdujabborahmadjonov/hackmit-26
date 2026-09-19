@@ -35,12 +35,16 @@ async def reindex_all() -> tuple[int, int]:
             settings.search_provider,
         )
     if not await es.ping():
+        hint = (
+            "Check ELASTICSEARCH_API_KEY in .env."
+            if es.is_cloud_endpoint()
+            else "Start it with: docker compose --profile elasticsearch up -d elasticsearch"
+        )
         raise SystemExit(
-            f"Elasticsearch is not reachable at {settings.elasticsearch_url}. "
-            "Start it with: docker compose --profile elasticsearch up -d elasticsearch"
+            f"Elasticsearch is not reachable at {settings.elasticsearch_url}. {hint}"
         )
 
-    await es.ensure_indices()
+    await es.recreate_indices()
 
     teachers = resources = 0
     async with SessionLocal() as session:
