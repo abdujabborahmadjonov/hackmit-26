@@ -12,8 +12,10 @@ services:
   - type: web
     name: edumatch-api
     runtime: docker
+    # Both paths are resolved from the REPO ROOT, independently of each other
+    # (Render blueprint spec), even though this file lives in backend/.
     rootDir: backend
-    dockerfilePath: ./Dockerfile
+    dockerfilePath: ./backend/Dockerfile
     plan: free
     region: oregon
     healthCheckPath: /health
