@@ -14,7 +14,7 @@ from app.database import Base
 import app.models  # noqa: F401  (registers every table on Base.metadata)
 
 config = context.config
-config.set_main_option("sqlalchemy.url", settings.database_url)
+config.set_main_option("sqlalchemy.url", settings.alembic_url)
 
 if config.config_file_name is not None:
     fileConfig(config.config_file_name)

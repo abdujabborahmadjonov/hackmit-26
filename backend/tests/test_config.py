@@ -99,3 +99,18 @@ def test_pooler_connect_args(monkeypatch) -> None:
     }
     # Irrelevant for non-asyncpg URLs.
     assert connect_args_for("postgresql://user:pass@host/db") == {}
+
+
+def test_alembic_url_escapes_percent_signs() -> None:
+    """A percent-encoded password must survive Alembic's ConfigParser."""
+    settings = Settings(
+        _env_file=None,
+        database_url="postgresql://postgres.ref:p%3Dword%40aws@host.pooler.supabase.com:5432/postgres",
+    )
+    assert settings.alembic_url == (
+        "postgresql+asyncpg://postgres.ref:p%%3Dword%%40aws@host.pooler.supabase.com:5432/postgres"
+    )
+    # Plain passwords are untouched.
+    assert Settings(_env_file=None, database_url="postgresql://u:simple@h/db").alembic_url == (
+        "postgresql+asyncpg://u:simple@h/db"
+    )

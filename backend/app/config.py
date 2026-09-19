@@ -143,6 +143,15 @@ class Settings(BaseSettings):
         return self.database_url.replace("+asyncpg", "")
 
     @property
+    def alembic_url(self) -> str:
+        """The URL as Alembic needs it.
+
+        Alembic stores it in a ConfigParser, which treats `%` as interpolation
+        syntax - and a percent-encoded password is full of them.
+        """
+        return self.database_url.replace("%", "%%")
+
+    @property
     def is_production(self) -> bool:
         return self.environment == "production"
 
