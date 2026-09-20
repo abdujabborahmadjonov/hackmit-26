@@ -30,6 +30,8 @@ logger = logging.getLogger(__name__)
 # declines, the API routes to another model rather than handing us a 200 with
 # no usable content.
 MODEL = "claude-opus-5"
+# `betas` and `fallbacks` are only accepted on the beta namespace
+# (client.beta.messages.*), not on client.messages.*.
 FALLBACK_BETA = "server-side-fallback-2026-07-01"
 
 
@@ -127,7 +129,7 @@ async def collaboration_brief(
 
     client = _client()
     try:
-        response = await client.messages.create(
+        response = await client.beta.messages.create(
             model=MODEL,
             max_tokens=1000,
             system=BRIEF_SYSTEM,
@@ -220,7 +222,7 @@ async def extract_profile_from_document(
 
     client = _client()
     try:
-        response = await client.messages.parse(
+        response = await client.beta.messages.parse(
             model=MODEL,
             max_tokens=2000,
             system=EXTRACT_SYSTEM,

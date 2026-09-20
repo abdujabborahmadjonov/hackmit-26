@@ -9,6 +9,7 @@ key is present.
 from __future__ import annotations
 
 import io
+import pathlib
 
 import pytest
 
@@ -151,3 +152,24 @@ async def test_brief_against_the_real_model(client):
     brief = response.json()["brief"]
     assert 60 < len(brief.split()) < 220
     assert "Bob" in brief
+
+
+def test_generation_uses_the_namespace_that_accepts_fallbacks():
+    """`betas`/`fallbacks` exist only on client.beta.messages.* - calling the
+    plain namespace with them raises TypeError at request time, which is a 503
+    to the user and invisible until something actually calls the model."""
+    import inspect
+
+    from anthropic.resources.beta.messages.messages import AsyncMessages as BetaMessages
+    from anthropic.resources.messages.messages import AsyncMessages as StdMessages
+
+    beta_params = set(inspect.signature(BetaMessages.create).parameters)
+    std_params = set(inspect.signature(StdMessages.create).parameters)
+    assert {"betas", "fallbacks"} <= beta_params
+    assert not {"betas", "fallbacks"} & std_params
+
+    source = pathlib.Path("app/services/llm_service.py").read_text()
+    assert "client.beta.messages.create(" in source
+    assert "client.beta.messages.parse(" in source
+    assert "await client.messages.create(" not in source
+    assert "await client.messages.parse(" not in source
