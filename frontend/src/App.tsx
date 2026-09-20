@@ -24,9 +24,10 @@ import CoursePlanDetail from "./pages/CoursePlanDetail";
 import TechniqueDetail from "./pages/TechniqueDetail";
 import StudentRate from "./pages/StudentRate";
 
-// Two things are deliberately absent. Mentor is reached from the pinned
-// educators at the top of Discover, in context with the rest of the network;
-// Network itself is in the account menu, with the other things that are yours.
+// Two things stay out of the main nav. Mentor is reached from the pinned
+// educators at the top of Discover, in context with the rest of the network,
+// and from the account menu; Network sits in that menu too, with the other
+// things that are yours.
 const NAV = [
   { to: "/", label: "Matches", icon: "spark", end: true },
   { to: "/classes", label: "Classes", icon: "class" },
@@ -145,6 +146,11 @@ function AccountMenu({
             <p className="truncate text-sm font-semibold text-ink">{name}</p>
           </div>
           <div className="my-1 h-px bg-line" />
+
+          <NavLink role="menuitem" to="/mentor" className={cx(item, "text-ink hover:bg-slate-100")}>
+            <NavIcon name="mentor" />
+            Mentors
+          </NavLink>
 
           <NavLink role="menuitem" to={myPageTo} className={cx(item, "text-ink hover:bg-slate-100")}>
             <NavIcon name="people" />
