@@ -386,3 +386,45 @@ def test_the_consent_record_says_what_was_extended_and_when():
     assert consent.granted is True
     assert "2026-09-19" in (consent.scope or "")
     assert "published information about him" in (consent.scope or "")
+
+
+# --------------------------------------------------------------------------- #
+# A figure that moves, versus a face that moves
+# --------------------------------------------------------------------------- #
+def test_a_character_needs_no_consent_because_it_is_nobody():
+    """The whole point of the rigged figure: it has a face that talks, blinks
+    and gestures, and that face belongs to no one."""
+    mentor = Mentor.model_validate(
+        {**REAL_PERSON, "mode": "guide",
+         "avatar": {"enabled": True, "kind": "character", "animated": True}}
+    )
+    assert mentor.avatar.kind == "character"
+    assert mentor.likeness_consent.granted is False
+
+
+def test_animating_a_real_likeness_needs_more_than_permission_for_the_photo():
+    """Agreeing to a photograph is not agreeing to a face that moves and
+    speaks, so 'likeness' alone does not unlock it."""
+    with pytest.raises(ValidationError, match="'animation'"):
+        Mentor.model_validate(
+            {**REAL_PERSON, "mode": "guide",
+             "avatar": {"enabled": True, "kind": "likeness", "animated": True},
+             "likeness_consent": {"granted": True, "covers": ["likeness"], "source": "email"}}
+        )
+
+
+def test_an_animated_likeness_is_allowed_once_animation_is_covered():
+    mentor = Mentor.model_validate(
+        {**REAL_PERSON, "mode": "guide",
+         "avatar": {"enabled": True, "kind": "likeness", "animated": True},
+         "likeness_consent": {
+             "granted": True, "covers": ["likeness", "animation"], "source": "email, 2026-09-20"}}
+    )
+    assert mentor.avatar.animated is True
+
+
+def test_his_portrait_is_not_animated():
+    mentor = mentor_service.get_mentor(ZAIANE)
+    assert mentor.avatar.kind == "likeness"
+    assert mentor.avatar.animated is False
+    assert "animation" not in mentor.likeness_consent.covers

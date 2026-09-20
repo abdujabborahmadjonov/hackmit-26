@@ -3,6 +3,7 @@ import { streamMentorChat } from "../api/client";
 import type { ChatTurn, Mentor } from "../api/types";
 import { Button } from "../components/ui";
 import { Avatar3D } from "./Avatar3D";
+import { CharacterAvatar } from "./CharacterAvatar";
 import { PortraitAvatar } from "./PortraitAvatar";
 import { useVoice } from "./useVoice";
 
@@ -36,6 +37,9 @@ export function VoiceMode({
   const [error, setError] = useState<string | null>(null);
   const [live, setLive] = useState("");
   const [searching, setSearching] = useState<string | null>(null);
+  // A rigged figure that moves, or his actual photograph which does not. Both
+  // are honest; they are honest about different things.
+  const [view, setView] = useState<"character" | "portrait">("character");
   const abort = useRef<AbortController | null>(null);
   // The loop reads the latest transcript without being re-created each turn.
   const turnsRef = useRef(turns);
@@ -98,6 +102,8 @@ export function VoiceMode({
   );
 
   const busy = v.state === "thinking" || v.state === "speaking";
+  // His photograph is only on offer where the consent covers his likeness.
+  const hasPortrait = avatarConfig.kind === "likeness" && !!mentor.avatar_url;
   const lastReply = [...turns].reverse().find((t) => t.role === "assistant")?.content ?? "";
   const shown = live || lastReply;
 
@@ -124,9 +130,7 @@ export function VoiceMode({
           aria-label={busy ? "Stop" : undefined}
           tabIndex={busy ? 0 : -1}
         >
-          {/* A likeness needs both the consent and a photograph to show; the
-              abstract form covers everyone else and every failure. */}
-          {avatarConfig.kind === "likeness" && mentor.avatar_url ? (
+          {hasPortrait && view === "portrait" ? (
             <PortraitAvatar
               src={mentor.avatar_url}
               mouth={v.mouth}
@@ -134,8 +138,15 @@ export function VoiceMode({
               accent={avatarConfig.accent}
               className="h-72 w-full sm:h-96"
             />
-          ) : (
+          ) : avatarConfig.kind === "stylised" ? (
             <Avatar3D
+              mouth={v.mouth}
+              state={v.state}
+              accent={avatarConfig.accent}
+              className="h-72 w-full sm:h-96"
+            />
+          ) : (
+            <CharacterAvatar
               mouth={v.mouth}
               state={v.state}
               accent={avatarConfig.accent}
@@ -148,11 +159,31 @@ export function VoiceMode({
           <p className="text-xs text-white/45">
             {avatarConfig.kind === "stylised"
               ? "Abstract form — not a likeness"
-              : "His photograph, used with permission — his face is not animated"}
+              : hasPortrait && view === "portrait"
+                ? "His photograph, used with permission — his face is not animated"
+                : "An animated figure — not his likeness"}
             {mentor.voice?.clone_of ? " · cloned voice" : " · synthesised voice, not his"}
             {v.hosted.enabled && v.hosted.model ? ` · ${v.hosted.model}` : ""}
           </p>
         </div>
+
+        {hasPortrait && (
+          <div className="absolute right-4 top-4 flex rounded-full bg-black/40 p-0.5 backdrop-blur">
+            {(["character", "portrait"] as const).map((option) => (
+              <button
+                key={option}
+                type="button"
+                onClick={() => setView(option)}
+                className={
+                  "press rounded-full px-2.5 py-1 text-[11px] font-medium capitalize " +
+                  (view === option ? "bg-white/90 text-slate-900" : "text-white/60 hover:text-white")
+                }
+              >
+                {option}
+              </button>
+            ))}
+          </div>
+        )}
       </div>
 
       {/* what is being said, either direction */}

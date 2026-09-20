@@ -81,12 +81,21 @@ class MentorVoice(BaseModel):
 class MentorAvatar(BaseModel):
     """What the persona looks like.
 
-    `stylised` means a form nobody could mistake for a photograph of a person.
-    Anything else is a likeness and needs consent covering "likeness".
+    `stylised`  an abstract form - nobody, and obviously nobody.
+    `character` a rigged figure that talks, blinks and gestures. Also nobody:
+                it has a face, but not anyone's face, so it needs no consent.
+    `likeness`  this person's actual appearance, which needs consent covering
+                "likeness". Note that consent does not extend to animating it -
+                a still portrait and a moving face are different things to
+                agree to, and `animated` is gated on saying so explicitly.
     """
 
     enabled: bool = False
-    kind: Literal["stylised", "likeness"] = "stylised"
+    kind: Literal["stylised", "character", "likeness"] = "stylised"
+    animated: bool = Field(
+        default=False,
+        description="Animate a likeness. Needs likeness_consent covering 'animation'.",
+    )
     model_url: str = ""
     accent: str = "#4f46e5"
 
@@ -99,7 +108,7 @@ class LikenessConsent(BaseModel):
     """
 
     granted: bool = False
-    covers: list[Literal["voice", "likeness"]] = Field(default_factory=list)
+    covers: list[Literal["voice", "likeness", "animation"]] = Field(default_factory=list)
     source: str | None = None
     scope: str | None = None
     note: str = ""
@@ -213,7 +222,14 @@ class Mentor(BaseModel):
         if self.avatar.kind == "likeness" and "likeness" not in covered:
             raise ValueError(
                 f"{self.slug}: avatar.kind 'likeness' needs likeness_consent.granted with "
-                "'likeness' in covers. Use kind 'stylised' until then."
+                "'likeness' in covers. Use kind 'character' for a rigged figure that is "
+                "nobody, or 'stylised' for an abstract one."
+            )
+        if self.avatar.animated and self.avatar.kind == "likeness" and "animation" not in covered:
+            raise ValueError(
+                f"{self.slug}: animating a real person's likeness needs likeness_consent "
+                "covering 'animation'. Agreeing to a photograph is not agreeing to a face "
+                "that moves and speaks."
             )
         known = {source.id for source in self.sources}
         for claim in self.claims:

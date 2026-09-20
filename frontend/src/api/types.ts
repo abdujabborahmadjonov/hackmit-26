@@ -233,7 +233,8 @@ export interface MentorVoice {
 export interface MentorAvatar {
   enabled: boolean;
   /** "stylised" is an abstract form; "likeness" needs the person's consent. */
-  kind: "stylised" | "likeness";
+  kind: "stylised" | "character" | "likeness";
+  animated?: boolean;
   model_url: string;
   accent: string;
 }
