@@ -1,4 +1,5 @@
 import { useEffect, useState } from "react";
+import { Logo } from "../components/Logo";
 import { Link, useNavigate } from "react-router-dom";
 import { api } from "../api/client";
 import { useAuth } from "../auth/AuthContext";
@@ -94,9 +95,7 @@ export default function Landing() {
       <header className="sticky top-0 z-30 border-b border-slate-200/80 bg-white/85 backdrop-blur-xl">
         <div className="mx-auto flex h-16 max-w-6xl items-center gap-6 px-5 sm:px-8">
           <Link to="/" className="press flex shrink-0 items-center gap-2.5 font-semibold tracking-tight">
-            <span className="grid h-8 w-8 place-items-center rounded-lg bg-indigo-600 text-sm text-white">
-              E
-            </span>
+            <Logo size={32} />
             EduMatch
           </Link>
           <nav className="hidden flex-1 items-center gap-7 text-sm text-slate-600 md:flex">

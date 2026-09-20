@@ -1,4 +1,5 @@
 import type { ReactNode } from "react";
+import { Logo } from "./Logo";
 import { Link } from "react-router-dom";
 import { Avatar, Badge, ScoreRing } from "./ui";
 
@@ -19,9 +20,7 @@ export function AuthShell({
     <div className="grid min-h-screen bg-white lg:grid-cols-[1fr_0.9fr]">
       <div className="flex min-h-screen flex-col px-5 py-5 sm:px-10 lg:px-16">
         <Link to="/" className="flex w-fit items-center gap-2.5 font-semibold tracking-tight text-ink">
-          <span className="grid h-8 w-8 place-items-center rounded-lg bg-indigo-600 text-sm text-white shadow-sm">
-            E
-          </span>
+          <Logo size={32} />
           EduMatch
         </Link>
 

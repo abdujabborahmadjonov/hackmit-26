@@ -1,4 +1,5 @@
 import { useEffect, useState, type FormEvent } from "react";
+import { Logo } from "../components/Logo";
 import { Link, useParams } from "react-router-dom";
 import { api } from "../api/client";
 import type { Technique } from "../api/types";
@@ -58,9 +59,7 @@ export default function StudentRate() {
     <div className="min-h-screen bg-paper">
       <header className="border-b border-line/80 bg-paper/90 backdrop-blur-xl">
         <div className="mx-auto flex h-14 max-w-lg items-center gap-2.5 px-4">
-          <span className="grid h-8 w-8 place-items-center rounded-lg bg-indigo-600 text-sm text-white shadow-sm">
-            E
-          </span>
+          <Logo size={32} />
           <span className="font-semibold tracking-tight text-ink">EduMatch</span>
           <span className="text-sm text-muted">· Student feedback</span>
         </div>

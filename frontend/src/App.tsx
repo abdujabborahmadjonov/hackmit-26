@@ -1,4 +1,5 @@
 import { Navigate, NavLink, Route, Routes, useLocation } from "react-router-dom";
+import { Logo } from "./components/Logo";
 import { useEffect, useRef, useState, type ReactNode } from "react";
 import { useAuth } from "./auth/AuthContext";
 import { Avatar, Loading, cx } from "./components/ui";
@@ -188,9 +189,7 @@ function Shell({ children }: { children: ReactNode }) {
             to="/"
             className="press flex shrink-0 items-center gap-2.5 font-semibold tracking-tight text-ink"
           >
-            <span className="grid h-8 w-8 place-items-center rounded-lg bg-indigo-600 text-sm text-white shadow-sm">
-              E
-            </span>
+            <Logo size={32} />
             EduMatch
           </NavLink>
           <nav className="hidden min-w-0 flex-1 items-center gap-1 overflow-x-auto md:flex">
