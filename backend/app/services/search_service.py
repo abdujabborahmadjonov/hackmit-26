@@ -278,6 +278,7 @@ class PostgresSearchBackend:
     async def search_resources(self, q: ResourceSearchQuery) -> SearchOutcome:
         started = time.perf_counter()
         filters = []
+        material_match_count = None
         if q.subject:
             filters.append(Resource.subject == canonical_term(q.subject))
         if q.education_level:
@@ -291,11 +292,22 @@ class PostgresSearchBackend:
         if q.tags:
             filters.append(Resource.tags.overlap([canonical_term(t) for t in q.tags]))
         if q.required_materials:
-            filters.append(
-                Resource.required_materials.overlap(
-                    [canonical_term(material) for material in q.required_materials]
-                )
+            requested_materials = [
+                canonical_term(material) for material in q.required_materials
+            ]
+            material_rows = (
+                func.unnest(Resource.required_materials)
+                .table_valued("material")
+                .render_derived(name="required_material")
             )
+            material_match_count = (
+                select(func.count())
+                .select_from(material_rows)
+                .where(material_rows.c.material.in_(requested_materials))
+                .correlate(Resource)
+                .scalar_subquery()
+            )
+            filters.append(material_match_count > 0)
         if q.owner_id:
             filters.append(Resource.owner_id == q.owner_id)
 
@@ -304,6 +316,10 @@ class PostgresSearchBackend:
         ) or 0
 
         stmt: Select = select(Resource).where(*filters)
+        if material_match_count is not None:
+            # Preserve partial matches, but put resources satisfying the largest
+            # intersection of requested materials first.
+            stmt = stmt.order_by(material_match_count.desc())
         score_expr = None
         if q.query:
             embedding = await self.embeddings.generate_embedding(q.query)
@@ -549,6 +565,7 @@ class ElasticsearchSearchBackend:
         started = time.perf_counter()
         client = es.get_client()
         filters: list[dict] = []
+        requested_materials: list[str] = []
         if q.subject:
             filters.append({"term": {"subject": canonical_term(q.subject)}})
         if q.education_level:
@@ -562,12 +579,13 @@ class ElasticsearchSearchBackend:
         if q.tags:
             filters.append({"terms": {"tags": [canonical_term(t) for t in q.tags]}})
         if q.required_materials:
+            requested_materials = [
+                canonical_term(material) for material in q.required_materials
+            ]
             filters.append(
                 {
                     "terms": {
-                        "required_materials.keyword": [
-                            canonical_term(material) for material in q.required_materials
-                        ]
+                        "required_materials.keyword": requested_materials
                     }
                 }
             )
@@ -581,6 +599,24 @@ class ElasticsearchSearchBackend:
             "track_total_hits": True,
             "_source": ["resource_id"],
         }
+        material_overlap_sort = None
+        if requested_materials:
+            material_overlap_sort = {
+                "_script": {
+                    "type": "number",
+                    "order": "desc",
+                    "script": {
+                        "lang": "painless",
+                        "source": (
+                            "int matches = 0; "
+                            "for (def value : doc['required_materials.keyword']) { "
+                            "if (params.materials.contains(value)) { matches++; } "
+                            "} return matches;"
+                        ),
+                        "params": {"materials": requested_materials},
+                    },
+                }
+            }
         if q.query:
             body["query"]["bool"]["should"] = [
                 {
@@ -600,8 +636,15 @@ class ElasticsearchSearchBackend:
                 "boost": 2.0,
                 **({"filter": filters} if filters else {}),
             }
+            if material_overlap_sort:
+                body["sort"] = [material_overlap_sort, {"_score": "desc"}]
         elif q.sort in ("newest", "relevance"):
-            body["sort"] = [{"created_at": "desc"}]
+            body["sort"] = [
+                *([material_overlap_sort] if material_overlap_sort else []),
+                {"created_at": "desc"},
+            ]
+        elif material_overlap_sort:
+            body["sort"] = [material_overlap_sort]
 
         response = await client.search(index=settings.elasticsearch_resource_index, body=body)
         hits_raw = response["hits"]["hits"]

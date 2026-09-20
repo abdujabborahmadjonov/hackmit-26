@@ -121,7 +121,12 @@ async def search_resources(
     tags: Annotated[list[str] | None, Query(description="Repeat the parameter for multiple tags")] = None,
     required_materials: Annotated[
         list[str] | None,
-        Query(description="Repeat the parameter to match any required material"),
+        Query(
+            description=(
+                "Repeat to match any required material; resources matching more "
+                "of the requested materials rank first"
+            )
+        ),
     ] = None,
     sort: Annotated[str, Query(pattern="^(relevance|newest|popular)$")] = "relevance",
     limit: Annotated[int, Query(ge=1, le=100)] = 20,

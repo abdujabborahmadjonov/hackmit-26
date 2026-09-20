@@ -193,7 +193,15 @@ async def list_resources(
     teaching_method: Annotated[str | None, Query()] = None,
     resource_type: Annotated[str | None, Query()] = None,
     tags: Annotated[list[str] | None, Query()] = None,
-    required_materials: Annotated[list[str] | None, Query()] = None,
+    required_materials: Annotated[
+        list[str] | None,
+        Query(
+            description=(
+                "Repeat to match any required material; resources matching more "
+                "of the requested materials rank first"
+            )
+        ),
+    ] = None,
     owner_id: Annotated[uuid.UUID | None, Query()] = None,
     sort: Annotated[str, Query(pattern="^(relevance|newest|popular)$")] = "newest",
     limit: Annotated[int, Query(ge=1, le=100)] = 20,
