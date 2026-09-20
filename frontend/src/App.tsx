@@ -12,7 +12,8 @@ import TeacherDetail from "./pages/TeacherDetail";
 import Resources from "./pages/Resources";
 import Connections from "./pages/Connections";
 import Messages from "./pages/Messages";
-import Mentor from "./pages/Mentor";
+import Mentors from "./pages/Mentors";
+import MentorProfile from "./pages/MentorProfile";
 import Forum from "./pages/Forum";
 
 const NAV = [
@@ -205,7 +206,7 @@ export default function App() {
         path="/mentor"
         element={
           <RequireAuth>
-            <Mentor />
+            <Mentors />
           </RequireAuth>
         }
       />
@@ -213,7 +214,7 @@ export default function App() {
         path="/mentor/:slug"
         element={
           <RequireAuth>
-            <Mentor />
+            <MentorProfile />
           </RequireAuth>
         }
       />

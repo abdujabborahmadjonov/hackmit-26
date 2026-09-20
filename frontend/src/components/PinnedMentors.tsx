@@ -50,11 +50,7 @@ export function PinnedMentors() {
                     {mentor.known_for}
                   </p>
                 )}
-                <p className="mt-3 text-xs font-medium text-indigo-700">
-                  {mentor.mode === "guide"
-                    ? `Ask about ${mentor.name.split(" ").slice(-1)[0]}'s teaching →`
-                    : "Start a conversation →"}
-                </p>
+                <p className="mt-3 text-xs font-medium text-indigo-700">Open profile →</p>
               </div>
             </Link>
           </Card>
