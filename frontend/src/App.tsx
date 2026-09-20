@@ -37,8 +37,9 @@ function NavIcon({ name }: { name: string }) {
 }
 
 function Shell({ children }: { children: ReactNode }) {
-  const { user, logout } = useAuth();
+  const { user, profile, logout } = useAuth();
   const name = user ? `${user.first_name} ${user.last_name}` : "";
+  const myPageTo = user && profile ? `/teachers/${user.id}` : "/profile";
   return (
     <div className="min-h-screen bg-paper">
       <header className="sticky top-0 z-20 border-b border-line/80 bg-paper/90 backdrop-blur-xl">
@@ -70,10 +71,16 @@ function Shell({ children }: { children: ReactNode }) {
               </NavLink>
             ))}
           </nav>
-          <div className="flex shrink-0 items-center gap-2">
+          <div className="flex shrink-0 items-center gap-1.5 sm:gap-2">
             <NavLink
-              to="/profile"
-              className="press flex items-center gap-2 rounded-xl p-1.5 hover:bg-slate-100"
+              to={myPageTo}
+              title="My public page"
+              className={({ isActive }) =>
+                cx(
+                  "press flex items-center gap-2 rounded-xl p-1.5 hover:bg-slate-100",
+                  isActive && "bg-indigo-50",
+                )
+              }
             >
               <span className="relative">
                 <Avatar name={name} size={32} />
@@ -82,6 +89,17 @@ function Shell({ children }: { children: ReactNode }) {
               <span className="hidden text-sm font-medium text-ink sm:block">
                 {user?.first_name}
               </span>
+            </NavLink>
+            <NavLink
+              to="/profile"
+              className={({ isActive }) =>
+                cx(
+                  "press hidden rounded-xl px-2.5 py-1.5 text-sm font-medium sm:inline-flex",
+                  isActive ? "bg-slate-100 text-ink" : "text-muted hover:bg-slate-100 hover:text-ink",
+                )
+              }
+            >
+              Edit profile
             </NavLink>
             <Button variant="ghost" size="sm" onClick={logout}>
               Sign out

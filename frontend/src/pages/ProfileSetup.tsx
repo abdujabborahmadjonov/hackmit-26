@@ -1,5 +1,5 @@
 import { useEffect, useState, type FormEvent } from "react";
-import { useNavigate } from "react-router-dom";
+import { Link, useNavigate } from "react-router-dom";
 import { api } from "../api/client";
 import type { ProfileInput } from "../api/types";
 import {
@@ -35,7 +35,7 @@ const EMPTY: ProfileInput = {
 };
 
 export default function ProfileSetup() {
-  const { profile, refreshProfile } = useAuth();
+  const { user, profile, refreshProfile } = useAuth();
   const navigate = useNavigate();
   const [form, setForm] = useState<ProfileInput>(EMPTY);
   const [error, setError] = useState<unknown>(null);
@@ -99,7 +99,19 @@ export default function ProfileSetup() {
         eyebrow={isNew ? "Profile setup" : "Profile settings"}
         title={isNew ? "Tell us how you teach" : "Your teaching profile"}
         description="The strongest matches start with an honest picture of your classroom—your methods, learners, expertise, and the environment where you do your best work."
-        actions={profile?.has_embedding ? <Badge tone="emerald">Semantic profile ready</Badge> : undefined}
+        actions={
+          <div className="flex flex-wrap items-center gap-2">
+            {profile?.has_embedding ? <Badge tone="emerald">Semantic profile ready</Badge> : null}
+            {user && profile ? (
+              <Link
+                to={`/teachers/${user.id}`}
+                className="press inline-flex items-center rounded-xl bg-white px-3 py-1.5 text-sm font-semibold text-ink ring-1 ring-line hover:bg-slate-50"
+              >
+                View my page
+              </Link>
+            ) : null}
+          </div>
+        }
       />
 
       <div className="mt-8 rounded-2xl bg-indigo-50 p-5 ring-1 ring-indigo-100">

@@ -23,6 +23,7 @@ from app.api import (
     recommendations,
     resources,
     search,
+    student_tokens,
     users,
 )
 from app.config import settings
@@ -66,7 +67,11 @@ TAGS_METADATA = [
     {"name": "recommendations", "description": "The hybrid matching engine and its explanations."},
     {"name": "search", "description": "Filtered, semantic and geographic discovery."},
     {"name": "resources", "description": "Teaching materials: metadata, uploads, recommendations."},
-    {"name": "ratings", "description": "Peer ratings and reviews."},
+    {"name": "ratings", "description": "Peer and verified student ratings."},
+    {
+        "name": "student-tokens",
+        "description": "Classroom codes educators issue so students can leave verified ratings.",
+    },
     {"name": "connections", "description": "Connection requests between educators."},
     {"name": "messages", "description": "Direct messaging (HTTPS transport security only)."},
     {"name": "ai", "description": "Generative features: collaboration briefs and syllabus import."},
@@ -161,6 +166,7 @@ def create_app() -> FastAPI:
         search.router,
         resources.router,
         ratings.router,
+        student_tokens.router,
         connections.router,
         messages.router,
     ):

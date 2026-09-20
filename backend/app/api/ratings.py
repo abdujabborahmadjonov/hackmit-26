@@ -11,18 +11,43 @@ from sqlalchemy.exc import IntegrityError
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.database import get_db
-from app.models.connection import Connection, ConnectionStatus
 from app.models.profile import TeacherProfile
 from app.models.rating import Rating
 from app.models.user import User
 from app.schemas.common import Message, Page
-from app.schemas.rating import RatingCreate, RatingRead, RatingSummary, RatingUpdate
+from app.schemas.rating import (
+    AspectAverages,
+    RatingCreate,
+    RatingRead,
+    RatingSummary,
+    RatingUpdate,
+)
 from app.services.profile_service import recalculate_teacher_rating, sync_profile_to_index
+from app.services import verification_service
 from app.utils.auth import CurrentUser, OptionalUser
 
 router = APIRouter(tags=["ratings"])
 
 DB = Annotated[AsyncSession, Depends(get_db)]
+
+_ASPECT_FIELDS = (
+    "knowledge_of_material",
+    "presentation",
+    "friendliness",
+    "other",
+)
+
+
+def _overall_from_payload(payload: RatingCreate | RatingUpdate) -> int | None:
+    aspects = [
+        getattr(payload, field)
+        for field in _ASPECT_FIELDS
+        if getattr(payload, field, None) is not None
+    ]
+    if len(aspects) == 4:
+        # Half-up so a 4.5 average becomes 5 stars (not banker's rounding).
+        return max(1, min(5, int(sum(aspects) / 4 + 0.5)))
+    return getattr(payload, "rating", None)
 
 
 async def _refresh_rollup(db: AsyncSession, teacher_id: uuid.UUID) -> None:
@@ -40,8 +65,9 @@ async def _refresh_rollup(db: AsyncSession, teacher_id: uuid.UUID) -> None:
     summary="Rate an educator",
     description=(
         "One rating per reviewer per teacher. Posting again returns 409 - use "
-        "PUT to change your existing rating. The teacher's `average_rating` and "
-        "`rating_count` are recalculated automatically."
+        "PUT to change your existing rating. Include a `verification_token` plus "
+        "all four aspect scores for a verified student rating. The teacher's "
+        "`average_rating` and `rating_count` are recalculated automatically."
     ),
 )
 async def create_rating(
@@ -66,28 +92,33 @@ async def create_rating(
             detail="You already rated this educator - use PUT to update your rating",
         )
 
-    # A connection between the two accounts is our (weak) proxy for a verified
-    # working relationship. It is advisory metadata, not a trust claim.
-    connected = await db.scalar(
-        select(Connection.id).where(
-            Connection.status == ConnectionStatus.ACCEPTED,
-            (
-                (Connection.requester_id == current_user.id)
-                & (Connection.receiver_id == teacher_id)
-            )
-            | (
-                (Connection.receiver_id == current_user.id)
-                & (Connection.requester_id == teacher_id)
-            ),
+    verification_token_id: uuid.UUID | None = None
+    is_verified_student = False
+    if payload.verification_token:
+        redeemed = await verification_service.redeem_student_token(
+            db, teacher_id=teacher_id, plaintext=payload.verification_token
         )
-    )
+        verification_token_id = redeemed.id
+        is_verified_student = True
+
+    overall = _overall_from_payload(payload)
+    if overall is None:
+        raise HTTPException(
+            status_code=status.HTTP_422_UNPROCESSABLE_CONTENT,
+            detail="Provide an overall rating or all four aspect scores",
+        )
 
     rating = Rating(
         reviewer_id=current_user.id,
         teacher_id=teacher_id,
-        rating=payload.rating,
+        rating=overall,
         comment=payload.comment,
-        is_verified_student=bool(connected),
+        knowledge_of_material=payload.knowledge_of_material,
+        presentation=payload.presentation,
+        friendliness=payload.friendliness,
+        other=payload.other,
+        is_verified_student=is_verified_student,
+        verification_token_id=verification_token_id,
     )
     db.add(rating)
     try:
@@ -119,8 +150,12 @@ async def update_rating(
         raise HTTPException(
             status_code=status.HTTP_404_NOT_FOUND, detail="You have not rated this educator yet"
         )
-    for field, value in payload.model_dump(exclude_unset=True).items():
+    data = payload.model_dump(exclude_unset=True)
+    for field, value in data.items():
         setattr(rating, field, value)
+    overall = _overall_from_payload(payload)
+    if overall is not None and "rating" not in data:
+        rating.rating = overall
     await db.commit()
     await db.refresh(rating)
     await _refresh_rollup(db, teacher_id)
@@ -196,9 +231,41 @@ async def rating_summary(teacher_id: uuid.UUID, db: DB, _: OptionalUser) -> Rati
     average = (
         sum(value * count for value, count in distribution.items()) / total if total else 0.0
     )
+
+    verified_count = await db.scalar(
+        select(func.count())
+        .select_from(Rating)
+        .where(Rating.teacher_id == teacher_id, Rating.is_verified_student.is_(True))
+    ) or 0
+
+    aspect_avgs = (
+        await db.execute(
+            select(
+                func.avg(Rating.knowledge_of_material),
+                func.avg(Rating.presentation),
+                func.avg(Rating.friendliness),
+                func.avg(Rating.other),
+            ).where(
+                Rating.teacher_id == teacher_id,
+                Rating.is_verified_student.is_(True),
+                Rating.knowledge_of_material.is_not(None),
+            )
+        )
+    ).one()
+
+    def _round(value: float | None) -> float | None:
+        return round(float(value), 2) if value is not None else None
+
     return RatingSummary(
         teacher_id=teacher_id,
         average_rating=round(average, 2),
         rating_count=total,
+        verified_student_count=int(verified_count),
         distribution=distribution,
+        aspect_averages=AspectAverages(
+            knowledge_of_material=_round(aspect_avgs[0]),
+            presentation=_round(aspect_avgs[1]),
+            friendliness=_round(aspect_avgs[2]),
+            other=_round(aspect_avgs[3]),
+        ),
     )
