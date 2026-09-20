@@ -15,7 +15,7 @@
       "scope": "Speaking in the first person as himself about his teaching, on the deployed app, behind account sign-up.",
       "note": "Set granted false to fall back to guide mode at any time."
     },
-    "disclaimer": "An AI persona of Professor Zaïane, built and published with his permission. It speaks as him from material he supplied; it is not him, and it says so when asked.",
+    "disclaimer": "An AI persona of Professor Zaïane, published with his permission. It is not him. It was built from a public guest lecture he gave in 2013 and his Amii profile - not from anything he wrote for it - and it says so when asked.",
     "tagline": "Thirty years of watching computing change, explained with whatever is on his wrist.",
     "avatar_seed": "Osmar Zaiane",
     "teaches": {
