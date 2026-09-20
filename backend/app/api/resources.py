@@ -55,6 +55,7 @@ async def _embed_resource(resource: Resource) -> None:
         teaching_method=resource.teaching_method,
         difficulty=resource.difficulty,
         tags=resource.tags,
+        required_materials=resource.required_materials,
     )
     try:
         resource.embedding = await embeddings.generate_embedding(text)
@@ -118,6 +119,9 @@ async def upload_resource(
     difficulty: Annotated[str | None, Form()] = None,
     teaching_method: Annotated[str | None, Form()] = None,
     tags: Annotated[str | None, Form(description="Comma separated")] = None,
+    required_materials: Annotated[
+        str | None, Form(description="Comma-separated materials needed to use this resource")
+    ] = None,
 ) -> ResourceRead:
     extension = os.path.splitext(file.filename or "")[1].lower()
     if extension not in ALLOWED_UPLOAD_TYPES:
@@ -148,6 +152,9 @@ async def upload_resource(
         difficulty=difficulty,
         teaching_method=teaching_method,
         tags=[tag.strip() for tag in (tags or "").split(",") if tag.strip()],
+        required_materials=[
+            material.strip() for material in (required_materials or "").split(",") if material.strip()
+        ],
     )
 
     try:
@@ -186,6 +193,15 @@ async def list_resources(
     teaching_method: Annotated[str | None, Query()] = None,
     resource_type: Annotated[str | None, Query()] = None,
     tags: Annotated[list[str] | None, Query()] = None,
+    required_materials: Annotated[
+        list[str] | None,
+        Query(
+            description=(
+                "Repeat to match any required material; resources matching more "
+                "of the requested materials rank first"
+            )
+        ),
+    ] = None,
     owner_id: Annotated[uuid.UUID | None, Query()] = None,
     sort: Annotated[str, Query(pattern="^(relevance|newest|popular)$")] = "newest",
     limit: Annotated[int, Query(ge=1, le=100)] = 20,
@@ -200,6 +216,7 @@ async def list_resources(
             teaching_method=teaching_method,
             resource_type=resource_type,
             tags=tags or [],
+            required_materials=required_materials or [],
             owner_id=owner_id,
             sort=sort,
             limit=limit,
@@ -271,6 +288,7 @@ async def update_resource(
         "teaching_method",
         "difficulty",
         "tags",
+        "required_materials",
     }:
         await _embed_resource(resource)
     await db.commit()

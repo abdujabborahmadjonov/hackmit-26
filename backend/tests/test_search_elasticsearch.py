@@ -64,6 +64,7 @@ def test_mappings_use_the_configured_vector_width():
     assert es.TEACHER_MAPPING["properties"]["embedding"]["similarity"] == "cosine"
     assert es.TEACHER_MAPPING["properties"]["location"]["type"] == "geo_point"
     assert es.RESOURCE_MAPPING["properties"]["tags"]["type"] == "keyword"
+    assert es.RESOURCE_MAPPING["properties"]["required_materials"]["type"] == "text"
 
 
 def test_teacher_document_shape():

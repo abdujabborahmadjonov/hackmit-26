@@ -83,6 +83,11 @@ function ResourceRow({
         {resource.education_level && <Badge tone="amber">{humanize(resource.education_level)}</Badge>}
         {resource.teaching_method && <Badge>{humanize(resource.teaching_method)}</Badge>}
         {resource.difficulty && <Badge>{humanize(resource.difficulty)}</Badge>}
+        {resource.required_materials.length > 0 && (
+          <span className="text-xs text-muted">
+            Requires: {resource.required_materials.map(humanize).join(", ")}
+          </span>
+        )}
         {resource.file_url && (
           <a
             href={resource.file_url}
@@ -134,6 +139,7 @@ const EMPTY_UPLOAD = {
   difficulty: "",
   teaching_method: "",
   tags: "",
+  required_materials: "",
 };
 
 export default function Resources() {
@@ -146,6 +152,7 @@ export default function Resources() {
   const [query, setQuery] = useState("");
   const [subject, setSubject] = useState("");
   const [level, setLevel] = useState("");
+  const [requiredMaterials, setRequiredMaterials] = useState("");
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<unknown>(null);
 
@@ -175,6 +182,9 @@ export default function Resources() {
         query: query || undefined,
         subject: subject || undefined,
         education_level: level || undefined,
+        required_materials: requiredMaterials
+          ? requiredMaterials.split(",").map((material) => material.trim()).filter(Boolean)
+          : undefined,
         sort: query ? "relevance" : "newest",
         limit: 20,
       });
@@ -185,7 +195,7 @@ export default function Resources() {
     } finally {
       setLoading(false);
     }
-  }, [query, subject, level]);
+  }, [query, subject, level, requiredMaterials]);
 
   const loadMine = useCallback(async () => {
     if (!user) return;
@@ -256,6 +266,9 @@ export default function Resources() {
       if (uploadForm.difficulty) form.append("difficulty", uploadForm.difficulty);
       if (uploadForm.teaching_method) form.append("teaching_method", uploadForm.teaching_method);
       if (uploadForm.tags.trim()) form.append("tags", uploadForm.tags.trim());
+      if (uploadForm.required_materials.trim()) {
+        form.append("required_materials", uploadForm.required_materials.trim());
+      }
 
       const created = await api.uploadResource(form);
       setUploadForm(EMPTY_UPLOAD);
@@ -313,7 +326,7 @@ export default function Resources() {
       </div>
 
       {tab === "browse" && (
-        <Card className="mt-5 grid gap-3 p-5 sm:grid-cols-4">
+        <Card className="mt-5 grid gap-3 p-5 sm:grid-cols-5">
           <div className="sm:col-span-2">
             <Input
               value={query}
@@ -330,6 +343,13 @@ export default function Resources() {
               </option>
             ))}
           </Select>
+          <Input
+            value={requiredMaterials}
+            onChange={(e) => setRequiredMaterials(e.target.value)}
+            placeholder="Required materials"
+            aria-label="Filter by required materials"
+            onKeyDown={(e) => e.key === "Enter" && void loadBrowse()}
+          />
           <div className="flex gap-2">
             <Select value={level} onChange={(e) => setLevel(e.target.value)}>
               <option value="">Any level</option>
@@ -461,6 +481,13 @@ export default function Resources() {
                   value={uploadForm.tags}
                   onChange={(e) => setUploadField("tags", e.target.value)}
                   placeholder="syllabus, week1, homework"
+                />
+              </Field>
+              <Field label="Required materials" hint="Comma-separated">
+                <Input
+                  value={uploadForm.required_materials}
+                  onChange={(e) => setUploadField("required_materials", e.target.value)}
+                  placeholder="laptops, projector, markers"
                 />
               </Field>
             </div>

@@ -16,6 +16,9 @@ name: edumatch
 services:
   postgres:
     image: pgvector/pgvector:pg16
+    # pgvector's HNSW index build needs more than Docker's 64 MB /dev/shm default.
+    tmpfs:
+      - /dev/shm:size=536870912
     environment:
       POSTGRES_USER: edumatch
       POSTGRES_PASSWORD: edumatch

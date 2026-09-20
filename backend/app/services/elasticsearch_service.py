@@ -63,6 +63,11 @@ RESOURCE_MAPPING: dict[str, Any] = {
         "difficulty": {"type": "keyword"},
         "teaching_method": {"type": "keyword"},
         "tags": {"type": "keyword"},
+        "required_materials": {
+            "type": "text",
+            "analyzer": "english",
+            "fields": {"keyword": {"type": "keyword"}},
+        },
         "created_at": {"type": "date"},
         "embedding": {
             "type": "dense_vector",
@@ -287,6 +292,7 @@ def resource_document(resource) -> dict[str, Any]:
         "difficulty": resource.difficulty,
         "teaching_method": resource.teaching_method,
         "tags": list(resource.tags or []),
+        "required_materials": list(resource.required_materials or []),
         "created_at": resource.created_at.isoformat() if resource.created_at else None,
     }
     if resource.embedding is not None:

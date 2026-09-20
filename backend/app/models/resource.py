@@ -36,6 +36,9 @@ class Resource(UUIDPrimaryKeyMixin, TimestampMixin, Base):
     tags: Mapped[list[str]] = mapped_column(
         ARRAY(String), nullable=False, server_default=text("'{}'::varchar[]")
     )
+    required_materials: Mapped[list[str]] = mapped_column(
+        ARRAY(String), nullable=False, server_default=text("'{}'::varchar[]")
+    )
 
     download_count: Mapped[int] = mapped_column(Integer, nullable=False, server_default=text("0"))
 
@@ -50,6 +53,7 @@ class Resource(UUIDPrimaryKeyMixin, TimestampMixin, Base):
         Index("ix_resources_difficulty", "difficulty"),
         Index("ix_resources_teaching_method", "teaching_method"),
         Index("ix_resources_tags", "tags", postgresql_using="gin"),
+        Index("ix_resources_required_materials", "required_materials", postgresql_using="gin"),
         Index("ix_resources_created_at", "created_at"),
         Index(
             "ix_resources_embedding_hnsw",
