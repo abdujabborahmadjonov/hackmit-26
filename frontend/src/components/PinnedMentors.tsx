@@ -34,7 +34,7 @@ export function PinnedMentors() {
         {mentors.map((mentor) => (
           <Card key={mentor.slug} className="h-full p-5" interactive>
             <Link to={`/mentor/${mentor.slug}`} className="flex h-full items-start gap-4">
-              <Avatar name={mentor.avatar_seed || mentor.name} size={46} />
+              <Avatar name={mentor.avatar_seed || mentor.name} src={mentor.avatar_url} size={46} />
               <div className="min-w-0 flex-1">
                 <div className="flex items-center justify-between gap-2">
                   <p className="truncate font-semibold text-ink">{mentor.name}</p>

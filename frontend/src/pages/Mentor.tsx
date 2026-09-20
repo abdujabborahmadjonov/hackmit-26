@@ -170,7 +170,7 @@ export default function Mentor() {
                   : "press flex items-center gap-2 rounded-full bg-white px-3 py-1.5 text-sm font-medium text-muted ring-1 ring-line hover:text-ink"
               }
             >
-              <Avatar name={option.avatar_seed || option.name} size={20} />
+              <Avatar name={option.avatar_seed || option.name} src={option.avatar_url} size={20} />
               {option.name}
             </button>
           ))}
@@ -180,7 +180,7 @@ export default function Mentor() {
       <Card className="overflow-hidden">
         {/* --- who you are talking to --- */}
         <div className="flex flex-wrap items-start gap-4 border-b border-line bg-slate-50/60 p-5">
-          <Avatar name={mentor.avatar_seed || mentor.name} size={52} />
+          <Avatar name={mentor.avatar_seed || mentor.name} src={mentor.avatar_url} size={52} />
           <div className="min-w-0 flex-1">
             <div className="flex flex-wrap items-center gap-2">
               <h2 className="font-semibold tracking-tight text-ink">
@@ -210,7 +210,7 @@ export default function Mentor() {
           ref={transcript}
           className="flex max-h-[26rem] min-h-[18rem] flex-col gap-4 overflow-y-auto p-5"
         >
-          <Bubble from="mentor" name={mentor.name}>
+          <Bubble from="mentor" name={mentor.name} avatar={mentor.avatar_url}>
             {mentor.opening_line}
           </Bubble>
 
@@ -219,6 +219,7 @@ export default function Mentor() {
               key={index}
               from={turn.role === "user" ? "you" : "mentor"}
               name={mentor.name}
+              avatar={mentor.avatar_url}
               citations={turn.citations}
               unverified={turn.unverified}
             >
@@ -227,7 +228,7 @@ export default function Mentor() {
           ))}
 
           {busy && (
-            <Bubble from="mentor" name={mentor.name}>
+            <Bubble from="mentor" name={mentor.name} avatar={mentor.avatar_url}>
               {streaming ? (
                 <>
                   {streaming}
@@ -339,12 +340,14 @@ function Notice({ children }: { children: React.ReactNode }) {
 function Bubble({
   from,
   name,
+  avatar,
   citations,
   unverified,
   children,
 }: {
   from: "you" | "mentor";
   name: string;
+  avatar?: string;
   citations?: MentorSource[];
   unverified?: string[];
   children: React.ReactNode;
@@ -352,7 +355,7 @@ function Bubble({
   const mine = from === "you";
   return (
     <div className={mine ? "flex justify-end" : "flex gap-3"}>
-      {!mine && <Avatar name={name} size={32} />}
+      {!mine && <Avatar name={name} src={avatar} size={32} />}
       <div className={mine ? "max-w-[85%]" : "max-w-[85%]"}>
         <div
           className={

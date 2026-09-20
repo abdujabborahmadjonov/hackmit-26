@@ -220,3 +220,37 @@ def test_viewer_prompt_without_a_profile_asks_instead_of_guessing():
     prompt = mentor_service.viewer_prompt(None, "Alice")
     assert "has not filled in" in prompt
     assert "Ask what and where they teach" in prompt
+
+
+# --------------------------------------------------------------------------- #
+# The consented persona's dossier
+# --------------------------------------------------------------------------- #
+def test_the_consented_persona_has_material_and_declares_where_it_came_from():
+    mentor = mentor_service.get_mentor(ZAIANE)
+    assert mentor.has_material is True
+    assert {s.id for s in mentor.sources} == {"Z1", "Z2"}
+    assert all(s.url for s in mentor.sources)
+
+
+def test_his_limits_carry_the_two_things_a_2013_lecture_cannot_support():
+    """One talk, and an old one. Both have to be in front of the model."""
+    prompt = mentor_service.persona_prompt(mentor_service.get_mentor(ZAIANE))
+    limits = prompt.split("What they do NOT know:")[1]
+    assert "2013" in limits
+    assert "one lecture, not a career" in limits
+    # It must not extrapolate past the source's date.
+    assert "after 2013" in limits
+
+
+def test_the_provenance_file_exists_and_covers_every_source():
+    """A persona that speaks in a real person's voice has to be reviewable by
+    that person, line by line, without them reading JSON."""
+    doc = (mentor_service.DATA_FILE.parent / "osmar-zaiane-provenance.md").read_text()
+    mentor = mentor_service.get_mentor(ZAIANE)
+    for source in mentor.sources:
+        assert f"**{source.id}**" in doc
+        assert source.url in doc
+    # The speaker boundary is the thing most easily got wrong.
+    assert "He begins at **07:06**" in doc
+    # Anything inferred rather than said must be flagged as such.
+    assert "not something he says" in doc

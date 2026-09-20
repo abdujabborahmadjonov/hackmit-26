@@ -86,6 +86,7 @@ class MentorCard(BaseModel):
     known_for: str
     tagline: str
     avatar_seed: str
+    avatar_url: str
     synthetic: bool
     disclaimer: str
     subjects: list[str]
@@ -114,6 +115,7 @@ class MentorCard(BaseModel):
             known_for=mentor.known_for,
             tagline=mentor.tagline,
             avatar_seed=mentor.avatar_seed or mentor.name,
+            avatar_url=mentor.avatar_url,
             synthetic=mentor.synthetic,
             disclaimer=mentor.disclaimer,
             subjects=mentor.teaches.subjects,

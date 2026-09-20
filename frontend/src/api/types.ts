@@ -236,6 +236,7 @@ export interface Mentor {
   known_for: string;
   tagline: string;
   avatar_seed: string;
+  avatar_url: string;
   synthetic: boolean;
   disclaimer: string;
   subjects: string[];

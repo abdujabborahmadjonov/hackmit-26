@@ -96,6 +96,8 @@ class Mentor(BaseModel):
     disclaimer: str = ""
     tagline: str = ""
     avatar_seed: str = ""
+    avatar_url: str = Field(default="", description="A photograph, served from the client")
+    avatar_credit: str = ""
     teaches: MentorTeaches = Field(default_factory=MentorTeaches)
 
     # --- guide mode ---

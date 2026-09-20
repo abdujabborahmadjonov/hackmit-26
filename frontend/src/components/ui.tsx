@@ -227,7 +227,33 @@ export function ErrorNote({ error }: { error: unknown }) {
   );
 }
 
-export function Avatar({ name, size = 40 }: { name: string; size?: number }) {
+export function Avatar({
+  name,
+  size = 40,
+  src,
+}: {
+  name: string;
+  size?: number;
+  /** A photograph. Falls through to initials when absent or broken. */
+  src?: string;
+}) {
+  if (src) {
+    return (
+      <img
+        src={src}
+        alt=""
+        width={size}
+        height={size}
+        loading="lazy"
+        className="shrink-0 rounded-full object-cover ring-1 ring-line"
+        style={{ width: size, height: size }}
+        onError={(event) => {
+          // A missing file should degrade to initials, not a broken icon.
+          event.currentTarget.style.display = "none";
+        }}
+      />
+    );
+  }
   const initials = name
     .split(" ")
     .filter(Boolean)
