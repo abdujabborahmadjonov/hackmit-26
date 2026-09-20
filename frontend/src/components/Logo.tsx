@@ -38,9 +38,10 @@ export function Logo({
         src="/logo.png"
         alt=""
         loading="lazy"
-        // Inset so the mark breathes inside the ring rather than touching it.
+        // The asset is a square canvas with the mark centred and a 10%
+        // margin baked in, so this can fill the ring and still breathe.
         className="object-contain"
-        style={{ width: size * 0.68, height: size * 0.68 }}
+        style={{ width: size * 0.86, height: size * 0.86 }}
       />
     </span>
   );
