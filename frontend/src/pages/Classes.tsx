@@ -223,11 +223,11 @@ export default function Classes() {
       <PageHeader
         eyebrow="Your classrooms"
         title="Class profiles"
-        description="Describe each class you teach so technique search and planning can match context — size, format, and constraints. Or generate a full course plan from the library."
+        description="Describe each class you teach so technique search and planning can match context — size, format, and constraints. Or generate a full class plan from the library."
         actions={
           <>
             <Link to="/classes/generate">
-              <Button size="sm">Generate course</Button>
+              <Button size="sm">Generate class</Button>
             </Link>
             <Button variant="secondary" size="sm" loading={extracting} onClick={() => fileRef.current?.click()}>
               Import syllabus
@@ -258,7 +258,7 @@ export default function Classes() {
         <section className="mt-6">
           <div className="mb-3 flex items-end justify-between gap-3">
             <div>
-              <p className="text-sm font-semibold text-ink">Course plans</p>
+              <p className="text-sm font-semibold text-ink">Class plans</p>
               <p className="text-xs text-muted">
                 Generated outlines grounded in resources and peer classes.
               </p>
@@ -462,11 +462,11 @@ export default function Classes() {
         <div className="mt-7">
           <EmptyState
             title="No class profiles yet"
-            body="Generate a course plan from the library, add a class you teach, or import a syllabus."
+            body="Generate a class plan from the library, add a class you teach, or import a syllabus."
             action={
               <div className="flex flex-wrap gap-2">
                 <Link to="/classes/generate">
-                  <Button>Generate course</Button>
+                  <Button>Generate class</Button>
                 </Link>
                 <Button variant="secondary" onClick={openCreate}>
                   New class
@@ -507,7 +507,7 @@ export default function Classes() {
                     to={`/classes/generate?classId=${klass.id}`}
                     className="text-xs font-semibold text-indigo-600 hover:text-indigo-700"
                   >
-                    Generate course →
+                    Generate class →
                   </Link>
                 </div>
                 <div className="mt-auto flex flex-wrap gap-2 pt-4">

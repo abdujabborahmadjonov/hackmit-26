@@ -85,7 +85,7 @@ TAGS_METADATA = [
     {"name": "class-profiles", "description": "Per-class teaching context for technique search."},
     {
         "name": "course-plans",
-        "description": "AI course plan generator grounded in resources, techniques, and peer classes.",
+        "description": "AI class plan generator grounded in resources, techniques, and peer classes.",
     },
     {"name": "techniques", "description": "Teaching technique cards, drafts, and student ratings."},
     {

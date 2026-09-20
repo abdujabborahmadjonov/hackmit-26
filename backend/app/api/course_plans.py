@@ -1,4 +1,4 @@
-"""Course plan generation and CRUD for educators."""
+"""Class plan generation and CRUD for educators."""
 
 from __future__ import annotations
 
@@ -37,7 +37,7 @@ async def _owned(db: AsyncSession, plan_id: uuid.UUID, teacher_id: uuid.UUID):
     plan = await course_plan_service.get_owned_plan(db, plan_id, teacher_id)
     if plan is None:
         raise HTTPException(
-            status_code=status.HTTP_404_NOT_FOUND, detail="Course plan not found"
+            status_code=status.HTTP_404_NOT_FOUND, detail="Class plan not found"
         )
     return plan
 
@@ -61,7 +61,7 @@ def _generation_http(exc: CoursePlanGenerationError) -> HTTPException:
     )
 
 
-@router.get("", response_model=Page[CoursePlanSummary], summary="List my course plans")
+@router.get("", response_model=Page[CoursePlanSummary], summary="List my class plans")
 async def list_course_plans(
     current_user: CurrentUser,
     db: DB,
@@ -84,7 +84,7 @@ async def list_course_plans(
     response_model=CoursePlanRead,
     status_code=status.HTTP_201_CREATED,
     dependencies=[Depends(ai_rate_limit)],
-    summary="Generate a course plan + planned class from a brief",
+    summary="Generate a class plan + planned class from a brief",
 )
 async def generate_course_plan(
     payload: CoursePlanGenerateRequest,
@@ -150,7 +150,7 @@ async def update_course_plan_structure(
     "/{plan_id}/regenerate",
     response_model=CoursePlanRead,
     dependencies=[Depends(ai_rate_limit)],
-    summary="Regenerate the entire course plan",
+    summary="Regenerate the entire class plan",
 )
 async def regenerate_course_plan(
     plan_id: uuid.UUID,
@@ -210,4 +210,4 @@ async def delete_course_plan(
 ) -> MessageEnvelope:
     plan = await _owned(db, plan_id, current_user.id)
     await course_plan_service.delete_plan(db, plan)
-    return MessageEnvelope(detail="Course plan deleted")
+    return MessageEnvelope(detail="Class plan deleted")

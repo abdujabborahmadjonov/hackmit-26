@@ -750,7 +750,7 @@ async def stream_mentor_reply(
 
 
 # --------------------------------------------------------------------------- #
-# Course plan generation (retrieve-then-generate, grounded IDs only)
+# Class plan generation (retrieve-then-generate, grounded IDs only)
 # --------------------------------------------------------------------------- #
 
 
@@ -837,7 +837,7 @@ class GeneratedCoursePlan(BaseModel):
         return out
 
 
-COURSE_PLAN_SYSTEM = f"""You design high-level multi-week course plans for educators.
+COURSE_PLAN_SYSTEM = f"""You design high-level multi-week class plans for educators.
 
 You receive:
 - A brief describing the class the teacher wants
@@ -976,14 +976,14 @@ async def generate_course_plan_outline(
             fallbacks="default",
         )
     except Exception as exc:
-        logger.warning("Course plan generation failed: %s", exc)
-        raise LLMUnavailable(f"Course plan generation failed: {exc}") from exc
+        logger.warning("Class plan generation failed: %s", exc)
+        raise LLMUnavailable(f"Class plan generation failed: {exc}") from exc
 
     raw = "".join(
         block.text for block in response.content if getattr(block, "type", None) == "text"
     ).strip()
     if not raw:
-        raise LLMUnavailable("The model returned an empty course plan.")
+        raise LLMUnavailable("The model returned an empty class plan.")
 
     # Strip common fences / leading prose before the JSON object.
     cleaned = raw
@@ -1003,8 +1003,8 @@ async def generate_course_plan_outline(
         return GeneratedCoursePlan.model_validate(payload)
     except Exception as exc:
         logger.warning(
-            "Course plan JSON parse failed (%s). Raw head: %s",
+            "Class plan JSON parse failed (%s). Raw head: %s",
             exc,
             raw[:500],
         )
-        raise LLMUnavailable("The model did not return a usable course plan.") from exc
+        raise LLMUnavailable("The model did not return a usable class plan.") from exc

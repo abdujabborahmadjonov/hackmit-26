@@ -118,7 +118,7 @@ export default function GenerateCourse() {
   async function runGenerate() {
     if (generating) return;
     if (!aiEnabled) {
-      setError(new Error("Course plan generation is not configured on this deployment."));
+      setError(new Error("Class plan generation is not configured on this deployment."));
       return;
     }
     setGenerating(true);
@@ -145,8 +145,8 @@ export default function GenerateCourse() {
     <div>
       <PageHeader
         eyebrow="Classes"
-        title="Generate a course"
-        description="Describe the class you want to teach. EduMatch builds a multi-week outline grounded in existing resources, techniques, and similar peer classes."
+        title="Generate a class"
+        description="Describe the class you want to teach. EduMatch builds a multi-week plan grounded in existing resources, techniques, and similar peer classes."
         actions={
           <Link to="/classes" className="text-sm font-semibold text-indigo-600 hover:text-indigo-700">
             ← Back to classes
@@ -191,7 +191,7 @@ export default function GenerateCourse() {
             <>
               <p className="font-semibold text-ink">What are you teaching?</p>
               <div className="grid gap-4 sm:grid-cols-2">
-                <Field label="Course title">
+                <Field label="Class title">
                   <Input
                     value={form.title}
                     onChange={(e) => setField("title", e.target.value)}
@@ -445,16 +445,17 @@ export default function GenerateCourse() {
                 disabled={!aiEnabled || generating}
                 onClick={() => void runGenerate()}
               >
-                Generate course plan
+                Generate class plan
               </Button>
-            )}          </div>
+            )}
+          </div>
         </form>
       </Card>
 
       {generating && (
         <div className="fixed inset-x-0 bottom-20 z-30 mx-auto flex w-fit items-center gap-2 rounded-full bg-ink px-4 py-2 text-sm text-white shadow-lg md:bottom-6">
           <Spinner className="h-4 w-4" />
-          Building your course from the library…
+          Building your class from the library…
         </div>
       )}
     </div>

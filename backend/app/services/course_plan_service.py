@@ -1,4 +1,4 @@
-"""Retrieve-then-generate course plans grounded in library + peer classes."""
+"""Retrieve-then-generate class plans grounded in library + peer classes."""
 
 from __future__ import annotations
 
@@ -202,7 +202,7 @@ def _validate_generated(
     if generated.cannot_generate:
         raise CoursePlanGenerationError(
             generated.cannot_generate_reason
-            or "Not enough relevant resources to generate a grounded course plan.",
+            or "Not enough relevant resources to generate a grounded class plan.",
             resource_candidates=len(bundle.resources),
             technique_candidates=len(bundle.techniques),
             similar_classes=len(bundle.similar_classes),
@@ -305,7 +305,7 @@ def _validate_generated(
         # Soft warning path — still accept if citations are valid, but this
         # catches severely under-filled plans on dense briefs.
         logger.info(
-            "Course plan produced %s sessions (expected ~%s)",
+            "Class plan produced %s sessions (expected ~%s)",
             session_count,
             expected_sessions,
         )
@@ -546,7 +546,7 @@ async def _ensure_class_profile(
         technology=payload.technology,
         notes=payload.notes
         or (
-            f"Auto-created with course plan generator"
+            f"Auto-created with class plan generator"
             f" ({payload.duration_weeks} weeks)."
         ),
     )

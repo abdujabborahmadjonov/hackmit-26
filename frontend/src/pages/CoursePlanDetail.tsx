@@ -170,7 +170,7 @@ export default function CoursePlanDetail() {
   }
 
   async function removePlan() {
-    if (!plan || !confirm("Delete this course plan?")) return;
+    if (!plan || !confirm("Delete this class plan?")) return;
     try {
       await api.deleteCoursePlan(plan.id);
       navigate("/classes");
@@ -179,7 +179,7 @@ export default function CoursePlanDetail() {
     }
   }
 
-  if (loading) return <Loading label="Loading course plan" />;
+  if (loading) return <Loading label="Loading class plan" />;
   if (!plan) {
     return (
       <div>
@@ -194,8 +194,8 @@ export default function CoursePlanDetail() {
   return (
     <div>
       <PageHeader
-        eyebrow="Course plan"
-        title={editing ? "Edit course plan" : plan.title}
+        eyebrow="Class plan"
+        title={editing ? "Edit class plan" : plan.title}
         description={`${humanize(plan.subject)} · ${humanize(plan.level)} · ${plan.duration_weeks} weeks · ${plan.sessions_per_week}× / week`}
         actions={
           <div className="flex flex-wrap gap-2">
@@ -241,7 +241,7 @@ export default function CoursePlanDetail() {
               loading={regenBusy === "all"}
               onClick={() => void regenerateAll()}
             >
-              Regenerate plan
+              Regenerate class plan
             </Button>
             <Button size="sm" variant="danger" onClick={() => void removePlan()}>
               Delete
