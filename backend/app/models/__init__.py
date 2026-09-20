@@ -7,6 +7,7 @@ from app.models.rating import Rating
 from app.models.recommendation import RecommendationEvent, RecommendationFeedback
 from app.models.resource import Resource
 from app.models.user import User
+from app.models.verification_token import StudentVerificationToken
 
 __all__ = [
     "Connection",
@@ -18,6 +19,7 @@ __all__ = [
     "RecommendationEvent",
     "RecommendationFeedback",
     "Resource",
+    "StudentVerificationToken",
     "TeacherProfile",
     "User",
 ]

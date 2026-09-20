@@ -858,16 +858,26 @@ class DemoDataGenerator:
             seen.add((reviewer, teacher))
             # Skewed towards positive, like every real review corpus.
             score = self.random.choices([5, 4, 3, 2, 1], weights=[48, 28, 14, 7, 3], k=1)[0]
-            rows.append(
-                {
-                    "id": uuid.uuid4(),
-                    "reviewer_id": reviewer,
-                    "teacher_id": teacher,
-                    "rating": score,
-                    "comment": self.random.choice(RATING_COMMENTS),
-                    "is_verified_student": self.random.random() < 0.28,
-                }
-            )
+            verified = self.random.random() < 0.28
+            row: dict = {
+                "id": uuid.uuid4(),
+                "reviewer_id": reviewer,
+                "teacher_id": teacher,
+                "rating": score,
+                "comment": self.random.choice(RATING_COMMENTS),
+                "is_verified_student": verified,
+            }
+            if verified:
+                aspects = [
+                    self.random.choices([5, 4, 3, 2, 1], weights=[48, 28, 14, 7, 3], k=1)[0]
+                    for _ in range(4)
+                ]
+                row["knowledge_of_material"] = aspects[0]
+                row["presentation"] = aspects[1]
+                row["friendliness"] = aspects[2]
+                row["other"] = aspects[3]
+                row["rating"] = max(1, min(5, int(sum(aspects) / 4 + 0.5)))
+            rows.append(row)
         await self._bulk_insert(Rating, rows)
         await self.refresh_rating_rollups()
         logger.info("Inserted %d ratings", len(rows))

@@ -10,10 +10,13 @@ import type {
   Profile,
   ProfileInput,
   Rating,
+  RatingSummary,
   RecommendationResponse,
   RecommendedResource,
   Resource,
   ResourceSearchResponse,
+  StudentRatingInput,
+  StudentToken,
   TeacherSearchResponse,
   TokenResponse,
   UserPrivate,
@@ -175,10 +178,40 @@ export const api = {
 
   // --- ratings ---
   ratings: (teacherId: string) => request<Page<Rating>>(`/teachers/${teacherId}/ratings`),
+  ratingSummary: (teacherId: string) =>
+    request<RatingSummary>(`/teachers/${teacherId}/ratings/summary`),
   rate: (teacherId: string, rating: number, comment?: string) =>
     request<Rating>(`/teachers/${teacherId}/ratings`, {
       method: "POST",
       body: JSON.stringify({ rating, comment: comment || null }),
+    }),
+  rateAsStudent: (teacherId: string, data: StudentRatingInput) =>
+    request<Rating>(`/teachers/${teacherId}/ratings`, {
+      method: "POST",
+      body: JSON.stringify({
+        verification_token: data.verification_token,
+        knowledge_of_material: data.knowledge_of_material,
+        presentation: data.presentation,
+        friendliness: data.friendliness,
+        other: data.other,
+        comment: data.comment || null,
+      }),
+    }),
+
+  // --- student verification tokens ---
+  studentTokens: () => request<Page<StudentToken>>("/teachers/me/student-tokens"),
+  createStudentToken: (data: {
+    duration_minutes: number;
+    label?: string;
+    max_uses?: number | null;
+  }) =>
+    request<StudentToken>("/teachers/me/student-tokens", {
+      method: "POST",
+      body: JSON.stringify(data),
+    }),
+  revokeStudentToken: (tokenId: string) =>
+    request<{ detail: string }>(`/teachers/me/student-tokens/${tokenId}`, {
+      method: "DELETE",
     }),
 
   // --- connections ---
