@@ -12,6 +12,7 @@ product runs unchanged without it.
 from __future__ import annotations
 
 import logging
+from collections.abc import AsyncIterator
 from typing import Any
 
 from pydantic import BaseModel, Field
@@ -239,3 +240,43 @@ async def extract_profile_from_document(
     if parsed is None:
         raise LLMUnavailable("The model did not return a usable profile.")
     return parsed
+
+
+# --------------------------------------------------------------------------- #
+# Mentor chat
+# --------------------------------------------------------------------------- #
+async def stream_mentor_reply(
+    persona_prompt: str,
+    viewer_prompt: str,
+    messages: list[dict[str, str]],
+    *,
+    max_tokens: int = 1200,
+) -> AsyncIterator[str]:
+    """Stream one reply, token by token, as the persona.
+
+    The persona dossier is the same for every viewer, so it goes first behind a
+    cache breakpoint; the viewer's own profile follows it and varies per user.
+    """
+    client = _client()
+    system = [
+        {"type": "text", "text": persona_prompt, "cache_control": {"type": "ephemeral"}},
+        {"type": "text", "text": viewer_prompt},
+    ]
+    try:
+        async with client.beta.messages.stream(
+            model=MODEL,
+            max_tokens=max_tokens,
+            system=system,
+            messages=messages,
+            betas=[FALLBACK_BETA],
+            fallbacks="default",
+        ) as stream:
+            async for chunk in stream.text_stream:
+                yield chunk
+            final = await stream.get_final_message()
+    except Exception as exc:
+        logger.warning("Mentor chat failed: %s", exc)
+        raise LLMUnavailable(f"The conversation dropped: {exc}") from exc
+
+    if getattr(final, "stop_reason", None) == "refusal":
+        raise LLMUnavailable("The model declined to answer this one.")

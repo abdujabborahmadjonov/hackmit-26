@@ -209,3 +209,47 @@ export interface ProfileDraft {
   confidence: string;
   source_name: string | null;
 }
+
+
+/** One thing a guide is allowed to draw on. Shown as a footnote under a reply. */
+export interface MentorSource {
+  id: string;
+  label: string;
+  url: string;
+  kind: "interview" | "talk" | "book" | "course" | "article" | "other";
+}
+
+/** An educator you can hold a live conversation with. The persona is data on
+ *  the server - `available` is false when that deployment has no model key.
+ *
+ *  `mode` is the difference that matters: a `first_person` persona speaks as
+ *  the educator (only ever a composite, or someone who agreed to it), while a
+ *  `guide` speaks *about* a real educator's published teaching and cites it. */
+export interface Mentor {
+  slug: string;
+  name: string;
+  title: string;
+  institution: string;
+  mode: "first_person" | "guide";
+  pinned: boolean;
+  location_name: string;
+  known_for: string;
+  tagline: string;
+  avatar_seed: string;
+  synthetic: boolean;
+  disclaimer: string;
+  subjects: string[];
+  years_experience: number | null;
+  opening_line: string;
+  suggested_questions: string[];
+  collaborates_on: string[];
+  sources: MentorSource[];
+  /** False for a guide whose sources have not been filled in yet. */
+  has_material: boolean;
+  available: boolean;
+}
+
+export interface ChatTurn {
+  role: "user" | "assistant";
+  content: string;
+}

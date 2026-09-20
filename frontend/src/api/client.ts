@@ -2,7 +2,10 @@
  *  the base URL, and how the API reports errors. */
 
 import type {
+  ChatTurn,
   Connection,
+  Mentor,
+  MentorSource,
   ProfileDraft,
   Conversation,
   Message,
@@ -117,6 +120,96 @@ async function request<T>(
   return body as T;
 }
 
+/** Mentor chat streams, so it bypasses `request()` and reads the body itself.
+ *  EventSource is not an option: it cannot POST and cannot send the token. */
+export interface MentorReplyEnd {
+  /** The sources this reply actually cited, in the order it cited them. */
+  citations: MentorSource[];
+  /** Keys the model wrote that match no source. The server checks; we show
+   *  them as unverified rather than pretending they are references. */
+  unverified: string[];
+}
+
+export async function streamMentorChat(
+  slug: string,
+  messages: ChatTurn[],
+  options: {
+    onDelta: (text: string) => void;
+    onEnd?: (end: MentorReplyEnd) => void;
+    signal?: AbortSignal;
+  },
+): Promise<void> {
+  const token = getToken();
+  const response = await fetch(`${API_URL}/mentors/${slug}/chat`, {
+    method: "POST",
+    headers: {
+      "Content-Type": "application/json",
+      Accept: "text/event-stream",
+      ...(token ? { Authorization: `Bearer ${token}` } : {}),
+    },
+    body: JSON.stringify({ messages }),
+    signal: options.signal,
+  });
+
+  if (!response.ok) {
+    if (response.status === 401 && token) setToken(null);
+    const text = await response.text();
+    throw readError(response.status, text ? (JSON.parse(text) as unknown) : null);
+  }
+  if (!response.body) throw new ApiError(500, "This browser cannot read a streamed reply.");
+
+  const reader = response.body.pipeThrough(new TextDecoderStream()).getReader();
+  let buffer = "";
+
+  /** Returns true when the stream said it was finished. */
+  const handleFrame = (frame: string): boolean => {
+    let event = "message";
+    let data = "";
+    for (const line of frame.split("\n")) {
+      if (line.startsWith("event:")) event = line.slice(6).trim();
+      // A frame may carry several data lines; SSE joins them with a newline.
+      else if (line.startsWith("data:")) data += (data ? "\n" : "") + line.slice(5).trim();
+    }
+    const payload = data
+      ? (JSON.parse(data) as {
+          text?: string;
+          detail?: string;
+          citations?: MentorSource[];
+          unverified?: string[];
+        })
+      : {};
+    if (event === "delta" && payload.text) options.onDelta(payload.text);
+    // The 200 was sent before the model spoke, so a failure arrives in-band.
+    if (event === "error") throw new ApiError(502, payload.detail ?? "The conversation dropped.");
+    if (event === "done") {
+      options.onEnd?.({
+        citations: payload.citations ?? [],
+        unverified: payload.unverified ?? [],
+      });
+      return true;
+    }
+    return false;
+  };
+
+  try {
+    for (;;) {
+      const { done, value } = await reader.read();
+      if (done) break;
+      buffer += value.replace(/\r\n/g, "\n");
+      let boundary = buffer.indexOf("\n\n");
+      while (boundary !== -1) {
+        const frame = buffer.slice(0, boundary);
+        buffer = buffer.slice(boundary + 2);
+        if (frame.trim() && handleFrame(frame)) return;
+        boundary = buffer.indexOf("\n\n");
+      }
+    }
+  } finally {
+    // Stops the request when the caller aborts or a frame threw.
+    await reader.cancel().catch(() => {});
+  }
+}
+
 export const api = {
   // --- auth ---
   register: (data: {
@@ -225,6 +318,11 @@ export const api = {
     else form.append("file", input);
     return request<ProfileDraft>("/ai/profile-from-document", { method: "POST", body: form });
   },
+
+  // --- mentors ---
+  mentors: () => request<Mentor[]>("/mentors"),
+  mentor: (slug: string) => request<Mentor>(`/mentors/${slug}`),
+  // The conversation itself streams - see streamMentorChat above.
 
   // --- system ---
   health: () => request<{ status: string; database: string }>("/health"),

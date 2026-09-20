@@ -17,6 +17,7 @@ from app.api import (
     ai,
     auth,
     connections,
+    mentors,
     messages,
     profiles,
     ratings,
@@ -47,6 +48,7 @@ colleagues they are most likely to collaborate well with.
 2. `POST /profiles` to describe your teaching.
 3. `GET /recommendations` for your matches - each one explains *why*.
 4. `GET /search/teachers` for filtered/semantic/geographic discovery.
+5. `POST /mentors/{slug}/chat` to talk to an educator persona, streamed live.
 
 ### How matching works
 `score = 0.30*semantic + 0.20*expertise + 0.15*education + 0.15*teaching_level
@@ -70,6 +72,7 @@ TAGS_METADATA = [
     {"name": "connections", "description": "Connection requests between educators."},
     {"name": "messages", "description": "Direct messaging (HTTPS transport security only)."},
     {"name": "ai", "description": "Generative features: collaboration briefs and syllabus import."},
+    {"name": "mentors", "description": "Live streaming conversation with an educator persona."},
     {"name": "system", "description": "Health and diagnostics."},
 ]
 
@@ -155,6 +158,7 @@ def create_app() -> FastAPI:
     for router in (
         auth.router,
         ai.router,
+        mentors.router,
         users.router,
         profiles.router,
         recommendations.router,
