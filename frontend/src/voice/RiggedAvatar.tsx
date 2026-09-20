@@ -55,7 +55,7 @@ export function RiggedAvatar({
     if (!mount) return;
 
     const scene = new THREE.Scene();
-    const camera = new THREE.PerspectiveCamera(30, 1, 0.1, 200);
+    const camera = new THREE.PerspectiveCamera(26, 1, 0.1, 200);
 
     let renderer: THREE.WebGLRenderer;
     try {
@@ -225,7 +225,7 @@ export function RiggedAvatar({
       camera.aspect = w / h;
       // Close enough that the head fills the frame, pulled back on a wide
       // canvas so the shoulders do not crop.
-      camera.position.set(0, framedAt, 0.78 * Math.max(1, 1.7 / camera.aspect));
+      camera.position.set(0, framedAt, 0.52 * Math.max(1, 1.7 / camera.aspect));
       camera.lookAt(0, framedAt, 0);
       camera.updateProjectionMatrix();
     };

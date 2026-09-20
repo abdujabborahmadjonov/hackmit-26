@@ -6,6 +6,7 @@ import { humanize } from "../api/vocab";
 import { MentorConversation } from "../components/MentorConversation";
 import {
   Avatar,
+  Button,
   Badge,
   Card,
   ErrorNote,
@@ -16,6 +17,9 @@ import {
 
 const VoiceMode = lazy(() =>
   import("../voice/VoiceMode").then((m) => ({ default: m.VoiceMode })),
+);
+const MeetingRoom = lazy(() =>
+  import("../voice/MeetingRoom").then((m) => ({ default: m.MeetingRoom })),
 );
 
 /** An educator's profile, with the conversation on it.
@@ -37,6 +41,7 @@ export default function MentorProfile() {
   const [error, setError] = useState<unknown>(null);
   const [turns, setTurns] = useState<ChatTurn[]>([]);
   const [mode, setMode] = useState<"text" | "voice">("text");
+  const [inMeeting, setInMeeting] = useState(false);
 
   const mentor = slug ? mentors.find((m) => m.slug === slug) : mentors[0];
 
@@ -47,6 +52,7 @@ export default function MentorProfile() {
   useEffect(() => {
     setTurns([]);
     setMode("text");
+    setInMeeting(false);
   }, [slug]);
 
   if (loading) return <Loading label="Opening the profile" />;
@@ -67,6 +73,28 @@ export default function MentorProfile() {
   const guide = mentor.mode === "guide";
   const ready = mentor.available && mentor.has_material;
   const canSpeak = Boolean(mentor.voice?.enabled && mentor.avatar?.enabled && ready);
+
+  if (inMeeting) {
+    return (
+      <Suspense
+        fallback={
+          <div className="fixed inset-0 z-50 grid place-items-center bg-slate-950">
+            <span className="inline-flex items-center gap-2 text-sm text-white/50">
+              <Spinner className="h-4 w-4" />
+              Connecting…
+            </span>
+          </div>
+        }
+      >
+        <MeetingRoom
+          mentor={mentor}
+          turns={turns}
+          onTurns={setTurns}
+          onLeave={() => setInMeeting(false)}
+        />
+      </Suspense>
+    );
+  }
 
   return (
     <div className="space-y-6">
@@ -127,6 +155,21 @@ export default function MentorProfile() {
               </span>
               {mentor.tagline}
             </blockquote>
+          )}
+
+          {canSpeak && (
+            <div className="mt-6 flex flex-wrap items-center gap-3">
+              <Button onClick={() => setInMeeting(true)}>
+                <svg aria-hidden="true" viewBox="0 0 24 24" className="h-4 w-4" fill="none" stroke="currentColor" strokeWidth="1.9" strokeLinecap="round" strokeLinejoin="round">
+                  <rect x="2" y="6" width="13" height="12" rx="2.5" />
+                  <path d="m15 11 6-3.5v9L15 13" />
+                </svg>
+                Meet {mentor.name.split(" ").slice(-1)[0]}
+              </Button>
+              <p className="text-xs text-muted">
+                Face to face, out loud — an AI persona, not him.
+              </p>
+            </div>
           )}
 
           {mentor.subjects.length > 0 && (
