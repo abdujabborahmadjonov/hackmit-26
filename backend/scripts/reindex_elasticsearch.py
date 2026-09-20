@@ -128,8 +128,16 @@ async def reindex_all() -> tuple[int, int]:
 
 
 async def main() -> int:
-    await reindex_all()
-    await engine.dispose()
+    # Cleanup has to survive the early exits too - reindex_all() raises
+    # SystemExit when the cluster is unreachable, which is the most common way
+    # to run this script while credentials are still being sorted out. Without
+    # the finally, aiohttp logs "Unclosed client session" on top of the real
+    # error message and buries it.
+    try:
+        await reindex_all()
+    finally:
+        await es.close_client()
+        await engine.dispose()
     return 0
 
 

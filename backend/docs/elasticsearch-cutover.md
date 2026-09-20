@@ -63,6 +63,12 @@ you add both yourself:
 
 The key needs write access to the `edumatch_*` indices, not just read.
 
+Elastic shows you three values when you create a key: an `id`, an `api_key`,
+and an **`encoded`** value. Take the `encoded` one — this config passes
+`api_key` as a single string, and elasticsearch-py only accepts the id/secret
+pair as a tuple. Pasting the bare `api_key` field gives you the same 401 you
+were trying to fix, which is a miserable ten minutes.
+
 **2. Build the indices.**
 
 ```bash
