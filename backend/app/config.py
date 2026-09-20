@@ -136,7 +136,7 @@ class Settings(BaseSettings):
     tts_rate_limit_per_minute: int = 120
 
     # --- search ---
-    search_provider: Literal["postgres", "elasticsearch"] = "postgres"
+    search_provider: Literal["postgres", "elasticsearch"] = "elasticsearch"
     elasticsearch_url: str = "http://localhost:9200"
     elasticsearch_api_key: str = Field(
         default="",
@@ -182,7 +182,7 @@ class Settings(BaseSettings):
     rec_weight_class_size: float = 0.10
     rec_weight_social: float = 0.08
     rec_weight_quality: float = 0.07
-    rec_candidate_pool: int = 300
+    rec_candidate_pool: int = 80
     rec_default_limit: int = 10
     # Optional JSON override, e.g. {"high_school": {"university": 0.4}}
     education_compatibility_json: str = ""
@@ -193,6 +193,8 @@ class Settings(BaseSettings):
     rec_mmr_lambda: float = 0.7
     rec_quality_prior: float = 3.5
     rec_quality_prior_strength: float = 5.0
+    # Short in-process cache for identical Matches requests (per worker).
+    rec_response_cache_ttl_seconds: float = 45.0
 
     @field_validator("database_url", mode="after")
     @classmethod

@@ -530,43 +530,45 @@ class RecommendationService:
         if not viewer_friends:
             return dict.fromkeys(candidate_ids, (0.0, 0))
 
-        # 2-hop: edges among friends (and to candidates) so we can count overlap.
-        # Cap friend fan-out so a hub account cannot explode this query.
+        # 2-hop: only friend↔candidate edges (enough for FoF + shared-neighbor counts).
         friend_list = list(viewer_friends)[:200]
         candidate_set = set(candidate_ids)
-        interesting = set(friend_list) | candidate_set
+        if not friend_list or not candidate_set:
+            return dict.fromkeys(candidate_ids, (0.0, 0))
 
         hop2 = (
             await self.db.execute(
                 select(Connection.requester_id, Connection.receiver_id).where(
                     Connection.status == ConnectionStatus.ACCEPTED,
                     or_(
-                        Connection.requester_id.in_(friend_list),
-                        Connection.receiver_id.in_(friend_list),
+                        and_(
+                            Connection.requester_id.in_(friend_list),
+                            Connection.receiver_id.in_(candidate_ids),
+                        ),
+                        and_(
+                            Connection.receiver_id.in_(friend_list),
+                            Connection.requester_id.in_(candidate_ids),
+                        ),
                     ),
                 )
             )
         ).all()
 
-        neighbors: dict[uuid.UUID, set[uuid.UUID]] = defaultdict(set)
-        for a, b in hop2:
-            if a in interesting or b in interesting:
-                neighbors[a].add(b)
-                neighbors[b].add(a)
-        neighbors[viewer_id] = viewer_friends
-
+        shared_counts: dict[uuid.UUID, int] = defaultdict(int)
         fof: set[uuid.UUID] = set()
-        for friend in friend_list:
-            fof |= neighbors.get(friend, set())
-        fof -= viewer_friends
-        fof.discard(viewer_id)
+        for a, b in hop2:
+            if a in viewer_friends and b in candidate_set:
+                shared_counts[b] += 1
+                fof.add(b)
+            elif b in viewer_friends and a in candidate_set:
+                shared_counts[a] += 1
+                fof.add(a)
 
         out: dict[uuid.UUID, tuple[float, int]] = {}
         for cid in candidate_ids:
-            shared = len(viewer_friends & neighbors.get(cid, set()))
-            is_fof = cid in fof
+            shared = shared_counts.get(cid, 0)
             out[cid] = (
-                social_similarity(shared_neighbors=shared, is_friend_of_friend=is_fof),
+                social_similarity(shared_neighbors=shared, is_friend_of_friend=cid in fof),
                 shared,
             )
         return out
@@ -583,7 +585,10 @@ class RecommendationService:
     ) -> RecommendationResult:
         started = time.perf_counter()
         limit = limit or settings.rec_default_limit
-        pool_size = pool_size or settings.rec_candidate_pool
+        # Cap the scored pool relative to the page size unless the caller
+        # explicitly overrode ``pool_size`` (via the API query param).
+        if pool_size is None:
+            pool_size = min(settings.rec_candidate_pool, max(limit * 8, 64))
         use_mmr = settings.rec_mmr_enabled if mmr is None else mmr
 
         viewer = await self._load_profile(user_id)
@@ -629,7 +634,12 @@ class RecommendationService:
         scored.sort(
             key=lambda item: (item.breakdown.total, item.profile.average_rating), reverse=True
         )
-        top = mmr_rerank(scored, limit=limit) if use_mmr else scored[:limit]
+        if use_mmr:
+            # Diversify only among the strongest candidates — full-pool MMR is O(n²).
+            mmr_input = scored[: max(limit * 5, 40)]
+            top = mmr_rerank(mmr_input, limit=limit)
+        else:
+            top = scored[:limit]
 
         if log_events and top:
             await self._log_events(user_id, top, arm_id=selected.arm_id)

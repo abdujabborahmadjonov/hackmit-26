@@ -10,7 +10,10 @@ from fastapi import APIRouter, Depends, HTTPException, Query, status
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from app.config import normalise_recommendation_weights, publish_recommendation_weights
+from app.config import (
+    normalise_recommendation_weights,
+    publish_recommendation_weights,
+)
 from app.database import get_db
 from app.models.profile import TeacherProfile
 from app.models.recommendation import RecommendationEvent, RecommendationFeedback
@@ -25,6 +28,12 @@ from app.schemas.recommendation import (
     RecommendationWeightsUpdate,
 )
 from app.services import bandit_service
+from app.services.recommendation_cache import (
+    cache_get,
+    cache_key,
+    cache_put,
+    invalidate_recommendation_cache,
+)
 from app.services.recommendation_service import (
     ProfileRequiredError,
     RecommendationService,
@@ -75,6 +84,17 @@ async def get_recommendations(
         bool | None, Query(description="Override REC_MMR_ENABLED for this request")
     ] = None,
 ) -> RecommendationResponse:
+    cache_key_value = cache_key(
+        current_user.id,
+        limit=limit,
+        exclude_connected=exclude_connected,
+        candidate_pool=candidate_pool,
+        mmr=mmr,
+    )
+    cached = cache_get(cache_key_value)
+    if cached is not None:
+        return cached
+
     service = RecommendationService(db)
     try:
         result = await service.recommend(
@@ -100,7 +120,7 @@ async def get_recommendations(
         )
         for item in result.items
     ]
-    return RecommendationResponse(
+    response = RecommendationResponse(
         items=items,
         generated_for=current_user.id,
         candidate_pool_size=result.candidate_pool_size,
@@ -109,6 +129,8 @@ async def get_recommendations(
         bandit_arm_id=result.bandit_arm_id,
         weight_source=result.weight_source,
     )
+    cache_put(cache_key_value, response)
+    return response
 
 
 @router.get(
@@ -162,6 +184,7 @@ async def put_weights(
 
     profile.recommendation_weights = weights
     await db.commit()
+    invalidate_recommendation_cache(current_user.id)
     return RecommendationWeightsRead(
         weights=publish_recommendation_weights(weights),
         saved=True,
@@ -186,6 +209,7 @@ async def delete_weights(current_user: CurrentUser, db: DB) -> RecommendationWei
         )
     profile.recommendation_weights = None
     await db.commit()
+    invalidate_recommendation_cache(current_user.id)
     selected = await bandit_service.resolve_weights(db, profile_weights=None)
     return RecommendationWeightsRead(
         weights=publish_recommendation_weights(selected.weights),
@@ -298,4 +322,5 @@ async def submit_feedback(
     event.feedback = feedback
     await bandit_service.record_feedback(db, arm_id=event.bandit_arm_id, feedback=feedback)
     await db.commit()
+    invalidate_recommendation_cache(current_user.id)
     return Message(detail="Feedback recorded")

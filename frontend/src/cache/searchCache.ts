@@ -5,7 +5,7 @@ import type { TeacherSearchResponse } from "../api/types";
 type CacheKey = string;
 
 const store = new Map<CacheKey, { data: TeacherSearchResponse; fetchedAt: number }>();
-const TTL_MS = 60_000;
+const TTL_MS = 5 * 60_000;
 
 export function searchCacheKey(params: Record<string, unknown>): CacheKey {
   return JSON.stringify(params, Object.keys(params).sort());

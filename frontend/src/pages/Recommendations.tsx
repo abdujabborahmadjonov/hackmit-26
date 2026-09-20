@@ -5,7 +5,9 @@ import type { Recommendation, RecommendationResponse } from "../api/types";
 import {
   clearRecommendationsCache,
   getRecommendationsCache,
+  loadRecommendationsShared,
   patchRecommendationsCache,
+  recommendationsCacheIsStale,
   setRecommendationsCache,
 } from "../cache/recommendationsCache";
 import { MatchCard } from "../components/MatchCard";
@@ -25,6 +27,8 @@ import { Button, Card, ErrorNote, PageHeader } from "../components/ui";
  *  if there are others that can overtake them. */
 const POOL = 20;
 const SHOWN = 10;
+/** Keep the ANN+score pool modest — enough diversity without multi-second loads. */
+const CANDIDATE_POOL = 80;
 
 function writeCache(parts: {
   data: RecommendationResponse;
@@ -73,21 +77,28 @@ export default function Recommendations() {
     let cancelled = false;
 
     async function fetchMatches(force: boolean) {
-      if (!force && getRecommendationsCache()) return;
+      const cached = getRecommendationsCache();
+      if (!force && cached && !recommendationsCacheIsStale(cached)) return;
 
-      if (force && getRecommendationsCache()) setRefreshing(true);
-      else if (!getRecommendationsCache()) setLoading(true);
+      if (cached && !force) {
+        // Stale-while-revalidate: keep painting cached rows, refresh quietly.
+        setRefreshing(true);
+      } else if (force && cached) {
+        setRefreshing(true);
+      } else if (!cached) {
+        setLoading(true);
+      }
 
       setError(null);
       try {
-        const result = await api.recommendations({
-          limit: POOL,
-          exclude_connected: true,
-        });
-        if (cancelled) return;
-        setData(result);
-        setWeights(result.weights);
-        setWeightsSaved(result.weight_source === "profile");
+        const result = await loadRecommendationsShared(() =>
+          api.recommendations({
+            limit: POOL,
+            exclude_connected: true,
+            candidate_pool: CANDIDATE_POOL,
+          }),
+        );
+        // Always persist — StrictMode may cancel the first mount before paint.
         writeCache({
           data: result,
           weights: result.weights,
@@ -96,6 +107,10 @@ export default function Recommendations() {
           connected: force ? new Set() : new Set(getRecommendationsCache()?.connected ?? []),
           aiEnabled: getRecommendationsCache()?.aiEnabled ?? false,
         });
+        if (cancelled) return;
+        setData(result);
+        setWeights(result.weights);
+        setWeightsSaved(result.weight_source === "profile");
         if (force) {
           setDismissed(new Set());
           setConnected(new Set());
@@ -141,6 +156,7 @@ export default function Recommendations() {
       const result = await api.recommendations({
         limit: POOL,
         exclude_connected: true,
+        candidate_pool: CANDIDATE_POOL,
       });
       setData(result);
       setWeights(result.weights);

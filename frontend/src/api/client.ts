@@ -294,8 +294,12 @@ export const api = {
     request<Profile>("/profiles/me", { method: "PUT", body: JSON.stringify(data) }),
 
   // --- the main event ---
-  recommendations: (params?: { limit?: number; exclude_connected?: boolean; mmr?: boolean }) =>
-    request<RecommendationResponse>("/recommendations", { query: params }),
+  recommendations: (params?: {
+    limit?: number;
+    exclude_connected?: boolean;
+    mmr?: boolean;
+    candidate_pool?: number;
+  }) => request<RecommendationResponse>("/recommendations", { query: params }),
 
   explain: (userId: string) =>
     request<RecommendationResponse["items"][number]>(`/recommendations/${userId}/explain`),

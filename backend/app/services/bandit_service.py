@@ -53,6 +53,8 @@ async def ensure_arms(db: AsyncSession) -> list[BanditArm]:
     """Create missing arms from the default catalogue; leave existing posteriors."""
     specs = default_arm_specs()
     existing = {arm.arm_id: arm for arm in (await db.scalars(select(BanditArm))).all()}
+    if len(existing) >= len(specs):
+        return list(existing.values())
     created = False
     for arm_id, weights in specs.items():
         if arm_id in existing:

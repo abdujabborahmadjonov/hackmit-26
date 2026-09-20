@@ -15,6 +15,7 @@ from app.models.connection import Connection, ConnectionStatus
 from app.models.user import User
 from app.schemas.common import Message, Page
 from app.schemas.connection import ConnectionCreate, ConnectionRead, ConnectionUpdate
+from app.services.recommendation_cache import invalidate_recommendation_cache
 from app.utils.auth import CurrentUser
 
 router = APIRouter(prefix="/connections", tags=["connections"])
@@ -69,6 +70,8 @@ async def create_connection(
             existing.requester_id, existing.receiver_id = current_user.id, payload.receiver_id
             await db.commit()
             await db.refresh(existing)
+            invalidate_recommendation_cache(current_user.id)
+            invalidate_recommendation_cache(payload.receiver_id)
             return ConnectionRead.model_validate(existing)
         raise HTTPException(
             status_code=status.HTTP_409_CONFLICT,
@@ -89,6 +92,8 @@ async def create_connection(
             status_code=status.HTTP_409_CONFLICT, detail="A connection already exists"
         ) from None
     await db.refresh(connection)
+    invalidate_recommendation_cache(current_user.id)
+    invalidate_recommendation_cache(payload.receiver_id)
     return ConnectionRead.model_validate(connection)
 
 
@@ -179,6 +184,8 @@ async def update_connection(
     connection.status = new_status
     await db.commit()
     await db.refresh(connection)
+    invalidate_recommendation_cache(connection.requester_id)
+    invalidate_recommendation_cache(connection.receiver_id)
     return ConnectionRead.model_validate(connection)
 
 
@@ -199,4 +206,6 @@ async def delete_connection(
         )
     await db.delete(connection)
     await db.commit()
+    invalidate_recommendation_cache(connection.requester_id)
+    invalidate_recommendation_cache(connection.receiver_id)
     return Message(detail="Connection removed")

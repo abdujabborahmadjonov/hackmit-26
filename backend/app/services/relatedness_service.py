@@ -124,14 +124,12 @@ async def refresh_cooccurrence(db: AsyncSession, *, force: bool = False) -> int:
 async def ensure_cooccurrence(db: AsyncSession, *, blocking: bool = True) -> None:
     """Refresh relatedness cache.
 
-    On the recommendation hot path pass ``blocking=False`` so a cold cache
-    uses hand-curated relatedness only for this request (refresh is skipped
-    rather than scanning thousands of profiles inline).
+    On the recommendation hot path pass ``blocking=False`` so we never scan
+    thousands of profiles inline — hand-curated RELATED_TERMS still apply.
+    A warm cache is reused as-is until a blocking caller refreshes it.
     """
     try:
-        if not blocking and not _CACHE:
-            # Mark empty so we do not stampede; a later blocking caller / demo
-            # script can fill it. Hand-curated RELATED_TERMS still apply.
+        if not blocking:
             return
         await refresh_cooccurrence(db)
     except Exception:  # pragma: no cover

@@ -61,8 +61,13 @@ export default function Search() {
     lon: profile?.longitude ?? undefined,
   };
   const [filters, setFilters] = useState<Filters>(EMPTY);
-  const [data, setData] = useState<TeacherSearchResponse | null>(null);
-  const [loading, setLoading] = useState(false);
+  const defaultCacheKey = searchCacheKey({
+    sort: "relevance",
+    limit: 24,
+  });
+  const cachedDefault = getSearchCache(defaultCacheKey);
+  const [data, setData] = useState<TeacherSearchResponse | null>(cachedDefault);
+  const [loading, setLoading] = useState(!cachedDefault);
   const [error, setError] = useState<unknown>(null);
 
   const run = useCallback(async (active: Filters) => {
@@ -105,9 +110,11 @@ export default function Search() {
     }
   }, []);
 
+  // First paint: hydrate from cache immediately, then fetch once auth is ready
+  // (geo filters need profile coords only when a radius is set).
   useEffect(() => {
     if (authLoading) return;
-    const handle = window.setTimeout(() => void run(filters), 250);
+    const handle = window.setTimeout(() => void run(filters), cachedDefault ? 0 : 250);
     return () => window.clearTimeout(handle);
     // Geographic controls apply as they change; other filters still use Submit.
     // eslint-disable-next-line react-hooks/exhaustive-deps

@@ -97,7 +97,10 @@ async def test_refresh_in_flight_returns_existing():
 
 
 @pytest.mark.asyncio
-async def test_ensure_nonblocking_skips_cold_cache():
+async def test_ensure_nonblocking_never_hits_the_database():
+    # Even with a warm-but-stale cache, the recommend hot path must not refresh.
+    rel._CACHE = {("a", "b"): 0.5}
+    rel._CACHE_BUILT_AT = 0.0  # expired
     db = AsyncMock()
     await ensure_cooccurrence(db, blocking=False)
     db.execute.assert_not_called()
