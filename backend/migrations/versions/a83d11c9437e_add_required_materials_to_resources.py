@@ -1,7 +1,7 @@
 """add required materials to resources
 
 Revision ID: a83d11c9437e
-Revises: f37b766f11e4
+Revises: d4e5f6a7b8c9
 Create Date: 2026-09-20 02:11:00.000000+00:00
 """
 
@@ -10,7 +10,7 @@ import sqlalchemy as sa
 from sqlalchemy.dialects import postgresql
 
 revision = "a83d11c9437e"
-down_revision = "f37b766f11e4"
+down_revision = "d4e5f6a7b8c9"
 branch_labels = None
 depends_on = None
 
