@@ -18,6 +18,8 @@ import Forum from "./pages/Forum";
 import Classes from "./pages/Classes";
 import ClassSearch from "./pages/ClassSearch";
 import ClassPlanning from "./pages/ClassPlanning";
+import GenerateCourse from "./pages/GenerateCourse";
+import CoursePlanDetail from "./pages/CoursePlanDetail";
 import TechniqueDetail from "./pages/TechniqueDetail";
 import StudentRate from "./pages/StudentRate";
 
@@ -356,6 +358,22 @@ export default function App() {
         element={
           <RequireAuth>
             <Classes />
+          </RequireAuth>
+        }
+      />
+      <Route
+        path="/classes/generate"
+        element={
+          <RequireAuth>
+            <GenerateCourse />
+          </RequireAuth>
+        }
+      />
+      <Route
+        path="/classes/plans/:planId"
+        element={
+          <RequireAuth>
+            <CoursePlanDetail />
           </RequireAuth>
         }
       />
