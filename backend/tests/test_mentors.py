@@ -56,7 +56,7 @@ async def test_listing_mentors_needs_no_key_and_no_login(client, monkeypatch):
     monkeypatch.setattr(settings, "llm_api_key", "")
     body = (await client.get("/mentors")).json()
     # Pinned first - that is the order the directory renders them in.
-    assert [m["slug"] for m in body] == [GUIDE, SLUG]
+    assert [m["slug"] for m in body] == ["osmar-zaiane", SLUG, GUIDE]
     # The client uses this to explain why the chat box is missing.
     assert all(m["available"] is False for m in body)
     assert all(m["disclaimer"] for m in body)
@@ -68,7 +68,6 @@ async def test_the_listing_distinguishes_a_guide_from_a_persona(client):
 
     guide = by_slug[GUIDE]
     assert guide["mode"] == "guide"
-    assert guide["pinned"] is True
     assert guide["synthetic"] is False
     # No sources loaded yet, so it must not answer about him at all.
     assert guide["has_material"] is False

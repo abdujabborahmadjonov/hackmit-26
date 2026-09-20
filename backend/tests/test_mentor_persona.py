@@ -14,8 +14,9 @@ from pydantic import ValidationError
 from app.services import mentor_service
 from app.services.mentor_service import Mentor
 
-ELENA = "elena-vasquez"   # composite, speaks in the first person
-STRANG = "gilbert-strang"  # real person, so a guide to published material
+ELENA = "elena-vasquez"     # composite, speaks in the first person
+STRANG = "gilbert-strang"   # real person, no consent, so a cited guide
+ZAIANE = "osmar-zaiane"     # real person who consented, so first person
 
 REAL_PERSON = {"slug": "x", "name": "Real Person", "title": "Professor", "institution": "MIT"}
 
@@ -54,10 +55,22 @@ def test_a_claim_cannot_cite_a_source_that_does_not_exist():
 # --------------------------------------------------------------------------- #
 # Loading
 # --------------------------------------------------------------------------- #
-def test_both_seeded_mentors_load_with_the_pinned_one_first():
+def test_the_seeded_mentors_load_with_the_pinned_one_first():
     mentors = mentor_service.list_mentors()
-    assert [m.slug for m in mentors] == [STRANG, ELENA]
+    assert [m.slug for m in mentors] == [ZAIANE, ELENA, STRANG]
     assert mentors[0].pinned is True
+
+
+def test_consent_decides_the_mode_of_each_real_person():
+    """Same product, two real people, and the difference is a written yes."""
+    consented = mentor_service.get_mentor(ZAIANE)
+    assert consented.consent.granted is True
+    assert consented.consent.source and consented.consent.scope
+    assert consented.mode == "first_person"
+
+    not_consented = mentor_service.get_mentor(STRANG)
+    assert not_consented.consent.granted is False
+    assert not_consented.mode == "guide"
 
 
 def test_unknown_slug_is_none():
@@ -73,6 +86,37 @@ def test_the_real_person_is_a_guide_and_the_composite_is_not():
     elena = mentor_service.get_mentor(ELENA)
     assert elena.mode == "first_person"
     assert elena.synthetic is True
+
+
+CONSENTED = {
+    **REAL_PERSON,
+    "mode": "first_person",
+    "consent": {"granted": True, "source": "email, 2026-09-19"},
+}
+
+
+def test_an_empty_first_person_dossier_is_refused_at_the_prompt():
+    """The worst state a persona can be in: consent given, guardrails off, and
+    nothing left holding the model to the real person but its own memory."""
+    mentor = Mentor.model_validate(CONSENTED)
+    assert mentor.has_material is False
+
+    prompt = mentor_service.persona_prompt(mentor)
+    assert "YOU HAVE NO DOSSIER YET" in prompt
+    assert "answer nothing about how they teach" in prompt
+    # And it must not print empty section headers the model could fill in.
+    assert "What they believe about teaching" not in prompt
+    assert "Things they actually do in class" not in prompt
+
+
+@pytest.mark.parametrize(
+    "field", ["teaching_style", "beliefs", "signature_moves", "stories"]
+)
+def test_any_one_dossier_field_is_enough_to_speak(field):
+    value = "He opens with a question." if field == "teaching_style" else ["He opens with a question."]
+    mentor = Mentor.model_validate({**CONSENTED, field: value})
+    assert mentor.has_material is True
+    assert "YOU HAVE NO DOSSIER YET" not in mentor_service.persona_prompt(mentor)
 
 
 def test_a_guide_without_sources_reports_that_it_has_no_material():

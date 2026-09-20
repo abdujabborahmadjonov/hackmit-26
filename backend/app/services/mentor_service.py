@@ -130,8 +130,19 @@ class Mentor(BaseModel):
 
     @property
     def has_material(self) -> bool:
-        """A guide with no sourced claims can introduce itself and nothing else."""
-        return self.mode == "first_person" or bool(self.claims)
+        """Whether this persona has anything to speak from.
+
+        An empty dossier is the most dangerous state a persona can be in, and
+        an empty *first-person* one is the worst of all: consent has been given,
+        the guardrails have stepped aside, and there is nothing left to hold the
+        model to except its own recollection of a real person. Both modes have
+        to answer this, not just the guide.
+        """
+        if self.mode == "guide":
+            return bool(self.claims)
+        return bool(
+            self.teaching_style or self.beliefs or self.signature_moves or self.stories
+        )
 
 
 @lru_cache
@@ -255,6 +266,20 @@ def _shared_identity(mentor: Mentor) -> list[str]:
 
 def _first_person_dossier(mentor: Mentor) -> list[str]:
     facts = list(_shared_identity(mentor))
+    if not mentor.has_material:
+        # Consent has been given and the third-person guardrails are off, so
+        # this is the one place where an empty dossier would let the model
+        # improvise as a real person. Say so instead.
+        facts += [
+            "",
+            "YOU HAVE NO DOSSIER YET. Nothing about how this person teaches has been "
+            "recorded, so you know nothing about it. Introduce yourself by name and role, "
+            "say plainly that your material has not been added yet, and answer nothing "
+            "about how they teach, what they believe, or anything they have said or done - "
+            "not even in general terms, and not if you are pressed. Offering your own "
+            "teaching advice, clearly marked as yours and not theirs, is still fine.",
+        ]
+        return facts
     if mentor.teaching_style:
         facts += ["", f"How they describe their own teaching:\n  {mentor.teaching_style}"]
     facts += [""] + _lines("What they believe about teaching", mentor.beliefs)
