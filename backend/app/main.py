@@ -19,6 +19,7 @@ from app.api import (
     class_profiles,
     connections,
     forum,
+    mentors,
     messages,
     profiles,
     ratings,
@@ -29,6 +30,7 @@ from app.api import (
     technique_search,
     techniques,
     users,
+    voice,
 )
 from app.config import orphaned_env_lines, settings
 from app.database import engine, ensure_extensions
@@ -86,6 +88,8 @@ TAGS_METADATA = [
         "description": "Concept/problem search, follow-ups, ranking, and planning mode.",
     },
     {"name": "ai", "description": "Generative features: collaboration briefs and syllabus import."},
+    {"name": "mentors", "description": "Live streaming conversation with an educator persona."},
+    {"name": "voice", "description": "Speech synthesis for mentor chat."},
     {"name": "system", "description": "Health and diagnostics."},
 ]
 
@@ -181,6 +185,8 @@ def create_app() -> FastAPI:
 
     for router in (
         auth.router,
+        mentors.router,
+        voice.router,
         ai.router,
         users.router,
         profiles.router,

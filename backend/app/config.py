@@ -122,6 +122,19 @@ class Settings(BaseSettings):
         validation_alias=AliasChoices("LLM_API_KEY", "ANTHROPIC_API_KEY"),
     )
 
+    # --- speech (optional) ---
+    # A Deepgram API key. Unset means mentors fall back to the browser's own
+    # speech synthesis, which works but sounds markedly worse.
+    deepgram_api_key: str = Field(
+        default="",
+        repr=False,
+        validation_alias=AliasChoices("DEEPGRAM_API_KEY", "DG_API_KEY"),
+    )
+    # Aura-2, British, warm baritone - see https://developers.deepgram.com/docs/tts-models
+    deepgram_tts_model: str = "aura-2-draco-en"
+    # One request per spoken sentence, so this is per reply rather than per turn.
+    tts_rate_limit_per_minute: int = 120
+
     # --- search ---
     search_provider: Literal["postgres", "elasticsearch"] = "postgres"
     elasticsearch_url: str = "http://localhost:9200"
