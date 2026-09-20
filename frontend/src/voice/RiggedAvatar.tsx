@@ -106,8 +106,11 @@ export function RiggedAvatar({
 
     let disposed = false;
     let frame = 0;
-    // Vertical offset of the framing target, set once the head is located.
+    // Where to look, and how far back to stand. Both are computed from the
+    // model once it loads rather than guessed - a fixed distance only frames
+    // correctly at the canvas size it was tuned against.
     let framedAt = 0;
+    let framedFrom = 1;
 
     new FBXLoader().load(
       src,
@@ -145,21 +148,17 @@ export function RiggedAvatar({
         // The model ships in its bind pose - a T - because there is no idle
         // animation in the file. Put the arms down before anything is drawn,
         // otherwise it greets every visitor like a scarecrow.
-        const pose = (key: string, x: number, y: number, z: number) => {
-          const bone = bones[key];
-          if (!bone) return;
-          bone.rotation.set(bone.rotation.x + x, bone.rotation.y + y, bone.rotation.z + z);
-        };
         // Upper arms down along the body; forearms left at their bind
         // rotation, which is already straight - bending them here folded the
         // hands together in front of the chest.
-        // Attempted, but this rig does not respond to it: the node the skin
-        // is bound to is not the one these names resolve to, and reverse-
-        // engineering that is not worth it when the arms are out of frame.
-        // The real fix is an idle/talking animation clip for this skeleton
-        // (Mixamo publishes them free), which would also let the shot open out.
-        pose("leftarm", 0, 0, 1.38);
-        pose("rightarm", 0, 0, -1.38);
+        // The arms are not wanted here and cannot be posed: the model ships
+        // in a bind T-pose with no idle animation, and rotating these bones
+        // does not move the skin. So collapse them instead - scaling a bone to
+        // nothing pulls every vertex weighted to it into the shoulder, where
+        // the torso hides them. The head is the whole point of this view.
+        for (const key of ["leftarm", "rightarm"]) {
+          bones[key]?.scale.setScalar(0.001);
+        }
 
         for (const side of ["left", "right"] as const) {
           const bone = bones[`${side}arm`];
@@ -223,9 +222,10 @@ export function RiggedAvatar({
       if (!w || !h) return;
       renderer.setSize(w, h, false);
       camera.aspect = w / h;
-      // Close enough that the head fills the frame, pulled back on a wide
-      // canvas so the shoulders do not crop.
-      camera.position.set(0, framedAt, 0.52 * Math.max(1, 1.7 / camera.aspect));
+      // Vertical fit is aspect-independent, but a narrow canvas crops the
+      // sides, so stand back further when it is taller than it is wide.
+      const narrow = camera.aspect < 1 ? 1 / camera.aspect : 1;
+      camera.position.set(0, framedAt, framedFrom * narrow);
       camera.lookAt(0, framedAt, 0);
       camera.updateProjectionMatrix();
     };
