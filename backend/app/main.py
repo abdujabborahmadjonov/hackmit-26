@@ -17,6 +17,7 @@ from app.api import (
     ai,
     auth,
     connections,
+    forum,
     mentors,
     messages,
     profiles,
@@ -24,6 +25,7 @@ from app.api import (
     recommendations,
     resources,
     search,
+    student_tokens,
     users,
     voice,
 )
@@ -69,9 +71,14 @@ TAGS_METADATA = [
     {"name": "recommendations", "description": "The hybrid matching engine and its explanations."},
     {"name": "search", "description": "Filtered, semantic and geographic discovery."},
     {"name": "resources", "description": "Teaching materials: metadata, uploads, recommendations."},
-    {"name": "ratings", "description": "Peer ratings and reviews."},
+    {"name": "ratings", "description": "Peer and verified student ratings."},
+    {
+        "name": "student-tokens",
+        "description": "Classroom codes educators issue so students can leave verified ratings.",
+    },
     {"name": "connections", "description": "Connection requests between educators."},
     {"name": "messages", "description": "Direct messaging (HTTPS transport security only)."},
+    {"name": "forum", "description": "Public discussion topics and replies between educators."},
     {"name": "ai", "description": "Generative features: collaboration briefs and syllabus import."},
     {"name": "mentors", "description": "Live streaming conversation with an educator persona."},
     {"name": "voice", "description": "Speech synthesis for mentor chat."},
@@ -182,8 +189,10 @@ def create_app() -> FastAPI:
         search.router,
         resources.router,
         ratings.router,
+        student_tokens.router,
         connections.router,
         messages.router,
+        forum.router,
     ):
         app.include_router(router)
 

@@ -8,15 +8,20 @@ import type {
   MentorSource,
   ProfileDraft,
   Conversation,
+  ForumPost,
+  ForumTopic,
   Message,
   Page,
   Profile,
   ProfileInput,
   Rating,
+  RatingSummary,
   RecommendationResponse,
   RecommendedResource,
   Resource,
   ResourceSearchResponse,
+  StudentRatingInput,
+  StudentToken,
   TeacherSearchResponse,
   TokenResponse,
   UserPrivate,
@@ -283,10 +288,40 @@ export const api = {
 
   // --- ratings ---
   ratings: (teacherId: string) => request<Page<Rating>>(`/teachers/${teacherId}/ratings`),
+  ratingSummary: (teacherId: string) =>
+    request<RatingSummary>(`/teachers/${teacherId}/ratings/summary`),
   rate: (teacherId: string, rating: number, comment?: string) =>
     request<Rating>(`/teachers/${teacherId}/ratings`, {
       method: "POST",
       body: JSON.stringify({ rating, comment: comment || null }),
+    }),
+  rateAsStudent: (teacherId: string, data: StudentRatingInput) =>
+    request<Rating>(`/teachers/${teacherId}/ratings`, {
+      method: "POST",
+      body: JSON.stringify({
+        verification_token: data.verification_token,
+        knowledge_of_material: data.knowledge_of_material,
+        presentation: data.presentation,
+        friendliness: data.friendliness,
+        other: data.other,
+        comment: data.comment || null,
+      }),
+    }),
+
+  // --- student verification tokens ---
+  studentTokens: () => request<Page<StudentToken>>("/teachers/me/student-tokens"),
+  createStudentToken: (data: {
+    duration_minutes: number;
+    label?: string;
+    max_uses?: number | null;
+  }) =>
+    request<StudentToken>("/teachers/me/student-tokens", {
+      method: "POST",
+      body: JSON.stringify(data),
+    }),
+  revokeStudentToken: (tokenId: string) =>
+    request<{ detail: string }>(`/teachers/me/student-tokens/${tokenId}`, {
+      method: "DELETE",
     }),
 
   // --- connections ---
@@ -320,6 +355,40 @@ export const api = {
     request<{ detail: string }>(`/messages/conversations/${conversationId}/read`, {
       method: "POST",
     }),
+
+  // --- forum ---
+  forumTopics: (params?: Query) =>
+    request<Page<ForumTopic>>("/forum/topics", { query: params }),
+  forumTopic: (topicId: string) => request<ForumTopic>(`/forum/topics/${topicId}`),
+  createForumTopic: (data: { title: string; body: string; category?: string }) =>
+    request<ForumTopic>("/forum/topics", {
+      method: "POST",
+      body: JSON.stringify(data),
+    }),
+  updateForumTopic: (
+    topicId: string,
+    data: { title?: string; body?: string; category?: string },
+  ) =>
+    request<ForumTopic>(`/forum/topics/${topicId}`, {
+      method: "PUT",
+      body: JSON.stringify(data),
+    }),
+  deleteForumTopic: (topicId: string) =>
+    request<{ detail: string }>(`/forum/topics/${topicId}`, { method: "DELETE" }),
+  forumPosts: (topicId: string, params?: Query) =>
+    request<Page<ForumPost>>(`/forum/topics/${topicId}/posts`, { query: params }),
+  createForumPost: (topicId: string, content: string) =>
+    request<ForumPost>(`/forum/topics/${topicId}/posts`, {
+      method: "POST",
+      body: JSON.stringify({ content }),
+    }),
+  updateForumPost: (postId: string, content: string) =>
+    request<ForumPost>(`/forum/posts/${postId}`, {
+      method: "PUT",
+      body: JSON.stringify({ content }),
+    }),
+  deleteForumPost: (postId: string) =>
+    request<{ detail: string }>(`/forum/posts/${postId}`, { method: "DELETE" }),
 
   // --- generative features (503 when the deployment has no key) ---
   aiStatus: () => request<{ enabled: boolean; features: string[] }>("/ai/status"),

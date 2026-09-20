@@ -13,12 +13,14 @@ import Resources from "./pages/Resources";
 import Connections from "./pages/Connections";
 import Messages from "./pages/Messages";
 import Mentor from "./pages/Mentor";
+import Forum from "./pages/Forum";
 
 const NAV = [
   { to: "/", label: "Matches", icon: "spark", end: true },
   { to: "/search", label: "Discover", icon: "search" },
   { to: "/mentor", label: "Mentor", icon: "mentor" },
   { to: "/resources", label: "Resources", icon: "book" },
+  { to: "/forum", label: "Forum", icon: "forum" },
   { to: "/connections", label: "Network", icon: "people" },
   { to: "/messages", label: "Messages", icon: "message" },
 ];
@@ -28,6 +30,7 @@ function NavIcon({ name }: { name: string }) {
     spark: <path d="m12 3 1.2 4.1L17 9l-3.8 1.9L12 15l-1.2-4.1L7 9l3.8-1.9L12 3ZM5 14l.7 2.3L8 17.5l-2.3 1.2L5 21l-.7-2.3L2 17.5l2.3-1.2L5 14Z" />,
     search: <><circle cx="11" cy="11" r="6" /><path d="m16 16 4 4" /></>,
     book: <><path d="M4 5.5A2.5 2.5 0 0 1 6.5 3H11v16H6.5A2.5 2.5 0 0 0 4 21.5v-16Z" /><path d="M20 5.5A2.5 2.5 0 0 0 17.5 3H13v16h4.5a2.5 2.5 0 0 1 2.5 2.5v-16Z" /></>,
+    forum: <><path d="M7 7h10M7 12h7M5 4h14v16l-4-3H5V4Z" /></>,
     people: <><circle cx="9" cy="8" r="3" /><path d="M3 19c.5-3.5 2.5-5 6-5s5.5 1.5 6 5M16 5.5a3 3 0 0 1 0 5.8M17 14c2.3.4 3.6 1.8 4 4" /></>,
     message: <path d="M4 5h16v11H9l-5 4V5Z" />,
     mentor: <><circle cx="12" cy="7.5" r="3.5" /><path d="M5 20c.6-4 3.3-6 7-6s6.4 2 7 6" /><path d="M17.5 3.2a3 3 0 0 1 0 4.6" /></>,
@@ -40,8 +43,9 @@ function NavIcon({ name }: { name: string }) {
 }
 
 function Shell({ children }: { children: ReactNode }) {
-  const { user, logout } = useAuth();
+  const { user, profile, logout } = useAuth();
   const name = user ? `${user.first_name} ${user.last_name}` : "";
+  const myPageTo = user && profile ? `/teachers/${user.id}` : "/profile";
   return (
     <div className="min-h-screen bg-paper">
       <header className="sticky top-0 z-20 border-b border-line/80 bg-paper/90 backdrop-blur-xl">
@@ -73,10 +77,16 @@ function Shell({ children }: { children: ReactNode }) {
               </NavLink>
             ))}
           </nav>
-          <div className="flex shrink-0 items-center gap-2">
+          <div className="flex shrink-0 items-center gap-1.5 sm:gap-2">
             <NavLink
-              to="/profile"
-              className="press flex items-center gap-2 rounded-xl p-1.5 hover:bg-slate-100"
+              to={myPageTo}
+              title="My public page"
+              className={({ isActive }) =>
+                cx(
+                  "press flex items-center gap-2 rounded-xl p-1.5 hover:bg-slate-100",
+                  isActive && "bg-indigo-50",
+                )
+              }
             >
               <span className="relative">
                 <Avatar name={name} size={32} />
@@ -85,6 +95,17 @@ function Shell({ children }: { children: ReactNode }) {
               <span className="hidden text-sm font-medium text-ink sm:block">
                 {user?.first_name}
               </span>
+            </NavLink>
+            <NavLink
+              to="/profile"
+              className={({ isActive }) =>
+                cx(
+                  "press hidden rounded-xl px-2.5 py-1.5 text-sm font-medium sm:inline-flex",
+                  isActive ? "bg-slate-100 text-ink" : "text-muted hover:bg-slate-100 hover:text-ink",
+                )
+              }
+            >
+              Edit profile
             </NavLink>
             <Button variant="ghost" size="sm" onClick={logout}>
               Sign out
@@ -217,6 +238,14 @@ export default function App() {
         element={
           <RequireAuth>
             <Messages />
+          </RequireAuth>
+        }
+      />
+      <Route
+        path="/forum"
+        element={
+          <RequireAuth>
+            <Forum />
           </RequireAuth>
         }
       />

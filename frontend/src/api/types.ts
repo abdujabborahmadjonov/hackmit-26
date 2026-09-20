@@ -166,9 +166,52 @@ export interface Rating {
   teacher_id: string;
   reviewer?: UserPublic | null;
   rating: number;
+  knowledge_of_material: number | null;
+  presentation: number | null;
+  friendliness: number | null;
+  other: number | null;
   comment: string | null;
   is_verified_student: boolean;
   created_at?: string | null;
+}
+
+export interface AspectAverages {
+  knowledge_of_material: number | null;
+  presentation: number | null;
+  friendliness: number | null;
+  other: number | null;
+}
+
+export interface RatingSummary {
+  teacher_id: string;
+  average_rating: number;
+  rating_count: number;
+  verified_student_count: number;
+  distribution: Record<string, number>;
+  aspect_averages: AspectAverages;
+}
+
+export interface StudentToken {
+  id: string;
+  teacher_id: string;
+  label: string | null;
+  expires_at: string;
+  max_uses: number | null;
+  use_count: number;
+  is_revoked: boolean;
+  is_active: boolean;
+  created_at?: string | null;
+  /** Only present immediately after creation. */
+  token?: string;
+}
+
+export interface StudentRatingInput {
+  verification_token: string;
+  knowledge_of_material: number;
+  presentation: number;
+  friendliness: number;
+  other: number;
+  comment?: string;
 }
 
 export interface Message {
@@ -185,6 +228,37 @@ export interface Conversation {
   participants: UserPublic[];
   last_message: Message | null;
   unread_count: number;
+  updated_at?: string | null;
+}
+
+export type ForumCategory =
+  | "general"
+  | "collaboration"
+  | "curriculum"
+  | "classroom"
+  | "resources"
+  | "technology";
+
+export interface ForumTopic {
+  id: string;
+  author_id: string;
+  author: UserPublic | null;
+  title: string;
+  body: string;
+  category: ForumCategory | string;
+  reply_count: number;
+  last_activity_at?: string | null;
+  created_at?: string | null;
+  updated_at?: string | null;
+}
+
+export interface ForumPost {
+  id: string;
+  topic_id: string;
+  author_id: string;
+  author: UserPublic | null;
+  content: string;
+  created_at?: string | null;
   updated_at?: string | null;
 }
 
