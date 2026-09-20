@@ -61,6 +61,12 @@ export function useVoice(options: {
   const decay = useRef<number | null>(null);
   const speaker = useRef<HostedSpeaker | null>(null);
   const meter = useRef<number | null>(null);
+  // One sentence synthesised ahead of the one being spoken.
+  const prefetched = useRef<{
+    stamp: number;
+    promise: Promise<AudioBuffer | null>;
+    text: string;
+  } | null>(null);
 
   const { mentorSlug } = options;
   useEffect(() => {
@@ -143,6 +149,7 @@ export function useVoice(options: {
     buffer.current = "";
     mouth.current = 0;
     speaker.current?.stop();
+    prefetched.current = null;
     if (meter.current !== null) {
       cancelAnimationFrame(meter.current);
       meter.current = null;
@@ -162,9 +169,71 @@ export function useVoice(options: {
     }
   }, []);
 
+  /** Start synthesising the next sentence, if one is waiting and nothing is
+   *  already in flight. Hosted speech takes ~1.5s per sentence, which is most
+   *  of a sentence's playing time - so it has to overlap with playback or half
+   *  the conversation is silence. */
+  const startPrefetch = useCallback(() => {
+    if (!hosted.enabled || !speaker.current) return;
+    if (prefetched.current) return;
+    const next = pending.current.shift();
+    if (next === undefined) return;
+    prefetched.current = {
+      stamp: generation.current,
+      // A failed sentence resolves to null and is skipped, rather than
+      // rejecting and taking the rest of the reply with it.
+      promise: speaker.current.prepare(next).catch(() => null),
+      text: next,
+    };
+  }, [hosted.enabled]);
+
   const drain = useCallback(() => {
-    if (muted) return;
-    if (speakingNow.current) return;
+    if (muted || speakingNow.current) return;
+
+    // --- hosted speech: real audio, real lip sync ---------------------------
+    if (hosted.enabled && speaker.current) {
+      startPrefetch();
+      const job = prefetched.current;
+      if (!job) {
+        if (streamDone.current) {
+          mouth.current = 0;
+          setState("idle");
+        }
+        return;
+      }
+      prefetched.current = null;
+      speakingNow.current = true;
+      setState("speaking");
+
+      void (async () => {
+        const audio = await job.promise;
+        if (job.stamp !== generation.current) return; // cancelled while waiting
+        try {
+          if (audio === null) {
+            // Either this sentence failed, or the deployment lost its key. Put
+            // it back once under the browser voice rather than dropping it.
+            speakingNow.current = false;
+            setHosted({ enabled: false, model: null });
+            pending.current.unshift(job.text);
+            drain();
+            return;
+          }
+          // Get the next one cooking before this one starts playing.
+          startPrefetch();
+          runMeter();
+          await speaker.current!.play(audio);
+        } finally {
+          if (job.stamp === generation.current) {
+            speakingNow.current = false;
+            drain();
+          }
+        }
+      })();
+      return;
+    }
+
+    // --- browser fallback ---------------------------------------------------
+    if (!speechSupported.speaking) return;
     const next = pending.current.shift();
     if (next === undefined) {
       if (streamDone.current) {
@@ -175,43 +244,6 @@ export function useVoice(options: {
     }
 
     const stamp = generation.current;
-
-    // --- hosted speech: real audio, real lip sync ---------------------------
-    if (hosted.enabled && speaker.current) {
-      speakingNow.current = true;
-      setState("speaking");
-      void (async () => {
-        try {
-          const audio = await speaker.current!.prepare(next);
-          if (stamp !== generation.current) return;
-          if (audio === null) {
-            // The deployment lost its key mid-conversation; fall back.
-            setHosted({ enabled: false, model: null });
-            speakingNow.current = false;
-            pending.current.unshift(next);
-            drain();
-            return;
-          }
-          runMeter();
-          await speaker.current!.play(audio);
-        } catch {
-          // A failed sentence should not end the conversation.
-          if (stamp !== generation.current) return;
-        } finally {
-          if (stamp === generation.current) {
-            speakingNow.current = false;
-            drain();
-          }
-        }
-      })();
-      return;
-    }
-
-    // --- browser fallback ---------------------------------------------------
-    if (!speechSupported.speaking) {
-      speakingNow.current = false;
-      return;
-    }
     const utterance = new SpeechSynthesisUtterance(next);
     if (chosen.current) utterance.voice = chosen.current;
     utterance.pitch = pitch;
@@ -237,7 +269,7 @@ export function useVoice(options: {
 
     speakingNow.current = true;
     speechSynthesis.speak(utterance);
-  }, [hosted.enabled, muted, pitch, rate, runDecay, runMeter]);
+  }, [hosted.enabled, muted, pitch, rate, runDecay, runMeter, startPrefetch]);
 
   const enqueue = useCallback(
     (text: string) => {

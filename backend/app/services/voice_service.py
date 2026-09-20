@@ -34,13 +34,34 @@ def is_enabled() -> bool:
     return bool(settings.deepgram_api_key)
 
 
+# One client for the process. A reply is several requests in a row, and a fresh
+# client per sentence means a fresh TLS handshake per sentence - measurably
+# slower, and the gap lands as silence between spoken sentences.
+_shared: httpx.AsyncClient | None = None
+
+
 def _client() -> httpx.AsyncClient:
+    global _shared
     if not is_enabled():
         raise VoiceUnavailable(
             "Speech synthesis needs DEEPGRAM_API_KEY. Without it the client "
             "falls back to the browser's own voice."
         )
-    return httpx.AsyncClient(timeout=TIMEOUT)
+    if _shared is None or _shared.is_closed:
+        _shared = httpx.AsyncClient(
+            timeout=TIMEOUT,
+            limits=httpx.Limits(max_keepalive_connections=8, keepalive_expiry=120.0),
+            headers={"Authorization": f"Token {settings.deepgram_api_key}"},
+        )
+    return _shared
+
+
+async def close_client() -> None:
+    """Called on shutdown, alongside the other pooled clients."""
+    global _shared
+    if _shared is not None and not _shared.is_closed:
+        await _shared.aclose()
+    _shared = None
 
 
 async def speak(text: str, *, model: str | None = None) -> tuple[bytes, str]:
@@ -56,20 +77,17 @@ async def speak(text: str, *, model: str | None = None) -> tuple[bytes, str]:
         cleaned = cleaned[:MAX_CHARS]
 
     params: dict[str, Any] = {"model": model or settings.deepgram_tts_model}
-    async with _client() as client:
-        try:
-            response = await client.post(
-                SPEAK_URL,
-                params=params,
-                headers={
-                    "Authorization": f"Token {settings.deepgram_api_key}",
-                    "Content-Type": "application/json",
-                },
-                json={"text": cleaned},
-            )
-        except httpx.HTTPError as exc:
-            logger.warning("Deepgram unreachable: %s", exc)
-            raise VoiceUnavailable(f"Could not reach the speech service: {exc}") from exc
+    client = _client()
+    try:
+        response = await client.post(
+            SPEAK_URL,
+            params=params,
+            headers={"Content-Type": "application/json"},
+            json={"text": cleaned},
+        )
+    except httpx.HTTPError as exc:
+        logger.warning("Deepgram unreachable: %s", exc)
+        raise VoiceUnavailable(f"Could not reach the speech service: {exc}") from exc
 
     if response.status_code != 200:
         # Deepgram puts the reason in the body; the status alone is not useful.

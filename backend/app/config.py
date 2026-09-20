@@ -6,6 +6,7 @@ import json
 import logging
 import re
 from functools import lru_cache
+from pathlib import Path
 from typing import Literal
 from urllib.parse import parse_qsl, urlencode, urlsplit, urlunsplit
 
@@ -242,6 +243,25 @@ class Settings(BaseSettings):
             return json.loads(self.education_compatibility_json)
         except json.JSONDecodeError as exc:  # pragma: no cover - config error path
             raise ValueError(f"EDUCATION_COMPATIBILITY_JSON is not valid JSON: {exc}") from exc
+
+
+def orphaned_env_lines(env_file: str = ".env") -> list[int]:
+    """Line numbers in .env that hold a value with no NAME= in front of it.
+
+    `echo 'KEY=value' >> .env` loses the name easily - a stray quote, a partial
+    paste - and the result is a file that looks right, parses without error,
+    and silently ignores the setting. Worth one warning at startup rather than
+    half an hour wondering why a key is not picked up.
+    """
+    path = Path(env_file)
+    if not path.exists():
+        return []
+    orphans = []
+    for number, line in enumerate(path.read_text(encoding="utf-8").splitlines(), start=1):
+        stripped = line.strip()
+        if stripped and not stripped.startswith("#") and "=" not in stripped:
+            orphans.append(number)
+    return orphans
 
 
 @lru_cache
