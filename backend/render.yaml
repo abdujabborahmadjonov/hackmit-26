@@ -40,18 +40,23 @@ services:
         value: hashing
       - key: EMBEDDING_DIM
         value: "384"
-      # Stay on Postgres until a one-time reindex has filled Elastic Cloud:
-      #   python scripts/reindex_elasticsearch.py
-      # Then change this to elasticsearch. Boot only creates empty indices;
-      # it does not copy existing teacher/resource rows.
+      # Elastic Cloud. Boot creates empty indices only — after deploy run once:
+      #   DATABASE_URL=... ELASTICSEARCH_URL=... ELASTICSEARCH_API_KEY=... \
+      #     python scripts/reindex_elasticsearch.py
       - key: SEARCH_PROVIDER
-        value: postgres
+        value: elasticsearch
       - key: ELASTICSEARCH_URL
         value: https://my-vectordb-project-b04eea.es.us-central1.gcp.elastic.cloud:443
       # Elastic Cloud API key (Deployment -> Security -> API keys). Secret.
-      # Needed for the one-time reindex and for the later provider switch.
+      # Needed for the one-time reindex and for live search.
       - key: ELASTICSEARCH_API_KEY
         sync: false
+      - key: SEARCH_FALLBACK_TO_POSTGRES
+        value: "true"
+      - key: REC_BANDIT_ENABLED
+        value: "true"
+      - key: REC_CANDIDATE_POOL
+        value: "80"
       # Render's free plan has no persistent disk, so uploads go to Supabase
       # Storage. Create a PUBLIC bucket named "resources" first.
       - key: STORAGE_PROVIDER

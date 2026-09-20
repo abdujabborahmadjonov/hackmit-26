@@ -121,11 +121,11 @@ async def test_ensure_arms_creates_missing_catalogue_entries():
     ]
     db.scalars = AsyncMock(side_effect=[empty, populated])
     db.add = MagicMock()
-    db.flush = AsyncMock()
+    db.commit = AsyncMock()
 
     arms = await ensure_arms(db)
     assert db.add.call_count >= 1
-    db.flush.assert_awaited()
+    db.commit.assert_awaited()
     assert arms
 
 

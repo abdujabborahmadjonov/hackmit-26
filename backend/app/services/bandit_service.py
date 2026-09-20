@@ -53,8 +53,22 @@ async def ensure_arms(db: AsyncSession) -> list[BanditArm]:
     """Create missing arms from the default catalogue; leave existing posteriors."""
     specs = default_arm_specs()
     existing = {arm.arm_id: arm for arm in (await db.scalars(select(BanditArm))).all()}
+    # Repair arms that were inserted with empty / invalid weight payloads.
+    repaired = False
+    for arm_id, arm in list(existing.items()):
+        try:
+            arm.weights = normalise_recommendation_weights(arm.weights or {})
+        except ValueError:
+            if arm_id in specs:
+                arm.weights = specs[arm_id]
+                repaired = True
+            else:
+                existing.pop(arm_id, None)
     if len(existing) >= len(specs):
+        if repaired:
+            await db.commit()
         return list(existing.values())
+
     created = False
     for arm_id, weights in specs.items():
         if arm_id in existing:
@@ -69,8 +83,11 @@ async def ensure_arms(db: AsyncSession) -> list[BanditArm]:
             )
         )
         created = True
-    if created:
-        await db.flush()
+    if created or repaired:
+        # Persist independently of recommendation-event logging. Otherwise a
+        # later rollback in `_log_events` wipes the catalogue and every request
+        # falls through to weight_source=default.
+        await db.commit()
         existing = {arm.arm_id: arm for arm in (await db.scalars(select(BanditArm))).all()}
     return list(existing.values())
 
@@ -109,13 +126,21 @@ async def resolve_weights(
     if enabled:
         try:
             arms = await ensure_arms(db)
-            if arms:
-                chosen = thompson_select(arms)
+            usable: list[BanditArm] = []
+            for arm in arms:
+                try:
+                    normalise_recommendation_weights(arm.weights or {})
+                    usable.append(arm)
+                except ValueError:
+                    continue
+            if usable:
+                chosen = thompson_select(usable)
                 return SelectedWeights(
                     weights=normalise_recommendation_weights(chosen.weights),
                     arm_id=chosen.arm_id,
                     source="bandit",
                 )
+            logger.warning("Bandit catalogue empty after ensure_arms; using defaults")
         except Exception:  # pragma: no cover - never break recommendations
             logger.exception("Bandit selection failed; using default weights")
 

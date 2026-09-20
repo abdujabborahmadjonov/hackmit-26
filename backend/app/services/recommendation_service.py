@@ -701,6 +701,8 @@ class RecommendationService:
             await self.db.commit()
         except Exception:  # pragma: no cover - telemetry must never break the response
             logger.exception("Failed to log recommendation events")
+            # Roll back only the failed event write; the session may already
+            # hold a committed bandit catalogue from ensure_arms.
             await self.db.rollback()
 
     # --- resource recommendations ------------------------------------------ #

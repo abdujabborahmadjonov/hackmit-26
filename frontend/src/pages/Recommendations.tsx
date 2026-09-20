@@ -193,16 +193,20 @@ export default function Recommendations() {
       (item) =>
         !dismissed.has(item.teacher.user_id) && !connected.has(item.teacher.user_id),
     );
+    // Re-score whenever the viewer has moved the sliders (or is actively
+    // tuning). Previously we only re-ranked when `changed` flipped, which
+    // looked like "weights do nothing" if the panel was open on defaults.
+    const useLocal = Boolean(weights) && (changed || tuning);
     const scored = active.map((item) => ({
       ...item,
-      localScore: weights && changed ? scoreWith(item.components, weights) : item.match_score,
+      localScore: useLocal && weights ? scoreWith(item.components, weights) : item.match_score,
     }));
     scored.sort((a, b) => b.localScore - a.localScore);
     return scored.map((item, index) => ({
       ...item,
       delta: (serverRank.get(item.teacher.user_id) ?? index) - index,
     }));
-  }, [data, weights, changed, dismissed, connected]);
+  }, [data, weights, changed, dismissed, connected, tuning]);
 
   async function connect(userId: string) {
     setConnecting(userId);
