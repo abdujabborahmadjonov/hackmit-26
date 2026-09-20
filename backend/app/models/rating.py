@@ -36,9 +36,7 @@ class Rating(UUIDPrimaryKeyMixin, TimestampMixin, Base):
     presentation: Mapped[int | None] = mapped_column(Integer)
     friendliness: Mapped[int | None] = mapped_column(Integer)
     other: Mapped[int | None] = mapped_column(Integer)
-    is_verified_student: Mapped[bool] = mapped_column(
-        Boolean, nullable=False, server_default=text("false")
-    )
+    is_verified_student: Mapped[bool] = mapped_column(Boolean, nullable=False, server_default=text("false"))
     verification_token_id: Mapped[uuid.UUID | None] = mapped_column(
         PGUUID(as_uuid=True),
         ForeignKey("student_verification_tokens.id", ondelete="SET NULL"),

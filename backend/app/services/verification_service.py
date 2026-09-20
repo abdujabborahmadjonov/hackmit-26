@@ -39,9 +39,7 @@ def _is_active(token: StudentVerificationToken, *, now: datetime | None = None) 
         expires = expires.replace(tzinfo=UTC)
     if expires <= current:
         return False
-    if token.max_uses is not None and token.use_count >= token.max_uses:
-        return False
-    return True
+    return token.max_uses is None or token.use_count < token.max_uses
 
 
 def token_to_read_fields(token: StudentVerificationToken) -> dict:
@@ -81,9 +79,7 @@ async def create_student_token(
     return row, plaintext
 
 
-async def list_student_tokens(
-    db: AsyncSession, teacher_id: uuid.UUID
-) -> list[StudentVerificationToken]:
+async def list_student_tokens(db: AsyncSession, teacher_id: uuid.UUID) -> list[StudentVerificationToken]:
     rows = (
         await db.scalars(
             select(StudentVerificationToken)
@@ -110,9 +106,7 @@ async def revoke_student_token(
     return token
 
 
-async def redeem_student_token(
-    db: AsyncSession, *, teacher_id: uuid.UUID, plaintext: str
-) -> StudentVerificationToken:
+async def redeem_student_token(db: AsyncSession, *, teacher_id: uuid.UUID, plaintext: str) -> StudentVerificationToken:
     """Validate a classroom code for a teacher and consume one use."""
     token = await db.scalar(
         select(StudentVerificationToken).where(

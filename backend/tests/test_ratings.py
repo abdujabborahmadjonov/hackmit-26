@@ -29,9 +29,7 @@ async def test_rating_updates_the_profile_rollup(client):
         headers=reviewer_two["headers"],
     )
 
-    profile = (
-        await client.get(f"/profiles/{teacher['user_id']}", headers=reviewer_one["headers"])
-    ).json()
+    profile = (await client.get(f"/profiles/{teacher['user_id']}", headers=reviewer_one["headers"])).json()
     assert profile["rating_count"] == 2
     assert profile["average_rating"] == pytest.approx(4.5)
 
@@ -40,9 +38,7 @@ async def test_duplicate_rating_is_rejected_but_update_works(client):
     teacher = await register_with_profile(client, first_name="Teacher")
     reviewer = await register(client, first_name="Reviewer")
 
-    await client.post(
-        f"/teachers/{teacher['user_id']}/ratings", json={"rating": 5}, headers=reviewer["headers"]
-    )
+    await client.post(f"/teachers/{teacher['user_id']}/ratings", json={"rating": 5}, headers=reviewer["headers"])
     duplicate = await client.post(
         f"/teachers/{teacher['user_id']}/ratings", json={"rating": 3}, headers=reviewer["headers"]
     )
@@ -56,9 +52,7 @@ async def test_duplicate_rating_is_rejected_but_update_works(client):
     assert updated.status_code == 200
     assert updated.json()["rating"] == 2
 
-    profile = (
-        await client.get(f"/profiles/{teacher['user_id']}", headers=reviewer["headers"])
-    ).json()
+    profile = (await client.get(f"/profiles/{teacher['user_id']}", headers=reviewer["headers"])).json()
     assert profile["rating_count"] == 1
     assert profile["average_rating"] == pytest.approx(2.0)
 
@@ -146,9 +140,7 @@ async def test_verified_student_rating_requires_token_and_aspects(client):
     assert summary["aspect_averages"]["knowledge_of_material"] == pytest.approx(5.0)
     assert summary["aspect_averages"]["presentation"] == pytest.approx(4.0)
 
-    tokens = (
-        await client.get("/teachers/me/student-tokens", headers=teacher["headers"])
-    ).json()
+    tokens = (await client.get("/teachers/me/student-tokens", headers=teacher["headers"])).json()
     assert tokens["items"][0]["use_count"] == 1
     assert tokens["items"][0]["is_active"] is True
 
@@ -157,9 +149,7 @@ async def test_connection_alone_does_not_verify_student(client):
     teacher = await register_with_profile(client, first_name="Teacher")
     reviewer = await register(client, first_name="Colleague")
 
-    created = await client.post(
-        "/connections", json={"receiver_id": teacher["user_id"]}, headers=reviewer["headers"]
-    )
+    created = await client.post("/connections", json={"receiver_id": teacher["user_id"]}, headers=reviewer["headers"])
     await client.put(
         f"/connections/{created.json()['id']}",
         json={"status": "accepted"},
@@ -186,9 +176,7 @@ async def test_student_token_revoke_and_expiry_controls(client):
     token_id = created.json()["id"]
     code = created.json()["token"]
 
-    revoked = await client.delete(
-        f"/teachers/me/student-tokens/{token_id}", headers=teacher["headers"]
-    )
+    revoked = await client.delete(f"/teachers/me/student-tokens/{token_id}", headers=teacher["headers"])
     assert revoked.status_code == 200
 
     rejected = await client.post(
@@ -225,12 +213,8 @@ async def test_list_and_summary_and_delete(client):
     assert summary["average_rating"] == pytest.approx(4.33, abs=0.01)
     assert summary["verified_student_count"] == 0
 
-    deleted = await client.delete(
-        f"/teachers/{teacher['user_id']}/ratings", headers=reviewers[0]["headers"]
-    )
+    deleted = await client.delete(f"/teachers/{teacher['user_id']}/ratings", headers=reviewers[0]["headers"])
     assert deleted.status_code == 200
-    profile = (
-        await client.get(f"/profiles/{teacher['user_id']}", headers=reviewers[1]["headers"])
-    ).json()
+    profile = (await client.get(f"/profiles/{teacher['user_id']}", headers=reviewers[1]["headers"])).json()
     assert profile["rating_count"] == 2
     assert profile["average_rating"] == pytest.approx(4.0)

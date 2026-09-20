@@ -100,10 +100,12 @@ def upgrade() -> None:
 
 
 def downgrade() -> None:
-    op.drop_constraint("ck_ratings_other_range", "ratings", type_="check")
-    op.drop_constraint("ck_ratings_friendliness_range", "ratings", type_="check")
-    op.drop_constraint("ck_ratings_presentation_range", "ratings", type_="check")
-    op.drop_constraint("ck_ratings_knowledge_range", "ratings", type_="check")
+    # Use the same short names as create_check_constraint; Alembic's naming
+    # convention expands them to ck_ratings_* (passing the full name double-prefixes).
+    op.drop_constraint("other_range", "ratings", type_="check")
+    op.drop_constraint("friendliness_range", "ratings", type_="check")
+    op.drop_constraint("presentation_range", "ratings", type_="check")
+    op.drop_constraint("knowledge_range", "ratings", type_="check")
     op.drop_constraint(
         op.f("fk_ratings_verification_token_id_student_verification_tokens"),
         "ratings",

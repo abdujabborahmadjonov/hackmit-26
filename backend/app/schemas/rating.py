@@ -64,8 +64,7 @@ class RatingCreate(BaseModel):
 
         if has_any_aspect and not has_all_aspects:
             raise ValueError(
-                "When rating aspects, provide all of: knowledge_of_material, "
-                "presentation, friendliness, and other"
+                "When rating aspects, provide all of: knowledge_of_material, presentation, friendliness, and other"
             )
         return self
 
@@ -109,9 +108,7 @@ class RatingSummary(BaseModel):
     average_rating: float
     rating_count: int
     verified_student_count: int = 0
-    distribution: dict[int, int] = Field(
-        default_factory=dict, description="Star value -> number of ratings"
-    )
+    distribution: dict[int, int] = Field(default_factory=dict, description="Star value -> number of ratings")
     aspect_averages: AspectAverages = Field(default_factory=AspectAverages)
 
 

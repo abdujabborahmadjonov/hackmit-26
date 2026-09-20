@@ -53,9 +53,7 @@ async def create_my_student_token(
 )
 async def list_my_student_tokens(current_user: CurrentUser, db: DB) -> Page[StudentTokenRead]:
     rows = await verification_service.list_student_tokens(db, current_user.id)
-    items = [
-        StudentTokenRead(**verification_service.token_to_read_fields(row)) for row in rows
-    ]
+    items = [StudentTokenRead(**verification_service.token_to_read_fields(row)) for row in rows]
     return Page[StudentTokenRead](items=items, total=len(items), limit=len(items), offset=0)
 
 
@@ -64,11 +62,7 @@ async def list_my_student_tokens(current_user: CurrentUser, db: DB) -> Page[Stud
     response_model=Message,
     summary="Revoke a classroom verification token",
 )
-async def revoke_my_student_token(
-    token_id: uuid.UUID, current_user: CurrentUser, db: DB
-) -> Message:
-    await verification_service.revoke_student_token(
-        db, teacher_id=current_user.id, token_id=token_id
-    )
+async def revoke_my_student_token(token_id: uuid.UUID, current_user: CurrentUser, db: DB) -> Message:
+    await verification_service.revoke_student_token(db, teacher_id=current_user.id, token_id=token_id)
     await db.commit()
     return Message(detail="Token revoked")

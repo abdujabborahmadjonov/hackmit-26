@@ -25,9 +25,7 @@ class StudentVerificationToken(UUIDPrimaryKeyMixin, TimestampMixin, Base):
     expires_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), nullable=False)
     max_uses: Mapped[int | None] = mapped_column(Integer)
     use_count: Mapped[int] = mapped_column(Integer, nullable=False, server_default=text("0"))
-    is_revoked: Mapped[bool] = mapped_column(
-        Boolean, nullable=False, server_default=text("false")
-    )
+    is_revoked: Mapped[bool] = mapped_column(Boolean, nullable=False, server_default=text("false"))
 
     __table_args__ = (
         Index("ix_student_verification_tokens_teacher_id", "teacher_id"),
