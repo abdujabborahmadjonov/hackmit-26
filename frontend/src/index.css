@@ -7,6 +7,25 @@
   --color-paper: oklch(0.985 0.003 265);
   --color-line: oklch(0.91 0.006 265);
 
+  /* The brand comes from the logo: navy #0c2454 with an amber #f09c0c.
+     Rather than rewrite 162 `indigo-*` classes across 29 files, the indigo
+     ramp is redefined to the navy - every existing utility keeps working and
+     picks up the new colour. Delete this block to go back to Tailwind indigo. */
+  --color-indigo-50: oklch(0.966 0.017 258);
+  --color-indigo-100: oklch(0.930 0.036 258);
+  --color-indigo-200: oklch(0.860 0.070 258);
+  --color-indigo-300: oklch(0.760 0.105 258);
+  --color-indigo-400: oklch(0.620 0.135 258);
+  --color-indigo-500: oklch(0.480 0.135 258);
+  --color-indigo-600: oklch(0.360 0.120 258);
+  --color-indigo-700: oklch(0.300 0.105 258);
+  --color-indigo-800: oklch(0.255 0.088 258);
+  --color-indigo-900: oklch(0.215 0.072 258);
+  --color-indigo-950: oklch(0.165 0.055 258);
+
+  /* The logo's amber, for the places that want a second voice. */
+  --color-brand-amber: oklch(0.775 0.155 72);
+
   /* One motion scale, used everywhere. Fast for state, slower for entrances. */
   --ease-out: cubic-bezier(0.22, 1, 0.36, 1);
   --dur-fast: 140ms;
