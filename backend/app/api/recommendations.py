@@ -10,7 +10,7 @@ from fastapi import APIRouter, Depends, HTTPException, Query, status
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from app.config import normalise_recommendation_weights
+from app.config import normalise_recommendation_weights, publish_recommendation_weights
 from app.database import get_db
 from app.models.profile import TeacherProfile
 from app.models.recommendation import RecommendationEvent, RecommendationFeedback
@@ -105,7 +105,7 @@ async def get_recommendations(
         generated_for=current_user.id,
         candidate_pool_size=result.candidate_pool_size,
         took_ms=result.took_ms,
-        weights={k: round(v, 4) for k, v in result.weights.items()},
+        weights=publish_recommendation_weights(result.weights),
         bandit_arm_id=result.bandit_arm_id,
         weight_source=result.weight_source,
     )
@@ -129,7 +129,7 @@ async def get_weights(current_user: CurrentUser, db: DB) -> RecommendationWeight
         db, profile_weights=profile.recommendation_weights
     )
     return RecommendationWeightsRead(
-        weights={k: round(v, 4) for k, v in selected.weights.items()},
+        weights=publish_recommendation_weights(selected.weights),
         saved=profile.recommendation_weights is not None,
         source=selected.source,
         bandit_arm_id=selected.arm_id,
@@ -163,7 +163,7 @@ async def put_weights(
     profile.recommendation_weights = weights
     await db.commit()
     return RecommendationWeightsRead(
-        weights={k: round(v, 4) for k, v in weights.items()},
+        weights=publish_recommendation_weights(weights),
         saved=True,
         source="profile",
         bandit_arm_id=None,
@@ -188,7 +188,7 @@ async def delete_weights(current_user: CurrentUser, db: DB) -> RecommendationWei
     await db.commit()
     selected = await bandit_service.resolve_weights(db, profile_weights=None)
     return RecommendationWeightsRead(
-        weights={k: round(v, 4) for k, v in selected.weights.items()},
+        weights=publish_recommendation_weights(selected.weights),
         saved=False,
         source=selected.source,
         bandit_arm_id=selected.arm_id,

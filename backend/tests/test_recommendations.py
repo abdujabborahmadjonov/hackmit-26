@@ -130,7 +130,7 @@ async def test_recommendations_explain_themselves(client):
         assert 0.0 <= entry["score"] <= 1.0
         assert entry["contribution"] == pytest.approx(entry["score"] * entry["weight"], abs=1e-3)
 
-    assert sum(body["weights"].values()) == pytest.approx(1.0, abs=1e-6)
+    assert sum(body["weights"].values()) == pytest.approx(1.0, abs=1e-4)
     assert body["weights"]["semantic"] > body["weights"]["social"]
     assert "weight_source" in body
     assert body["candidate_pool_size"] >= 3

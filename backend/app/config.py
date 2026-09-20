@@ -274,6 +274,18 @@ def normalise_recommendation_weights(weights: dict[str, float]) -> dict[str, flo
     return {key: value / total for key, value in cleaned.items()}
 
 
+def publish_recommendation_weights(
+    weights: dict[str, float], *, ndigits: int = 4
+) -> dict[str, float]:
+    """Round for API responses while keeping the published sum at 1.0."""
+    rounded = {key: round(float(weights.get(key, 0.0) or 0.0), ndigits) for key in RECOMMENDATION_FACTORS}
+    drift = round(1.0 - sum(rounded.values()), ndigits)
+    if drift:
+        pivot = max(rounded, key=rounded.get)
+        rounded[pivot] = round(rounded[pivot] + drift, ndigits)
+    return rounded
+
+
 def orphaned_env_lines(env_file: str = ".env") -> list[int]:
     """Line numbers in .env that hold a value with no NAME= in front of it.
 

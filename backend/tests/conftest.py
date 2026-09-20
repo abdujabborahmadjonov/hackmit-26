@@ -126,13 +126,13 @@ def default_search_provider(monkeypatch):
 
 @pytest.fixture(autouse=True)
 def deterministic_recommendations(monkeypatch):
-    """Disable bandit/MMR so ranking and reason assertions stay stable.
+    """Disable the bandit so ranking assertions stay stable across CI runs.
 
-    Thompson sampling and MMR are covered by unit tests; enabling them here
-    makes Alice→Bob scenarios and score-order checks flake across CI runs.
+    Thompson sampling is covered by ``test_bandit.py``. MMR stays on so its
+    integration paths remain covered; tests that need pure score order pass
+    ``?mmr=false`` explicitly.
     """
     monkeypatch.setattr(settings, "rec_bandit_enabled", False)
-    monkeypatch.setattr(settings, "rec_mmr_enabled", False)
 
 
 # --------------------------------------------------------------------------- #

@@ -55,6 +55,14 @@ def test_weights_are_normalised_to_sum_to_one() -> None:
     assert weights["semantic"] > weights["expertise"]
 
 
+def test_published_weights_sum_exactly_after_rounding() -> None:
+    from app.config import publish_recommendation_weights, settings
+
+    published = publish_recommendation_weights(settings.recommendation_weights)
+    assert sum(published.values()) == pytest.approx(1.0, abs=1e-9)
+    assert all(round(v, 4) == v for v in published.values())
+
+
 def test_zero_weights_are_rejected() -> None:
     settings = Settings(
         _env_file=None,
