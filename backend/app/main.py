@@ -16,6 +16,7 @@ from fastapi.staticfiles import StaticFiles
 from app.api import (
     ai,
     auth,
+    class_profiles,
     connections,
     forum,
     messages,
@@ -25,6 +26,8 @@ from app.api import (
     resources,
     search,
     student_tokens,
+    technique_search,
+    techniques,
     users,
 )
 from app.config import settings
@@ -76,6 +79,12 @@ TAGS_METADATA = [
     {"name": "connections", "description": "Connection requests between educators."},
     {"name": "messages", "description": "Direct messaging (HTTPS transport security only)."},
     {"name": "forum", "description": "Public discussion topics and replies between educators."},
+    {"name": "class-profiles", "description": "Per-class teaching context for technique search."},
+    {"name": "techniques", "description": "Teaching technique cards, drafts, and student ratings."},
+    {
+        "name": "technique-search",
+        "description": "Concept/problem search, follow-ups, ranking, and planning mode.",
+    },
     {"name": "ai", "description": "Generative features: collaboration briefs and syllabus import."},
     {"name": "system", "description": "Health and diagnostics."},
 ]
@@ -172,6 +181,9 @@ def create_app() -> FastAPI:
         connections.router,
         messages.router,
         forum.router,
+        class_profiles.router,
+        techniques.router,
+        technique_search.router,
     ):
         app.include_router(router)
 

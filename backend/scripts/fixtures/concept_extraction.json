@@ -1,0 +1,26 @@
+[
+  {
+    "id": "calc_chain_rule_lecture",
+    "title": "Chain rule intro",
+    "gold": ["Chain rule", "Composition of functions", "Power rule", "Differentials"],
+    "predicted": ["Chain rule", "Composition of functions", "Power rule", "Product rule"]
+  },
+  {
+    "id": "cs_linked_lists_lab",
+    "title": "Linked lists lab",
+    "gold": ["Linked lists", "Pointers vs references", "Traversal", "Mutability"],
+    "predicted": ["Linked lists", "Pointers vs references", "Stacks", "Mutability"]
+  },
+  {
+    "id": "bio_photosynthesis",
+    "title": "Photosynthesis overview",
+    "gold": ["Photosynthesis", "Light reactions", "Calvin cycle", "Chloroplasts", "ATP"],
+    "predicted": ["Photosynthesis", "Light reactions", "Calvin cycle", "Mitochondria", "ATP"]
+  },
+  {
+    "id": "calc_series_convergence",
+    "title": "Series tests",
+    "gold": ["Series", "Ratio test", "Comparison test", "Absolute vs conditional convergence"],
+    "predicted": ["Series", "Ratio test", "Root test", "Absolute vs conditional convergence"]
+  }
+]
