@@ -111,3 +111,16 @@ async def test_deepgram_actually_returns_audio(client):
     assert response.status_code == 200
     assert response.headers["content-type"].startswith("audio/")
     assert len(response.content) > 1000
+
+
+@pytest.mark.skipif(not settings.deepgram_api_key, reason="No DEEPGRAM_API_KEY configured")
+async def test_the_pooled_client_survives_a_new_event_loop(client):
+    """The pool belongs to the loop that opened it. Caching it by nothing but
+    "is it closed" reuses a dead loop's connections on the next one."""
+    account = await register(client)
+    first = await client.post(SPEAK, json=BODY, headers=account["headers"])
+    assert first.status_code == 200
+    # Same process, second call - in the suite this is a different loop than
+    # the one that built the client for an earlier test.
+    second = await client.post(SPEAK, json=BODY, headers=account["headers"])
+    assert second.status_code == 200

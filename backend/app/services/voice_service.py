@@ -11,6 +11,7 @@ client drive lip sync from the real waveform rather than approximating it.
 
 from __future__ import annotations
 
+import asyncio
 import logging
 from typing import Any
 
@@ -34,34 +35,45 @@ def is_enabled() -> bool:
     return bool(settings.deepgram_api_key)
 
 
-# One client for the process. A reply is several requests in a row, and a fresh
+# One client per event loop. A reply is several requests in a row, and a fresh
 # client per sentence means a fresh TLS handshake per sentence - measurably
 # slower, and the gap lands as silence between spoken sentences.
+#
+# Keyed by loop, not just cached: a connection pool belongs to the loop that
+# opened it, and reusing one across loops fails with "Event loop is closed".
+# The server has a single loop so this is one client in practice, but the test
+# suite gives each test its own, and so would anything embedding the app.
 _shared: httpx.AsyncClient | None = None
+_shared_loop: asyncio.AbstractEventLoop | None = None
 
 
 def _client() -> httpx.AsyncClient:
-    global _shared
+    global _shared, _shared_loop
     if not is_enabled():
         raise VoiceUnavailable(
             "Speech synthesis needs DEEPGRAM_API_KEY. Without it the client "
             "falls back to the browser's own voice."
         )
-    if _shared is None or _shared.is_closed:
+    loop = asyncio.get_running_loop()
+    if _shared is None or _shared.is_closed or _shared_loop is not loop:
+        # The previous client's loop is gone, so it cannot be awaited shut;
+        # dropping the reference is all that is available.
         _shared = httpx.AsyncClient(
             timeout=TIMEOUT,
             limits=httpx.Limits(max_keepalive_connections=8, keepalive_expiry=120.0),
             headers={"Authorization": f"Token {settings.deepgram_api_key}"},
         )
+        _shared_loop = loop
     return _shared
 
 
 async def close_client() -> None:
     """Called on shutdown, alongside the other pooled clients."""
-    global _shared
+    global _shared, _shared_loop
     if _shared is not None and not _shared.is_closed:
         await _shared.aclose()
     _shared = None
+    _shared_loop = None
 
 
 async def speak(text: str, *, model: str | None = None) -> tuple[bytes, str]:
