@@ -24,10 +24,11 @@ import CoursePlanDetail from "./pages/CoursePlanDetail";
 import TechniqueDetail from "./pages/TechniqueDetail";
 import StudentRate from "./pages/StudentRate";
 
-// Two things stay out of the main nav. Mentor is reached from the pinned
-// educators at the top of Discover, in context with the rest of the network,
-// and from the account menu; Network sits in that menu too, with the other
-// things that are yours.
+// Two things stay out of the main nav. AI Mentor and Network both live in the
+// account menu instead - the personas are AI guides rather than member
+// accounts, so they sit apart from the people-facing tabs. The account menu is
+// now the only route to them, so do not remove that entry without adding
+// another way in.
 const NAV = [
   { to: "/", label: "Matches", icon: "spark", end: true },
   { to: "/classes", label: "Classes", icon: "class" },

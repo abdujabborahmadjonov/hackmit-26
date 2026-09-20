@@ -11,7 +11,6 @@ import {
   setRecommendationsCache,
 } from "../cache/recommendationsCache";
 import { MatchCard } from "../components/MatchCard";
-import { PinnedMentors } from "../components/PinnedMentors";
 import { MatchCardSkeleton } from "../components/Skeleton";
 import {
   FACTOR_ORDER,
@@ -344,11 +343,6 @@ export default function Recommendations() {
       <div className="mt-5">
         <ErrorNote error={error} />
       </div>
-
-      <PinnedMentors
-        title="Pinned first"
-        description="Always here, whatever your matches look like"
-      />
 
       {loading ? (
         <div className="mt-4 space-y-4">
