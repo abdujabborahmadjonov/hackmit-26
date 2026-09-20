@@ -101,7 +101,7 @@
     "avatar_credit": "Photograph supplied by the EduMatch team. Confirm the photographer's terms before using it anywhere public.",
     "voice": {
       "enabled": true,
-      "provider": "browser",
+      "provider": "auto",
       "prefer": [
         "Daniel",
         "Google UK English Male",
@@ -109,7 +109,8 @@
       ],
       "pitch": 1.0,
       "rate": 0.98,
-      "clone_of": null
+      "clone_of": null,
+      "model": "aura-2-draco-en"
     },
     "avatar": {
       "enabled": true,
@@ -211,7 +212,7 @@
     },
     "voice": {
       "enabled": true,
-      "provider": "browser",
+      "provider": "auto",
       "prefer": [
         "Daniel",
         "Google UK English Male",
@@ -219,7 +220,8 @@
       ],
       "pitch": 1.0,
       "rate": 0.98,
-      "clone_of": null
+      "clone_of": null,
+      "model": "aura-2-thalia-en"
     },
     "avatar": {
       "enabled": true,
@@ -285,7 +287,7 @@
     "suggested_questions": [],
     "voice": {
       "enabled": true,
-      "provider": "browser",
+      "provider": "auto",
       "prefer": [
         "Daniel",
         "Google UK English Male",
@@ -293,7 +295,8 @@
       ],
       "pitch": 1.0,
       "rate": 0.98,
-      "clone_of": null
+      "clone_of": null,
+      "model": "aura-2-atlas-en"
     },
     "avatar": {
       "enabled": true,

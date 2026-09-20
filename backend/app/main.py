@@ -25,6 +25,7 @@ from app.api import (
     resources,
     search,
     users,
+    voice,
 )
 from app.config import settings
 from app.database import engine, ensure_extensions
@@ -73,6 +74,7 @@ TAGS_METADATA = [
     {"name": "messages", "description": "Direct messaging (HTTPS transport security only)."},
     {"name": "ai", "description": "Generative features: collaboration briefs and syllabus import."},
     {"name": "mentors", "description": "Live streaming conversation with an educator persona."},
+    {"name": "voice", "description": "Speech synthesis for mentor chat."},
     {"name": "system", "description": "Health and diagnostics."},
 ]
 
@@ -159,6 +161,7 @@ def create_app() -> FastAPI:
         auth.router,
         ai.router,
         mentors.router,
+        voice.router,
         users.router,
         profiles.router,
         recommendations.router,

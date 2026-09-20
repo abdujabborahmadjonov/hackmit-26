@@ -83,6 +83,7 @@ export function VoiceMode({
   );
 
   const v = useVoice({
+    mentorSlug: mentor.slug,
     voice: { prefer: voiceConfig.prefer, pitch: voiceConfig.pitch, rate: voiceConfig.rate },
     onTranscript: (text) => void ask(text),
   });
@@ -134,6 +135,7 @@ export function VoiceMode({
           <p className="text-xs text-white/45">
             {avatarConfig.kind === "stylised" ? "Abstract form — not a likeness" : "Likeness"}
             {mentor.voice?.clone_of ? " · cloned voice" : " · synthesised voice, not his"}
+            {v.hosted.enabled && v.hosted.model ? ` · ${v.hosted.model}` : ""}
           </p>
         </div>
       </div>
@@ -169,6 +171,8 @@ export function VoiceMode({
             } else if (v.state === "listening") {
               v.stopListening();
             } else {
+              // Browsers refuse to play audio until a user gesture; this is it.
+              void v.unlockAudio();
               v.startListening();
             }
           }}
@@ -208,8 +212,9 @@ export function VoiceMode({
           </p>
         </div>
 
-        {/* Voice quality varies enormously by device, so let them choose. */}
-        {v.voices.length > 1 && (
+        {/* Only meaningful on the browser fallback - hosted speech has its own
+            voice, chosen per mentor on the server. */}
+        {!v.hosted.enabled && v.voices.length > 1 && (
           <select
             value={v.voiceName ?? ""}
             onChange={(event) => v.selectVoice(event.target.value)}

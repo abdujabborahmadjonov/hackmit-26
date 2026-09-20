@@ -67,7 +67,10 @@ class MentorVoice(BaseModel):
     """
 
     enabled: bool = False
-    provider: Literal["browser", "none"] = "browser"
+    # "auto" uses hosted speech when the deployment has a key and the browser
+    # otherwise, which is what almost every persona should say.
+    provider: Literal["auto", "deepgram", "browser", "none"] = "auto"
+    model: str = Field(default="", description="Provider voice id, e.g. aura-2-draco-en")
     # A hint the client matches against the voices the browser offers.
     prefer: list[str] = Field(default_factory=list)
     pitch: float = Field(default=1.0, ge=0.5, le=1.5)

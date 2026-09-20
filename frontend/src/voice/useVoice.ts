@@ -1,4 +1,5 @@
 import { useCallback, useEffect, useRef, useState } from "react";
+import { HostedSpeaker, hostedVoiceStatus } from "./hostedSpeech";
 import {
   listen,
   pickVoice,
@@ -28,6 +29,7 @@ export type VoiceState = "idle" | "listening" | "thinking" | "speaking";
  */
 export function useVoice(options: {
   voice: VoicePreference;
+  mentorSlug: string;
   onTranscript: (text: string) => void;
 }) {
   const { onTranscript } = options;
@@ -37,6 +39,11 @@ export function useVoice(options: {
   const [muted, setMuted] = useState(false);
   const [voices, setVoices] = useState<SpeechSynthesisVoice[]>([]);
   const [voiceName, setVoiceName] = useState<string | null>(null);
+  // Hosted speech sounds far better; the browser is the fallback, not the plan.
+  const [hosted, setHosted] = useState<{ enabled: boolean; model: string | null }>({
+    enabled: false,
+    model: null,
+  });
 
   const listener = useRef<Listener | null>(null);
   const chosen = useRef<SpeechSynthesisVoice | null>(null);
@@ -52,6 +59,39 @@ export function useVoice(options: {
 
   const mouth = useRef(0);
   const decay = useRef<number | null>(null);
+  const speaker = useRef<HostedSpeaker | null>(null);
+  const meter = useRef<number | null>(null);
+
+  const { mentorSlug } = options;
+  useEffect(() => {
+    let alive = true;
+    void hostedVoiceStatus().then((status) => {
+      if (alive) setHosted({ enabled: status.enabled, model: status.model });
+    });
+    speaker.current = new HostedSpeaker(mentorSlug);
+    return () => {
+      alive = false;
+      void speaker.current?.dispose();
+      speaker.current = null;
+    };
+  }, [mentorSlug]);
+
+  /** Read the real waveform while hosted audio plays. */
+  const runMeter = useCallback(() => {
+    if (meter.current !== null) return;
+    const tick = () => {
+      const level = speaker.current?.level() ?? 0;
+      // Rise fast, fall slow: a mouth, not an oscilloscope.
+      mouth.current = level > mouth.current ? level : mouth.current * 0.86;
+      if (mouth.current < 0.01 && level === 0) {
+        mouth.current = 0;
+        meter.current = null;
+        return;
+      }
+      meter.current = requestAnimationFrame(tick);
+    };
+    meter.current = requestAnimationFrame(tick);
+  }, []);
 
   const { pitch, rate } = options.voice;
   const preferKey = options.voice.prefer.join("|");
@@ -102,6 +142,11 @@ export function useVoice(options: {
     speakingNow.current = false;
     buffer.current = "";
     mouth.current = 0;
+    speaker.current?.stop();
+    if (meter.current !== null) {
+      cancelAnimationFrame(meter.current);
+      meter.current = null;
+    }
     if (speechSupported.speaking) {
       // Chrome can leave a paused queue behind; resume() first so cancel()
       // has something to actually flush.
@@ -118,7 +163,7 @@ export function useVoice(options: {
   }, []);
 
   const drain = useCallback(() => {
-    if (!speechSupported.speaking || muted) return;
+    if (muted) return;
     if (speakingNow.current) return;
     const next = pending.current.shift();
     if (next === undefined) {
@@ -130,6 +175,43 @@ export function useVoice(options: {
     }
 
     const stamp = generation.current;
+
+    // --- hosted speech: real audio, real lip sync ---------------------------
+    if (hosted.enabled && speaker.current) {
+      speakingNow.current = true;
+      setState("speaking");
+      void (async () => {
+        try {
+          const audio = await speaker.current!.prepare(next);
+          if (stamp !== generation.current) return;
+          if (audio === null) {
+            // The deployment lost its key mid-conversation; fall back.
+            setHosted({ enabled: false, model: null });
+            speakingNow.current = false;
+            pending.current.unshift(next);
+            drain();
+            return;
+          }
+          runMeter();
+          await speaker.current!.play(audio);
+        } catch {
+          // A failed sentence should not end the conversation.
+          if (stamp !== generation.current) return;
+        } finally {
+          if (stamp === generation.current) {
+            speakingNow.current = false;
+            drain();
+          }
+        }
+      })();
+      return;
+    }
+
+    // --- browser fallback ---------------------------------------------------
+    if (!speechSupported.speaking) {
+      speakingNow.current = false;
+      return;
+    }
     const utterance = new SpeechSynthesisUtterance(next);
     if (chosen.current) utterance.voice = chosen.current;
     utterance.pitch = pitch;
@@ -155,7 +237,7 @@ export function useVoice(options: {
 
     speakingNow.current = true;
     speechSynthesis.speak(utterance);
-  }, [muted, pitch, rate, runDecay]);
+  }, [hosted.enabled, muted, pitch, rate, runDecay, runMeter]);
 
   const enqueue = useCallback(
     (text: string) => {
@@ -253,6 +335,7 @@ export function useVoice(options: {
       generation.current += 1;
       if (speechSupported.speaking) speechSynthesis.cancel();
       if (decay.current !== null) cancelAnimationFrame(decay.current);
+      if (meter.current !== null) cancelAnimationFrame(meter.current);
     },
     [],
   );
@@ -269,8 +352,14 @@ export function useVoice(options: {
     voices,
     voiceName,
     selectVoice,
+    hosted,
+    /** Browsers block audio until a gesture - call from the click handler. */
+    unlockAudio: () => speaker.current?.unlock(),
     mouth,
-    supported: { listening: speechSupported.listening, speaking: speechSupported.speaking },
+    supported: {
+      listening: speechSupported.listening,
+      speaking: speechSupported.speaking || hosted.enabled,
+    },
     startListening,
     stopListening,
     beginStream,
