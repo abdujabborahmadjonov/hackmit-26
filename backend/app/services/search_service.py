@@ -638,7 +638,16 @@ class SearchService:
     async def search_teachers(self, q: TeacherSearchQuery) -> SearchOutcome:
         if self.elastic is not None:
             try:
-                return await self.elastic.search_teachers(q)
+                outcome = await self.elastic.search_teachers(q)
+                if outcome.hits or outcome.total == 0:
+                    return outcome
+                # Stale index after a DB rebuild: ES knows about documents whose
+                # IDs no longer exist in Postgres, so the page would look empty.
+                logger.warning(
+                    "Elasticsearch teacher search returned total=%d but 0 resolvable hits; using Postgres",
+                    outcome.total,
+                )
+                return await self.postgres.search_teachers(q)
             except Exception as exc:
                 if not settings.search_fallback_to_postgres:
                     raise
@@ -648,7 +657,14 @@ class SearchService:
     async def search_resources(self, q: ResourceSearchQuery) -> SearchOutcome:
         if self.elastic is not None:
             try:
-                return await self.elastic.search_resources(q)
+                outcome = await self.elastic.search_resources(q)
+                if outcome.hits or outcome.total == 0:
+                    return outcome
+                logger.warning(
+                    "Elasticsearch resource search returned total=%d but 0 resolvable hits; using Postgres",
+                    outcome.total,
+                )
+                return await self.postgres.search_resources(q)
             except Exception as exc:
                 if not settings.search_fallback_to_postgres:
                     raise
