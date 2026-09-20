@@ -3,10 +3,11 @@
 from __future__ import annotations
 
 import uuid
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 from types import SimpleNamespace
 
 import pytest
+from pydantic import ValidationError
 
 from app.schemas.course_plan import (
     CoursePlanGenerateRequest,
@@ -216,7 +217,7 @@ def test_generate_request_validates_taxonomy():
     assert ok.level == "high_school"
     assert ok.topic_hints == ["means"]
 
-    with pytest.raises(Exception):
+    with pytest.raises(ValidationError):
         CoursePlanGenerateRequest(
             title="X",
             subject="not_a_real_subject",
@@ -224,7 +225,7 @@ def test_generate_request_validates_taxonomy():
             format="lecture",
             duration_weeks=2,
         )
-    with pytest.raises(Exception):
+    with pytest.raises(ValidationError):
         CoursePlanGenerateRequest(
             title="X",
             subject="mathematics",
@@ -232,7 +233,7 @@ def test_generate_request_validates_taxonomy():
             format="lecture",
             duration_weeks=2,
         )
-    with pytest.raises(Exception):
+    with pytest.raises(ValidationError):
         CoursePlanGenerateRequest(
             title="X",
             subject="mathematics",
@@ -268,7 +269,7 @@ def test_structure_update_requires_resource_on_each_session():
 def test_build_units_and_serialize():
     rid = uuid.uuid4()
     tid = uuid.uuid4()
-    now = datetime.now(timezone.utc)
+    now = datetime.now(UTC)
     plan = SimpleNamespace(
         id=uuid.uuid4(),
         teacher_id=uuid.uuid4(),
