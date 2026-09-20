@@ -37,6 +37,7 @@ async def test_status_lists_features_when_configured(client, monkeypatch):
         "class_import",
         "technique_draft",
         "technique_search_parse",
+        "course_plan_generate",
     }
 
 
