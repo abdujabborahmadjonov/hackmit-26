@@ -13,6 +13,8 @@ export const DEFAULT_WEIGHTS: Weights = {
   teaching_level: 0.15,
   location: 0.1,
   class_size: 0.1,
+  social: 0.08,
+  quality: 0.07,
 };
 
 export const FACTOR_ORDER = [
@@ -22,6 +24,8 @@ export const FACTOR_ORDER = [
   "teaching_level",
   "location",
   "class_size",
+  "social",
+  "quality",
 ] as const;
 
 /** Re-score one candidate under arbitrary weights. The weights are normalised
@@ -46,9 +50,24 @@ interface WeightStudioProps {
   defaults: Weights;
   onChange: (weights: Weights) => void;
   changed: boolean;
+  onSave?: () => void;
+  onClearSaved?: () => void;
+  saving?: boolean;
+  saved?: boolean;
+  weightSource?: string;
 }
 
-export function WeightStudio({ weights, defaults, onChange, changed }: WeightStudioProps) {
+export function WeightStudio({
+  weights,
+  defaults,
+  onChange,
+  changed,
+  onSave,
+  onClearSaved,
+  saving,
+  saved,
+  weightSource,
+}: WeightStudioProps) {
   const shown = normalise(weights);
 
   return (
@@ -59,13 +78,32 @@ export function WeightStudio({ weights, defaults, onChange, changed }: WeightStu
           <p className="mt-0.5 text-xs text-muted">
             Drag a factor and the ranking re-orders instantly — scored in your browser from the
             same numbers the API returned.
+            {weightSource ? (
+              <>
+                {" "}
+                Active source: <span className="font-medium text-ink">{weightSource}</span>
+                {saved ? " (saved on your profile)" : ""}.
+              </>
+            ) : null}
           </p>
         </div>
-        {changed && (
-          <Button size="sm" variant="ghost" onClick={() => onChange(defaults)}>
-            Reset to defaults
-          </Button>
-        )}
+        <div className="flex flex-wrap gap-2">
+          {changed && (
+            <Button size="sm" variant="ghost" onClick={() => onChange(defaults)}>
+              Reset sliders
+            </Button>
+          )}
+          {onSave && (
+            <Button size="sm" variant="secondary" onClick={onSave} disabled={saving}>
+              {saving ? "Saving…" : "Save as my defaults"}
+            </Button>
+          )}
+          {onClearSaved && saved && (
+            <Button size="sm" variant="ghost" onClick={onClearSaved} disabled={saving}>
+              Use bandit again
+            </Button>
+          )}
+        </div>
       </div>
 
       <div className="mt-4 flex flex-col gap-5 sm:flex-row sm:items-center">

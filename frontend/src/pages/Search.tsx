@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import { api } from "../api/client";
 import type { TeacherSearchResponse } from "../api/types";
 import {
@@ -40,14 +40,21 @@ const EMPTY: Filters = {
   teaching_level: "",
   teaching_method: "",
   city: "",
-  radius_km: "50",
+  // Empty by default — a fixed 50km radius + profile coords forced a geo
+  // filter on every Discover visit (and a second fetch when profile loaded).
+  radius_km: "",
   minimum_rating: "",
   class_size: "",
   sort: "relevance",
 };
 
 export default function Search() {
-  const { profile } = useAuth();
+  const { profile, loading: authLoading } = useAuth();
+  const profileCoords = useRef<{ lat?: number; lon?: number }>({});
+  profileCoords.current = {
+    lat: profile?.latitude ?? undefined,
+    lon: profile?.longitude ?? undefined,
+  };
   const [filters, setFilters] = useState<Filters>(EMPTY);
   const [data, setData] = useState<TeacherSearchResponse | null>(null);
   const [loading, setLoading] = useState(false);
@@ -58,8 +65,8 @@ export default function Search() {
     setError(null);
     const city = CITIES.find((c) => c.name === active.city);
     const radiusKm = parseRadiusKm(active.radius_km);
-    const latitude = city?.lat ?? profile?.latitude ?? undefined;
-    const longitude = city?.lon ?? profile?.longitude ?? undefined;
+    const latitude = city?.lat ?? profileCoords.current.lat;
+    const longitude = city?.lon ?? profileCoords.current.lon;
     const hasGeo = radiusKm !== undefined && latitude != null && longitude != null;
     try {
       setData(
@@ -83,14 +90,15 @@ export default function Search() {
     } finally {
       setLoading(false);
     }
-  }, [profile?.latitude, profile?.longitude]);
+  }, []);
 
   useEffect(() => {
+    if (authLoading) return;
     const handle = window.setTimeout(() => void run(filters), 250);
     return () => window.clearTimeout(handle);
     // Geographic controls apply as they change; other filters still use Submit.
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [filters.city, filters.radius_km, run]);
+  }, [authLoading, filters.city, filters.radius_km, run]);
 
   function set<K extends keyof Filters>(key: K, value: Filters[K]) {
     setFilters((current) => ({ ...current, [key]: value }));

@@ -112,12 +112,16 @@ async def test_recommendations_explain_themselves(client):
         "teaching_level",
         "location",
         "class_size",
+        "social",
+        "quality",
     }
     for entry in top["explanation"]:
         assert 0.0 <= entry["score"] <= 1.0
         assert entry["contribution"] == pytest.approx(entry["score"] * entry["weight"], abs=1e-3)
 
-    assert body["weights"]["semantic"] == pytest.approx(0.30, abs=0.01)
+    assert sum(body["weights"].values()) == pytest.approx(1.0, abs=1e-6)
+    assert body["weights"]["semantic"] > body["weights"]["social"]
+    assert "weight_source" in body
     assert body["candidate_pool_size"] >= 3
     assert body["took_ms"] >= 0
 
@@ -230,6 +234,8 @@ async def test_every_component_is_returned_for_client_side_reranking(client):
             "teaching_level",
             "location",
             "class_size",
+            "social",
+            "quality",
         }
         assert all(0.0 <= value <= 1.0 for value in item["components"].values())
 

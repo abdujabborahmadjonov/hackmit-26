@@ -150,4 +150,6 @@ export const FACTOR_META: Record<string, { label: string; colour: string }> = {
   teaching_level: { label: "Learner level", colour: "#eda100" },
   location: { label: "Proximity", colour: "#e87ba4" },
   class_size: { label: "Class size", colour: "#008300" },
+  social: { label: "Network overlap", colour: "#6b5b95" },
+  quality: { label: "Peer quality", colour: "#c45c26" },
 };

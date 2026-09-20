@@ -6,7 +6,7 @@ import logging
 import re
 import uuid
 
-from sqlalchemy import select
+from sqlalchemy import select, text
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.models.concept import Concept, ConceptAlias
@@ -57,19 +57,42 @@ async def nearest_concepts(
     subject: str | None = None,
     limit: int = 5,
 ) -> list[tuple[Concept, float]]:
-    """Return concepts ranked by cosine similarity to `vector`."""
-    query = select(Concept).where(Concept.embedding.is_not(None))
-    if subject:
-        query = query.where(Concept.subject == subject)
-    rows = (await db.scalars(query.limit(500))).all()
-    scored: list[tuple[Concept, float]] = []
-    for concept in rows:
-        if concept.embedding is None:
-            continue
-        score = cosine_similarity(vector, list(concept.embedding))
-        scored.append((concept, score))
-    scored.sort(key=lambda item: item[1], reverse=True)
-    return scored[:limit]
+    """Return concepts ranked by cosine similarity to `vector`.
+
+    Prefers the HNSW ANN index; falls back to a bounded Python scan if the
+    vector query fails (missing index, dim mismatch, etc.).
+    """
+    try:
+        await db.execute(text(f"SET LOCAL hnsw.ef_search = {max(limit * 20, 64)}"))
+        filters = [Concept.embedding.is_not(None)]
+        if subject:
+            filters.append(Concept.subject == subject)
+        stmt = (
+            select(Concept)
+            .where(*filters)
+            .order_by(Concept.embedding.cosine_distance(vector))
+            .limit(limit)
+        )
+        rows = list((await db.scalars(stmt)).all())
+        return [
+            (concept, cosine_similarity(vector, list(concept.embedding)))
+            for concept in rows
+            if concept.embedding is not None
+        ]
+    except Exception:
+        logger.exception("Concept ANN query failed; falling back to scan")
+        query = select(Concept).where(Concept.embedding.is_not(None))
+        if subject:
+            query = query.where(Concept.subject == subject)
+        rows = (await db.scalars(query.limit(500))).all()
+        scored: list[tuple[Concept, float]] = []
+        for concept in rows:
+            if concept.embedding is None:
+                continue
+            score = cosine_similarity(vector, list(concept.embedding))
+            scored.append((concept, score))
+        scored.sort(key=lambda item: item[1], reverse=True)
+        return scored[:limit]
 
 
 async def create_concept(

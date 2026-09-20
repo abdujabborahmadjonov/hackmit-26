@@ -64,6 +64,8 @@ def test_zero_weights_are_rejected() -> None:
         rec_weight_teaching_level=0.0,
         rec_weight_location=0.0,
         rec_weight_class_size=0.0,
+        rec_weight_social=0.0,
+        rec_weight_quality=0.0,
     )
     with pytest.raises(ValueError):
         _ = settings.recommendation_weights

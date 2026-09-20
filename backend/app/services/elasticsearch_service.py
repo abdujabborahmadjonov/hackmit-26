@@ -91,19 +91,26 @@ def is_cloud_endpoint(url: str | None = None) -> bool:
     return _ELASTIC_CLOUD_DOMAIN in host or _ELASTIC_CLOUD_HOST_MARKER in host
 
 
-def client_kwargs() -> dict[str, Any]:
-    """Auth and transport options. API keys win over basic auth (Elastic Cloud)."""
+def client_kwargs(*, for_bulk: bool = False) -> dict[str, Any]:
+    """Auth and transport options. API keys win over basic auth (Elastic Cloud).
+
+    Interactive search uses a short timeout and no retries so a bad/slow cluster
+    fails fast into the Postgres fallback instead of hanging the Discover page.
+    """
     kwargs: dict[str, Any] = {
-        "request_timeout": 15,
-        "retry_on_timeout": True,
-        "max_retries": 2,
+        "request_timeout": 60 if for_bulk else 3,
+        "retry_on_timeout": for_bulk,
+        "max_retries": 2 if for_bulk else 0,
     }
-    api_key = settings.elasticsearch_api_key.strip()
-    username = settings.elasticsearch_username.strip()
-    if api_key:
-        kwargs["api_key"] = api_key
-    elif username:
-        kwargs["basic_auth"] = (username, settings.elasticsearch_password)
+    # Never send a Cloud API key to a local/single-node cluster — security is
+    # usually off and the key only adds failure modes.
+    if is_cloud_endpoint():
+        api_key = settings.elasticsearch_api_key.strip()
+        username = settings.elasticsearch_username.strip()
+        if api_key:
+            kwargs["api_key"] = api_key
+        elif username:
+            kwargs["basic_auth"] = (username, settings.elasticsearch_password)
     return kwargs
 
 

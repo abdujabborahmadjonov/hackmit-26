@@ -20,6 +20,7 @@ from dataclasses import dataclass, field
 
 from sqlalchemy import Float, Select, and_, cast, func, or_, select
 from sqlalchemy.ext.asyncio import AsyncSession
+from sqlalchemy.orm import defer
 
 from app.config import settings
 from app.models.profile import TeacherProfile
@@ -197,6 +198,7 @@ class PostgresSearchBackend:
 
         stmt: Select = (
             select(TeacherProfile, User)
+            .options(defer(TeacherProfile.teaching_style_embedding))
             .join(User, User.id == TeacherProfile.user_id)
             .where(*filters)
         )
@@ -493,6 +495,7 @@ class ElasticsearchSearchBackend:
         rows = (
             await self.db.execute(
                 select(TeacherProfile, User)
+                .options(defer(TeacherProfile.teaching_style_embedding))
                 .join(User, User.id == TeacherProfile.user_id)
                 .where(TeacherProfile.user_id.in_(ordered_ids))
             )
@@ -597,7 +600,11 @@ class ElasticsearchSearchBackend:
         resources = {
             resource.id: resource
             for resource in (
-                await self.db.scalars(select(Resource).where(Resource.id.in_(ordered_ids)))
+                await self.db.scalars(
+                    select(Resource)
+                    .options(defer(Resource.embedding))
+                    .where(Resource.id.in_(ordered_ids))
+                )
             ).all()
         }
         hits = [
@@ -639,15 +646,24 @@ class SearchService:
         if self.elastic is not None:
             try:
                 outcome = await self.elastic.search_teachers(q)
-                if outcome.hits or outcome.total == 0:
+                # Empty index (common right after switching to local ES before
+                # reindex) must not look like a successful empty corpus.
+                if outcome.hits:
                     return outcome
-                # Stale index after a DB rebuild: ES knows about documents whose
-                # IDs no longer exist in Postgres, so the page would look empty.
-                logger.warning(
-                    "Elasticsearch teacher search returned total=%d but 0 resolvable hits; using Postgres",
-                    outcome.total,
-                )
-                return await self.postgres.search_teachers(q)
+                if outcome.total == 0 and settings.search_fallback_to_postgres:
+                    logger.warning(
+                        "Elasticsearch teacher index empty; using Postgres"
+                    )
+                    return await self.postgres.search_teachers(q)
+                if outcome.total > 0:
+                    # Stale index after a DB rebuild: ES knows about documents
+                    # whose IDs no longer exist in Postgres.
+                    logger.warning(
+                        "Elasticsearch teacher search returned total=%d but 0 resolvable hits; using Postgres",
+                        outcome.total,
+                    )
+                    return await self.postgres.search_teachers(q)
+                return outcome
             except Exception as exc:
                 if not settings.search_fallback_to_postgres:
                     raise
@@ -658,13 +674,20 @@ class SearchService:
         if self.elastic is not None:
             try:
                 outcome = await self.elastic.search_resources(q)
-                if outcome.hits or outcome.total == 0:
+                if outcome.hits:
                     return outcome
-                logger.warning(
-                    "Elasticsearch resource search returned total=%d but 0 resolvable hits; using Postgres",
-                    outcome.total,
-                )
-                return await self.postgres.search_resources(q)
+                if outcome.total == 0 and settings.search_fallback_to_postgres:
+                    logger.warning(
+                        "Elasticsearch resource index empty; using Postgres"
+                    )
+                    return await self.postgres.search_resources(q)
+                if outcome.total > 0:
+                    logger.warning(
+                        "Elasticsearch resource search returned total=%d but 0 resolvable hits; using Postgres",
+                        outcome.total,
+                    )
+                    return await self.postgres.search_resources(q)
+                return outcome
             except Exception as exc:
                 if not settings.search_fallback_to_postgres:
                     raise

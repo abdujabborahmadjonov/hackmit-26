@@ -7,10 +7,12 @@ import uuid
 from typing import Annotated
 
 from fastapi import APIRouter, Depends, HTTPException, Query, status
-from sqlalchemy import select, update
+from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from app.config import normalise_recommendation_weights
 from app.database import get_db
+from app.models.profile import TeacherProfile
 from app.models.recommendation import RecommendationEvent, RecommendationFeedback
 from app.schemas.common import Message
 from app.schemas.profile import profile_summary
@@ -19,8 +21,16 @@ from app.schemas.recommendation import (
     Recommendation,
     RecommendationFeedbackRequest,
     RecommendationResponse,
+    RecommendationWeightsRead,
+    RecommendationWeightsUpdate,
 )
-from app.services.recommendation_service import ProfileRequiredError, RecommendationService
+from app.services import bandit_service
+from app.services.recommendation_service import (
+    ProfileRequiredError,
+    RecommendationService,
+    build_reasons,
+    score_profiles,
+)
 from app.utils.auth import CurrentUser
 from app.utils.rate_limit import default_rate_limit
 
@@ -39,16 +49,10 @@ DB = Annotated[AsyncSession, Depends(get_db)]
     response_model=RecommendationResponse,
     summary="Top educator matches for you",
     description=(
-        "Hybrid ranking over a pgvector candidate pool:\n\n"
-        "* 30% semantic teaching-style similarity\n"
-        "* 20% subject / expertise overlap\n"
-        "* 15% education-level compatibility\n"
-        "* 15% teaching-level compatibility\n"
-        "* 10% geographic proximity\n"
-        "* 10% class-size similarity\n\n"
-        "Every result carries plain-language reasons plus a structured "
-        "`explanation` array for a \"Why this match?\" panel. Weights are "
-        "configurable through REC_WEIGHT_* environment variables."
+        "Hybrid ranking over a pgvector candidate pool with social graph and "
+        "Bayesian quality signals, optional MMR diversity, and Thompson-sampling "
+        "weight arms (or your saved profile weights). Every result carries "
+        "plain-language reasons plus a structured explanation array."
     ),
 )
 async def get_recommendations(
@@ -56,10 +60,16 @@ async def get_recommendations(
     db: DB,
     limit: Annotated[int, Query(ge=1, le=50, description="How many matches to return")] = 10,
     exclude_connected: Annotated[
-        bool, Query(description="Hide people you are already connected to or have pending requests with")
+        bool,
+        Query(
+            description="Hide people you are already connected to or have pending requests with"
+        ),
     ] = False,
     candidate_pool: Annotated[
         int | None, Query(ge=10, le=2000, description="Override the ANN candidate pool size")
+    ] = None,
+    mmr: Annotated[
+        bool | None, Query(description="Override REC_MMR_ENABLED for this request")
     ] = None,
 ) -> RecommendationResponse:
     service = RecommendationService(db)
@@ -69,6 +79,7 @@ async def get_recommendations(
             limit=limit,
             exclude_connected=exclude_connected,
             pool_size=candidate_pool,
+            mmr=mmr,
         )
     except ProfileRequiredError as exc:
         raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=str(exc)) from exc
@@ -92,6 +103,92 @@ async def get_recommendations(
         candidate_pool_size=result.candidate_pool_size,
         took_ms=result.took_ms,
         weights={k: round(v, 4) for k, v in result.weights.items()},
+        bandit_arm_id=result.bandit_arm_id,
+        weight_source=result.weight_source,
+    )
+
+
+@router.get(
+    "/weights",
+    response_model=RecommendationWeightsRead,
+    summary="Your recommendation weight preferences",
+)
+async def get_weights(current_user: CurrentUser, db: DB) -> RecommendationWeightsRead:
+    profile = await db.scalar(
+        select(TeacherProfile).where(TeacherProfile.user_id == current_user.id)
+    )
+    if profile is None:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="Create your teacher profile first.",
+        )
+    selected = await bandit_service.resolve_weights(
+        db, profile_weights=profile.recommendation_weights
+    )
+    return RecommendationWeightsRead(
+        weights={k: round(v, 4) for k, v in selected.weights.items()},
+        saved=profile.recommendation_weights is not None,
+        source=selected.source,
+        bandit_arm_id=selected.arm_id,
+    )
+
+
+@router.put(
+    "/weights",
+    response_model=RecommendationWeightsRead,
+    summary="Save personal recommendation weights",
+    description="Persists on your teacher profile and overrides the bandit while set.",
+)
+async def put_weights(
+    payload: RecommendationWeightsUpdate,
+    current_user: CurrentUser,
+    db: DB,
+) -> RecommendationWeightsRead:
+    profile = await db.scalar(
+        select(TeacherProfile).where(TeacherProfile.user_id == current_user.id)
+    )
+    if profile is None:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="Create your teacher profile first.",
+        )
+    try:
+        weights = normalise_recommendation_weights(payload.weights)
+    except ValueError as exc:
+        raise HTTPException(status_code=status.HTTP_422_UNPROCESSABLE_CONTENT, detail=str(exc)) from exc
+
+    profile.recommendation_weights = weights
+    await db.commit()
+    return RecommendationWeightsRead(
+        weights={k: round(v, 4) for k, v in weights.items()},
+        saved=True,
+        source="profile",
+        bandit_arm_id=None,
+    )
+
+
+@router.delete(
+    "/weights",
+    response_model=RecommendationWeightsRead,
+    summary="Clear personal weights (return to bandit / defaults)",
+)
+async def delete_weights(current_user: CurrentUser, db: DB) -> RecommendationWeightsRead:
+    profile = await db.scalar(
+        select(TeacherProfile).where(TeacherProfile.user_id == current_user.id)
+    )
+    if profile is None:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="Create your teacher profile first.",
+        )
+    profile.recommendation_weights = None
+    await db.commit()
+    selected = await bandit_service.resolve_weights(db, profile_weights=None)
+    return RecommendationWeightsRead(
+        weights={k: round(v, 4) for k, v in selected.weights.items()},
+        saved=False,
+        source=selected.source,
+        bandit_arm_id=selected.arm_id,
     )
 
 
@@ -102,9 +199,7 @@ async def get_recommendations(
     description="Full score breakdown between you and one specific educator.",
 )
 async def explain_match(user_id: uuid.UUID, current_user: CurrentUser, db: DB) -> Recommendation:
-    from app.models.profile import TeacherProfile
     from app.models.user import User
-    from app.services.recommendation_service import build_reasons, score_profiles
 
     service = RecommendationService(db)
     viewer = await service._load_profile(current_user.id)
@@ -124,7 +219,36 @@ async def explain_match(user_id: uuid.UUID, current_user: CurrentUser, db: DB) -
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Profile not found")
 
     candidate, user = row
-    breakdown = score_profiles(viewer, candidate)
+    social_map = await service._social_scores(viewer.user_id, [candidate.user_id])
+    social_score, shared_n = social_map.get(candidate.user_id, (0.0, 0))
+
+    # Prefer the weights that actually served this pair (stable "why this match?").
+    event = await db.scalar(
+        select(RecommendationEvent).where(
+            RecommendationEvent.user_id == current_user.id,
+            RecommendationEvent.recommended_user_id == user_id,
+        )
+    )
+    weights = None
+    if event is not None and event.bandit_arm_id:
+        from app.models.recommendation import BanditArm
+
+        arm = await db.get(BanditArm, event.bandit_arm_id)
+        if arm is not None:
+            weights = normalise_recommendation_weights(arm.weights)
+    if weights is None:
+        selected = await bandit_service.resolve_weights(
+            db, profile_weights=viewer.recommendation_weights, bandit_enabled=False
+        )
+        weights = selected.weights
+
+    breakdown = score_profiles(
+        viewer,
+        candidate,
+        weights,
+        social_score=social_score,
+        shared_neighbors=shared_n,
+    )
     reasons, explanation = build_reasons(breakdown, viewer, candidate, max_reasons=6)
     return Recommendation(
         teacher=profile_summary(candidate, user, breakdown.distance_km),
@@ -140,7 +264,7 @@ async def explain_match(user_id: uuid.UUID, current_user: CurrentUser, db: DB) -
     "/{user_id}/feedback",
     response_model=Message,
     summary="Record feedback on a recommendation",
-    description="Feeds future weight tuning: none | saved | dismissed | connected.",
+    description="Updates the Thompson-sampling arm that served this match.",
 )
 async def submit_feedback(
     user_id: uuid.UUID,
@@ -156,18 +280,19 @@ async def submit_feedback(
             detail=f"feedback must be one of {[f.value for f in RecommendationFeedback]}",
         ) from None
 
-    result = await db.execute(
-        update(RecommendationEvent)
-        .where(
+    event = await db.scalar(
+        select(RecommendationEvent).where(
             RecommendationEvent.user_id == current_user.id,
             RecommendationEvent.recommended_user_id == user_id,
         )
-        .values(feedback=feedback)
     )
-    await db.commit()
-    if result.rowcount == 0:
+    if event is None:
         raise HTTPException(
             status_code=status.HTTP_404_NOT_FOUND,
             detail="No recommendation found for that educator",
         )
+
+    event.feedback = feedback
+    await bandit_service.record_feedback(db, arm_id=event.bandit_arm_id, feedback=feedback)
+    await db.commit()
     return Message(detail="Feedback recorded")

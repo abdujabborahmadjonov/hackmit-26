@@ -2,14 +2,14 @@
 #
 #     docker compose up --build
 #
-# Optional Elasticsearch engine (SEARCH_PROVIDER=elasticsearch).
+# Elasticsearch starts by default. Set SEARCH_PROVIDER=postgres to skip it
+# (CI does this). If ES is unreachable the API falls back to Postgres search.
 #
 # Elastic Cloud: set SEARCH_PROVIDER, ELASTICSEARCH_URL and ELASTICSEARCH_API_KEY
 # in .env (compose interpolates them into the backend service).
 #
-# Local cluster:
-#
-#     docker compose --profile elasticsearch up --build
+# Embeddings default to Voyage when EMBEDDING_API_KEY is set; otherwise the
+# backend falls back to the local hashing provider.
 #
 name: edumatch
 
@@ -31,6 +31,20 @@ services:
       timeout: 5s
       retries: 20
 
+  elasticsearch:
+    image: docker.elastic.co/elasticsearch/elasticsearch:8.17.0
+    environment:
+      discovery.type: single-node
+      xpack.security.enabled: "false"
+      ES_JAVA_OPTS: "-Xms512m -Xmx512m"
+    ports:
+      - "9200:9200"
+    healthcheck:
+      test: ["CMD-SHELL", "curl -fsS http://localhost:9200/_cluster/health || exit 1"]
+      interval: 10s
+      timeout: 5s
+      retries: 20
+
   backend:
     build:
       context: .
@@ -39,14 +53,17 @@ services:
     depends_on:
       postgres:
         condition: service_healthy
+      elasticsearch:
+        condition: service_healthy
     environment:
       DATABASE_URL: postgresql+asyncpg://edumatch:edumatch@postgres:5432/edumatch
       JWT_SECRET: ${JWT_SECRET:-change-me-in-production-please-use-a-long-random-string}
-      EMBEDDING_PROVIDER: ${EMBEDDING_PROVIDER:-hashing}
+      EMBEDDING_PROVIDER: ${EMBEDDING_PROVIDER:-voyage}
       EMBEDDING_API_KEY: ${EMBEDDING_API_KEY:-}
       EMBEDDING_DIM: ${EMBEDDING_DIM:-384}
       LLM_API_KEY: ${LLM_API_KEY:-${ANTHROPIC_API_KEY:-}}
-      SEARCH_PROVIDER: ${SEARCH_PROVIDER:-postgres}
+      SEARCH_PROVIDER: ${SEARCH_PROVIDER:-elasticsearch}
+      SEARCH_FALLBACK_TO_POSTGRES: ${SEARCH_FALLBACK_TO_POSTGRES:-true}
       ELASTICSEARCH_URL: ${ELASTICSEARCH_URL:-http://elasticsearch:9200}
       ELASTICSEARCH_API_KEY: ${ELASTICSEARCH_API_KEY:-${ELASTIC_API_KEY:-${ES_API_KEY:-}}}
       ELASTICSEARCH_USERNAME: ${ELASTICSEARCH_USERNAME:-}
@@ -62,26 +79,14 @@ services:
       REC_WEIGHT_TEACHING_LEVEL: ${REC_WEIGHT_TEACHING_LEVEL:-0.15}
       REC_WEIGHT_LOCATION: ${REC_WEIGHT_LOCATION:-0.10}
       REC_WEIGHT_CLASS_SIZE: ${REC_WEIGHT_CLASS_SIZE:-0.10}
+      REC_WEIGHT_SOCIAL: ${REC_WEIGHT_SOCIAL:-0.08}
+      REC_WEIGHT_QUALITY: ${REC_WEIGHT_QUALITY:-0.07}
+      REC_BANDIT_ENABLED: ${REC_BANDIT_ENABLED:-true}
+      REC_MMR_ENABLED: ${REC_MMR_ENABLED:-true}
     ports:
       - "8000:8000"
     volumes:
       - uploads:/app/storage
-
-  # Optional: start with `--profile elasticsearch`
-  elasticsearch:
-    image: docker.elastic.co/elasticsearch/elasticsearch:8.17.0
-    profiles: ["elasticsearch"]
-    environment:
-      discovery.type: single-node
-      xpack.security.enabled: "false"
-      ES_JAVA_OPTS: "-Xms512m -Xmx512m"
-    ports:
-      - "9200:9200"
-    healthcheck:
-      test: ["CMD-SHELL", "curl -fsS http://localhost:9200/_cluster/health || exit 1"]
-      interval: 10s
-      timeout: 5s
-      retries: 20
 
 volumes:
   postgres_data:

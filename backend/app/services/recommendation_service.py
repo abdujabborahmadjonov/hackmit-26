@@ -1,43 +1,49 @@
 """The hybrid recommendation engine - EduMatch's core feature.
 
-Scoring (weights configurable via REC_WEIGHT_* env vars):
+Scoring (weights configurable via REC_WEIGHT_* env vars; also bandit / profile):
 
-    score = 0.30 * semantic teaching-style similarity
-          + 0.20 * subject / expertise similarity
-          + 0.15 * education-level compatibility
-          + 0.15 * teaching-level compatibility
-          + 0.10 * geographic proximity
-          + 0.10 * class-size similarity
+    score = w_semantic * semantic teaching-style similarity
+          + w_expertise * subject / expertise similarity
+          + w_education * education-level compatibility
+          + w_teaching_level * teaching-level compatibility
+          + w_location * geographic proximity
+          + w_class_size * class-size similarity
+          + w_social * friends-of-friends / shared connections
+          + w_quality * Bayesian peer rating quality
 
 Performance: embeddings are written when a profile changes, never at request
 time. A request does one ANN query against the pgvector HNSW index plus one
 structured overlap query, then scores only that candidate pool in Python.
+Optional MMR diversifies the final top-N.
 """
 
 from __future__ import annotations
 
 import logging
+import math
 import time
 import uuid
+from collections import defaultdict
 from dataclasses import dataclass, field
 
 from sqlalchemy import and_, exists, func, or_, select, text
 from sqlalchemy.dialects.postgresql import insert as pg_insert
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from app.config import settings
+from app.config import normalise_recommendation_weights, settings
 from app.models.connection import Connection, ConnectionStatus
 from app.models.profile import TeacherProfile
 from app.models.recommendation import RecommendationEvent
 from app.models.resource import Resource
 from app.models.user import User
+from app.services import bandit_service
 from app.services.embedding_service import cosine_similarity
+from app.services.relatedness_service import combined_relatedness, ensure_cooccurrence
 from app.taxonomy import (
     TEACHING_LEVELS,
     canonical_terms,
     education_compatibility,
     humanize,
-    term_relatedness,
 )
 from app.utils.geo import location_similarity
 
@@ -59,9 +65,8 @@ def semantic_similarity(a: list[float] | None, b: list[float] | None) -> float:
 def expertise_similarity(a_terms: list[str] | None, b_terms: list[str] | None) -> float:
     """Soft Jaccard over subjects + fields of expertise.
 
-    Identical terms score 1.0, related terms (ML <-> AI) score partially, so
-    {python, machine_learning, computer_science} matches
-    {python, artificial_intelligence, computer_science} strongly.
+    Identical terms score 1.0, related terms (ML <-> AI, hand or co-occurrence)
+    score partially.
     """
     a = canonical_terms(a_terms)
     b = canonical_terms(b_terms)
@@ -70,13 +75,12 @@ def expertise_similarity(a_terms: list[str] | None, b_terms: list[str] | None) -
 
     matched = 0.0
     for term in a:
-        best = max((term_relatedness(term, other) for other in b), default=0.0)
+        best = max((combined_relatedness(term, other) for other in b), default=0.0)
         matched += best
     for term in b:
-        best = max((term_relatedness(term, other) for other in a), default=0.0)
+        best = max((combined_relatedness(term, other) for other in a), default=0.0)
         matched += best
 
-    # Symmetric soft-Jaccard: total matched mass over the size of the union.
     union_size = len(a) + len(b)
     return max(0.0, min(1.0, matched / union_size))
 
@@ -118,6 +122,35 @@ def class_size_similarity(a: int | None, b: int | None) -> float:
     return max(0.0, min(1.0, 1.0 - abs(a - b) / max(a, b)))
 
 
+def social_similarity(*, shared_neighbors: int, is_friend_of_friend: bool) -> float:
+    """Collaborative signal from the accepted-connection graph."""
+    if shared_neighbors <= 0 and not is_friend_of_friend:
+        return 0.0
+    shared_score = 1.0 - math.exp(-0.55 * max(shared_neighbors, 0))
+    fof_score = 0.45 if is_friend_of_friend else 0.0
+    return max(0.0, min(1.0, max(shared_score, fof_score)))
+
+
+def quality_similarity(
+    average_rating: float | None,
+    rating_count: int | None,
+    *,
+    prior: float | None = None,
+    prior_strength: float | None = None,
+) -> float:
+    """Bayesian average of 1–5 ratings, mapped to [0, 1]."""
+    prior = settings.rec_quality_prior if prior is None else prior
+    m = settings.rec_quality_prior_strength if prior_strength is None else prior_strength
+    count = max(0, int(rating_count or 0))
+    avg = float(average_rating or 0.0)
+    if count <= 0 or avg <= 0:
+        # Unrated teachers sit at the prior, slightly below a well-rated peer.
+        bayesian = prior
+    else:
+        bayesian = (m * prior + count * avg) / (m + count)
+    return max(0.0, min(1.0, (bayesian - 1.0) / 4.0))
+
+
 @dataclass
 class ScoreBreakdown:
     total: float
@@ -127,6 +160,7 @@ class ScoreBreakdown:
     shared_terms: list[str] = field(default_factory=list)
     shared_education_levels: list[str] = field(default_factory=list)
     shared_teaching_methods: list[str] = field(default_factory=list)
+    shared_neighbors: int = 0
 
     @property
     def contributions(self) -> dict[str, float]:
@@ -138,9 +172,12 @@ def score_profiles(
     candidate: TeacherProfile,
     weights: dict[str, float] | None = None,
     education_overrides: dict[str, dict[str, float]] | None = None,
+    *,
+    social_score: float = 0.0,
+    shared_neighbors: int = 0,
 ) -> ScoreBreakdown:
     """Score one candidate against the viewer. Pure function - easy to test."""
-    weights = weights or settings.recommendation_weights
+    weights = normalise_recommendation_weights(weights or settings.recommendation_weights)
     overrides = (
         education_overrides
         if education_overrides is not None
@@ -167,12 +204,18 @@ def score_profiles(
         ),
         "location": location_score,
         "class_size": class_size_similarity(viewer.class_size, candidate.class_size),
+        "social": max(0.0, min(1.0, social_score)),
+        "quality": quality_similarity(candidate.average_rating, candidate.rating_count),
     }
     total = sum(components[key] * weights[key] for key in components)
 
     shared_terms = sorted(canonical_terms(viewer_terms) & canonical_terms(candidate_terms))
-    shared_levels = [lvl for lvl in (viewer.education_levels or []) if lvl in (candidate.education_levels or [])]
-    shared_methods = [m for m in (viewer.teaching_methods or []) if m in (candidate.teaching_methods or [])]
+    shared_levels = [
+        lvl for lvl in (viewer.education_levels or []) if lvl in (candidate.education_levels or [])
+    ]
+    shared_methods = [
+        m for m in (viewer.teaching_methods or []) if m in (candidate.teaching_methods or [])
+    ]
 
     return ScoreBreakdown(
         total=max(0.0, min(1.0, total)),
@@ -182,6 +225,7 @@ def score_profiles(
         shared_terms=shared_terms,
         shared_education_levels=shared_levels,
         shared_teaching_methods=shared_methods,
+        shared_neighbors=shared_neighbors,
     )
 
 
@@ -191,11 +235,8 @@ def build_reasons(
     candidate: TeacherProfile,
     max_reasons: int = 5,
 ) -> tuple[list[str], list[dict]]:
-    """Turn component scores into display strings, strongest contribution first.
-
-    Raw maths never reaches the client; only percentages and plain language.
-    """
-    entries: list[tuple[float, str, str, float]] = []  # (contribution, factor, label, score)
+    """Turn component scores into display strings, strongest contribution first."""
+    entries: list[tuple[float, str, str, float]] = []
     contributions = breakdown.contributions
     components = breakdown.components
 
@@ -259,6 +300,21 @@ def build_reasons(
         label = f"Similar class size: {viewer.class_size} vs {candidate.class_size}"
         entries.append((contributions["class_size"], "class_size", label, components["class_size"]))
 
+    if components.get("social", 0) >= 0.35:
+        if breakdown.shared_neighbors > 0:
+            n = breakdown.shared_neighbors
+            label = f"{n} shared colleague{'s' if n != 1 else ''} in your network"
+        else:
+            label = "Connected through colleagues you already know"
+        entries.append((contributions["social"], "social", label, components["social"]))
+
+    if components.get("quality", 0) >= 0.55 and (candidate.rating_count or 0) > 0:
+        label = (
+            f"Strong peer rating ({candidate.average_rating:.1f}/5, "
+            f"n={candidate.rating_count})"
+        )
+        entries.append((contributions["quality"], "quality", label, components["quality"]))
+
     entries.sort(key=lambda item: item[0], reverse=True)
     top = entries[:max_reasons]
 
@@ -274,6 +330,49 @@ def build_reasons(
         for contribution, factor, label, score in top
     ]
     return reasons, explanation
+
+
+def _embedding_sim(a: TeacherProfile, b: TeacherProfile) -> float:
+    if a.teaching_style_embedding is not None and b.teaching_style_embedding is not None:
+        return max(
+            0.0,
+            cosine_similarity(list(a.teaching_style_embedding), list(b.teaching_style_embedding)),
+        )
+    a_terms = canonical_terms(list(a.subjects or []) + list(a.fields_of_expertise or []))
+    b_terms = canonical_terms(list(b.subjects or []) + list(b.fields_of_expertise or []))
+    if not a_terms or not b_terms:
+        return 0.0
+    return len(a_terms & b_terms) / len(a_terms | b_terms)
+
+
+def mmr_rerank(
+    items: list[RecommendationItem],
+    *,
+    lambda_: float | None = None,
+    limit: int,
+) -> list[RecommendationItem]:
+    """Maximal Marginal Relevance over teaching-style / subject similarity."""
+    if not items:
+        return []
+    lambda_ = settings.rec_mmr_lambda if lambda_ is None else lambda_
+    selected: list[RecommendationItem] = []
+    remaining = list(items)
+    while remaining and len(selected) < limit:
+        best_idx = 0
+        best_val = -1e9
+        for idx, cand in enumerate(remaining):
+            relevance = cand.breakdown.total
+            diversity_pen = 0.0
+            if selected:
+                diversity_pen = max(
+                    _embedding_sim(cand.profile, other.profile) for other in selected
+                )
+            value = lambda_ * relevance - (1 - lambda_) * diversity_pen
+            if value > best_val:
+                best_val = value
+                best_idx = idx
+        selected.append(remaining.pop(best_idx))
+    return selected
 
 
 # --------------------------------------------------------------------------- #
@@ -294,6 +393,8 @@ class RecommendationResult:
     candidate_pool_size: int
     took_ms: float
     weights: dict[str, float]
+    bandit_arm_id: str | None = None
+    weight_source: str = "default"
 
 
 class RecommendationService:
@@ -341,9 +442,7 @@ class RecommendationService:
 
         candidates: dict[uuid.UUID, tuple[TeacherProfile, User]] = {}
 
-        # 1. Approximate nearest neighbours on the teaching-style vector.
         if viewer.teaching_style_embedding is not None:
-            # Widen the HNSW search window a little for better recall.
             await self.db.execute(text(f"SET LOCAL hnsw.ef_search = {max(pool_size, 64)}"))
             ann_stmt = (
                 select(TeacherProfile, User)
@@ -359,8 +458,6 @@ class RecommendationService:
             for profile, user in (await self.db.execute(ann_stmt)).all():
                 candidates[profile.user_id] = (profile, user)
 
-        # 2. Structured overlap pass so strong attribute matches are never missed
-        #    just because the ANN index did not surface them.
         viewer_terms = list(viewer.subjects or []) + list(viewer.fields_of_expertise or [])
         if viewer_terms:
             overlap_stmt = (
@@ -381,8 +478,6 @@ class RecommendationService:
             for profile, user in (await self.db.execute(overlap_stmt)).all():
                 candidates.setdefault(profile.user_id, (profile, user))
 
-        # 3. Cold start: a brand new profile with no vector and no subjects still
-        #    deserves something sensible to look at.
         if not candidates:
             fallback_stmt = (
                 select(TeacherProfile, User)
@@ -396,6 +491,77 @@ class RecommendationService:
 
         return list(candidates.values())
 
+    async def _social_scores(
+        self, viewer_id: uuid.UUID, candidate_ids: list[uuid.UUID]
+    ) -> dict[uuid.UUID, tuple[float, int]]:
+        """Return candidate_id -> (social_score, shared_neighbor_count).
+
+        Only loads the viewer's 1-hop and 2-hop neighbourhood — never the full
+        connections table (that was O(all edges) per request).
+        """
+        if not candidate_ids:
+            return {}
+
+        # 1-hop: people the viewer is connected to.
+        direct = (
+            await self.db.execute(
+                select(Connection.requester_id, Connection.receiver_id).where(
+                    Connection.status == ConnectionStatus.ACCEPTED,
+                    or_(
+                        Connection.requester_id == viewer_id,
+                        Connection.receiver_id == viewer_id,
+                    ),
+                )
+            )
+        ).all()
+        viewer_friends: set[uuid.UUID] = set()
+        for a, b in direct:
+            viewer_friends.add(b if a == viewer_id else a)
+
+        if not viewer_friends:
+            return {cid: (0.0, 0) for cid in candidate_ids}
+
+        # 2-hop: edges among friends (and to candidates) so we can count overlap.
+        # Cap friend fan-out so a hub account cannot explode this query.
+        friend_list = list(viewer_friends)[:200]
+        candidate_set = set(candidate_ids)
+        interesting = set(friend_list) | candidate_set
+
+        hop2 = (
+            await self.db.execute(
+                select(Connection.requester_id, Connection.receiver_id).where(
+                    Connection.status == ConnectionStatus.ACCEPTED,
+                    or_(
+                        Connection.requester_id.in_(friend_list),
+                        Connection.receiver_id.in_(friend_list),
+                    ),
+                )
+            )
+        ).all()
+
+        neighbors: dict[uuid.UUID, set[uuid.UUID]] = defaultdict(set)
+        for a, b in hop2:
+            if a in interesting or b in interesting:
+                neighbors[a].add(b)
+                neighbors[b].add(a)
+        neighbors[viewer_id] = viewer_friends
+
+        fof: set[uuid.UUID] = set()
+        for friend in friend_list:
+            fof |= neighbors.get(friend, set())
+        fof -= viewer_friends
+        fof.discard(viewer_id)
+
+        out: dict[uuid.UUID, tuple[float, int]] = {}
+        for cid in candidate_ids:
+            shared = len(viewer_friends & neighbors.get(cid, set()))
+            is_fof = cid in fof
+            out[cid] = (
+                social_similarity(shared_neighbors=shared, is_friend_of_friend=is_fof),
+                shared,
+            )
+        return out
+
     async def recommend(
         self,
         user_id: uuid.UUID,
@@ -404,10 +570,12 @@ class RecommendationService:
         exclude_connected: bool = False,
         pool_size: int | None = None,
         log_events: bool = True,
+        mmr: bool | None = None,
     ) -> RecommendationResult:
         started = time.perf_counter()
         limit = limit or settings.rec_default_limit
         pool_size = pool_size or settings.rec_candidate_pool
+        use_mmr = settings.rec_mmr_enabled if mmr is None else mmr
 
         viewer = await self._load_profile(user_id)
         if viewer is None:
@@ -415,13 +583,29 @@ class RecommendationService:
                 "Create your teacher profile first - recommendations are based on it."
             )
 
-        weights = settings.recommendation_weights
+        await ensure_cooccurrence(self.db, blocking=False)
+
+        selected = await bandit_service.resolve_weights(
+            self.db, profile_weights=viewer.recommendation_weights
+        )
+        weights = selected.weights
         overrides = settings.education_compatibility_overrides
         candidates = await self._fetch_candidates(viewer, pool_size, exclude_connected)
+        social_map = await self._social_scores(
+            viewer.user_id, [profile.user_id for profile, _ in candidates]
+        )
 
         scored: list[RecommendationItem] = []
         for profile, user in candidates:
-            breakdown = score_profiles(viewer, profile, weights, overrides)
+            social_score, shared_n = social_map.get(profile.user_id, (0.0, 0))
+            breakdown = score_profiles(
+                viewer,
+                profile,
+                weights,
+                overrides,
+                social_score=social_score,
+                shared_neighbors=shared_n,
+            )
             reasons, explanation = build_reasons(breakdown, viewer, profile)
             scored.append(
                 RecommendationItem(
@@ -436,17 +620,19 @@ class RecommendationService:
         scored.sort(
             key=lambda item: (item.breakdown.total, item.profile.average_rating), reverse=True
         )
-        top = scored[:limit]
+        top = mmr_rerank(scored, limit=limit) if use_mmr else scored[:limit]
 
         if log_events and top:
-            await self._log_events(user_id, top)
+            await self._log_events(user_id, top, arm_id=selected.arm_id)
 
         took_ms = (time.perf_counter() - started) * 1000
         logger.debug(
-            "recommendations user=%s pool=%d returned=%d in %.1fms",
+            "recommendations user=%s pool=%d returned=%d arm=%s source=%s in %.1fms",
             user_id,
             len(candidates),
             len(top),
+            selected.arm_id,
+            selected.source,
             took_ms,
         )
         return RecommendationResult(
@@ -454,10 +640,18 @@ class RecommendationService:
             candidate_pool_size=len(candidates),
             took_ms=round(took_ms, 2),
             weights=weights,
+            bandit_arm_id=selected.arm_id,
+            weight_source=selected.source,
         )
 
-    async def _log_events(self, user_id: uuid.UUID, items: list[RecommendationItem]) -> None:
-        """Record what we served (upsert) for later weight tuning. Best effort."""
+    async def _log_events(
+        self,
+        user_id: uuid.UUID,
+        items: list[RecommendationItem],
+        *,
+        arm_id: str | None,
+    ) -> None:
+        """Record what we served (upsert) for bandit learning. Best effort."""
         rows = [
             {
                 "id": uuid.uuid4(),
@@ -466,8 +660,10 @@ class RecommendationService:
                 "match_score": item.breakdown.total,
                 "components": {k: round(v, 4) for k, v in item.breakdown.components.items()},
                 "reasons": item.reasons,
+                "bandit_arm_id": arm_id,
+                "rank_position": index + 1,
             }
-            for item in items
+            for index, item in enumerate(items)
         ]
         try:
             stmt = pg_insert(RecommendationEvent).values(rows)
@@ -477,6 +673,8 @@ class RecommendationService:
                     "match_score": stmt.excluded.match_score,
                     "components": stmt.excluded.components,
                     "reasons": stmt.excluded.reasons,
+                    "bandit_arm_id": stmt.excluded.bandit_arm_id,
+                    "rank_position": stmt.excluded.rank_position,
                     "updated_at": func.now(),
                 },
             )
@@ -498,11 +696,7 @@ class RecommendationService:
             )
 
         pool = max(limit * 10, 100)
-        stmt = (
-            select(Resource)
-            .where(Resource.owner_id != user_id)
-            .limit(pool)
-        )
+        stmt = select(Resource).where(Resource.owner_id != user_id).limit(pool)
         if viewer.teaching_style_embedding is not None:
             stmt = stmt.where(Resource.embedding.is_not(None)).order_by(
                 Resource.embedding.cosine_distance(viewer.teaching_style_embedding)
@@ -528,7 +722,7 @@ class RecommendationService:
                 reasons.append(f"Matches your subject: {humanize(resource.subject)}")
             elif resource.subject:
                 subject_score = max(
-                    (term_relatedness(resource.subject, term) for term in viewer_subjects),
+                    (combined_relatedness(resource.subject, term) for term in viewer_subjects),
                     default=0.0,
                 )
                 if subject_score >= 0.6:
@@ -536,7 +730,8 @@ class RecommendationService:
 
             level_score = (
                 1.0
-                if resource.education_level and resource.education_level in (viewer.education_levels or [])
+                if resource.education_level
+                and resource.education_level in (viewer.education_levels or [])
                 else 0.0
             )
             if level_score:
@@ -544,7 +739,8 @@ class RecommendationService:
 
             method_score = (
                 1.0
-                if resource.teaching_method and resource.teaching_method in (viewer.teaching_methods or [])
+                if resource.teaching_method
+                and resource.teaching_method in (viewer.teaching_methods or [])
                 else 0.0
             )
             if method_score:

@@ -96,6 +96,15 @@ export interface RecommendationResponse {
   candidate_pool_size: number;
   took_ms: number;
   weights: Record<string, number>;
+  bandit_arm_id?: string | null;
+  weight_source?: string;
+}
+
+export interface RecommendationWeights {
+  weights: Record<string, number>;
+  saved: boolean;
+  source: string;
+  bandit_arm_id?: string | null;
 }
 
 export interface TeacherSearchResult {

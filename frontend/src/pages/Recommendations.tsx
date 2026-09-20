@@ -32,6 +32,8 @@ export default function Recommendations() {
   const [connected, setConnected] = useState<Set<string>>(new Set());
   const [dismissed, setDismissed] = useState<Set<string>>(new Set());
   const [aiEnabled, setAiEnabled] = useState(false);
+  const [weightsSaved, setWeightsSaved] = useState(false);
+  const [savingWeights, setSavingWeights] = useState(false);
 
   const load = useCallback(async () => {
     setLoading(true);
@@ -42,7 +44,10 @@ export default function Recommendations() {
         exclude_connected: excludeConnected,
       });
       setData(result);
+      // Prefer server-published weights for this response (already includes
+      // profile / bandit resolution). Avoid a second round-trip on every load.
       setWeights(result.weights);
+      setWeightsSaved(result.weight_source === "profile");
     } catch (err) {
       setError(err);
     } finally {
@@ -113,12 +118,40 @@ export default function Recommendations() {
     void api.feedback(userId, "dismissed").catch(() => undefined);
   }
 
+  async function saveWeights() {
+    if (!weights) return;
+    setSavingWeights(true);
+    try {
+      const prefs = await api.saveRecommendationWeights(normalise(weights));
+      setWeightsSaved(true);
+      setWeights(prefs.weights);
+      await load();
+    } catch (err) {
+      setError(err);
+    } finally {
+      setSavingWeights(false);
+    }
+  }
+
+  async function clearSavedWeights() {
+    setSavingWeights(true);
+    try {
+      await api.clearRecommendationWeights();
+      setWeightsSaved(false);
+      await load();
+    } catch (err) {
+      setError(err);
+    } finally {
+      setSavingWeights(false);
+    }
+  }
+
   return (
     <div>
       <PageHeader
         eyebrow="Personalized for your classroom"
         title="Your best matches"
-        description="Educators ranked by teaching philosophy, subject overlap, learner level, proximity, and class size. Every recommendation shows its work."
+        description="Hybrid ranking over teaching philosophy, subjects, levels, proximity, class size, network overlap, and peer quality — with a bandit that learns from your feedback."
         actions={
           <>
           <label className="flex items-center gap-2 text-sm text-muted">
@@ -148,12 +181,17 @@ export default function Recommendations() {
             defaults={defaults}
             onChange={setWeights}
             changed={changed}
+            onSave={() => void saveWeights()}
+            onClearSaved={() => void clearSavedWeights()}
+            saving={savingWeights}
+            saved={weightsSaved}
+            weightSource={data?.weight_source}
           />
         </div>
       )}
 
       {data && !loading && (
-        <div className="mt-6 grid grid-cols-2 gap-2 sm:gap-3">
+        <div className="mt-6 grid grid-cols-2 gap-2 sm:gap-3 lg:grid-cols-4">
           <Card className="p-3 sm:p-4">
             <p className="text-xs text-muted">Candidates considered</p>
             <p className="mt-1 text-2xl font-semibold text-ink">{data.candidate_pool_size}</p>
@@ -162,6 +200,18 @@ export default function Recommendations() {
             <p className="text-xs text-muted">Top match</p>
             <p className="mt-1 text-2xl font-semibold text-ink">
               {ranked[0] ? `${Math.round(ranked[0].localScore * 100)}%` : "—"}
+            </p>
+          </Card>
+          <Card className="p-3 sm:p-4">
+            <p className="text-xs text-muted">Weight source</p>
+            <p className="mt-1 text-lg font-semibold capitalize text-ink">
+              {data.weight_source ?? "default"}
+            </p>
+          </Card>
+          <Card className="p-3 sm:p-4">
+            <p className="text-xs text-muted">Bandit arm</p>
+            <p className="mt-1 truncate text-lg font-semibold text-ink">
+              {data.bandit_arm_id ?? "—"}
             </p>
           </Card>
         </div>
