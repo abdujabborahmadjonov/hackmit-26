@@ -10,8 +10,8 @@ from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.models.concept import Concept, ConceptAlias
-from app.services.embedding_service import cosine_similarity, get_embedding_service
 from app.services import llm_service
+from app.services.embedding_service import cosine_similarity, get_embedding_service
 
 logger = logging.getLogger(__name__)
 

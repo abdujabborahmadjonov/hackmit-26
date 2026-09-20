@@ -271,14 +271,12 @@ def fields_compatible(
         return True
     # Free-text containment for labels like "ap_calculus" vs "calculus".
     shorter, longer = (ca, cb) if len(ca) <= len(cb) else (cb, ca)
-    if len(shorter) >= 4 and (
+    return len(shorter) >= 4 and (
         longer == shorter
         or longer.startswith(f"{shorter}_")
         or longer.endswith(f"_{shorter}")
         or f"_{shorter}_" in longer
-    ):
-        return True
-    return False
+    )
 
 
 def education_compatibility(a: str, b: str, overrides: dict[str, dict[str, float]] | None = None) -> float:

@@ -14,8 +14,8 @@ from sqlalchemy.orm import selectinload
 from app.models.class_profile import ClassProfile
 from app.models.concept import Concept
 from app.models.technique import Technique, TechniqueConcept, TechniqueRating
-from app.services.embedding_service import cosine_similarity, get_embedding_service
 from app.services import concept_service
+from app.services.embedding_service import cosine_similarity, get_embedding_service
 from app.taxonomy import (
     CLOSE_FIELD_THRESHOLD,
     canonical_term,

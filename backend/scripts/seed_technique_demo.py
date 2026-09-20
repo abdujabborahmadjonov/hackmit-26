@@ -14,7 +14,6 @@ import asyncio
 import logging
 import random
 import sys
-import uuid
 from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
@@ -143,7 +142,13 @@ TECHNIQUE_TEMPLATES = [
     {
         "title": "Predict–reveal–revise for {concept}",
         "summary": "Students commit to a prediction about {concept}, see a short reveal, then revise with evidence.",
-        "steps": "1. Pose a concrete prediction prompt about {concept}.\n2. Students write silently (1 min).\n3. Reveal a counterexample or demo.\n4. Pair revise explanations.\n5. Harvest 2 revised models on the board.",
+        "steps": (
+            "1. Pose a concrete prediction prompt about {concept}.\n"
+            "2. Students write silently (1 min).\n"
+            "3. Reveal a counterexample or demo.\n"
+            "4. Pair revise explanations.\n"
+            "5. Harvest 2 revised models on the board."
+        ),
         "materials": "Mini-whiteboard or index cards; one demo slide",
         "minutes": 15,
         "types": ["misconception", "engagement"],
@@ -151,7 +156,12 @@ TECHNIQUE_TEMPLATES = [
     {
         "title": "Prerequisite warm-up ladder for {concept}",
         "summary": "A 3-rung ladder that surfaces missing skills before {concept} is introduced.",
-        "steps": "1. Rung A: 60-second skill check.\n2. Rung B: peer teach the weak step.\n3. Rung C: apply the skill inside a {concept} micro-task.\n4. Exit ticket tags which rung still feels shaky.",
+        "steps": (
+            "1. Rung A: 60-second skill check.\n"
+            "2. Rung B: peer teach the weak step.\n"
+            "3. Rung C: apply the skill inside a {concept} micro-task.\n"
+            "4. Exit ticket tags which rung still feels shaky."
+        ),
         "materials": "Printed ladder half-sheets",
         "minutes": 12,
         "types": ["missing_prerequisite", "pacing"],
@@ -159,7 +169,13 @@ TECHNIQUE_TEMPLATES = [
     {
         "title": "Transfer clinic: {concept} in a new costume",
         "summary": "Same underlying {concept}, three surface forms — students map the invariant.",
-        "steps": "1. Show version A (familiar).\n2. Show version B (new context).\n3. Students list what stayed constant.\n4. Version C is an exam-style prompt done in pairs.\n5. Debrief the transfer moves.",
+        "steps": (
+            "1. Show version A (familiar).\n"
+            "2. Show version B (new context).\n"
+            "3. Students list what stayed constant.\n"
+            "4. Version C is an exam-style prompt done in pairs.\n"
+            "5. Debrief the transfer moves."
+        ),
         "materials": "Three short prompts on one slide",
         "minutes": 20,
         "types": ["transfer", "engagement"],
@@ -167,7 +183,12 @@ TECHNIQUE_TEMPLATES = [
     {
         "title": "Pace-split stations on {concept}",
         "summary": "Fast and slow tracks so finishers deepen {concept} while others consolidate.",
-        "steps": "1. Core station (everyone).\n2. Stretch station unlocks after a check.\n3. Support station with worked skeleton.\n4. 3-minute gallery of one insight per station.",
+        "steps": (
+            "1. Core station (everyone).\n"
+            "2. Stretch station unlocks after a check.\n"
+            "3. Support station with worked skeleton.\n"
+            "4. 3-minute gallery of one insight per station."
+        ),
         "materials": "Station cards; answer key folder",
         "minutes": 25,
         "types": ["pacing", "engagement"],
@@ -175,7 +196,13 @@ TECHNIQUE_TEMPLATES = [
     {
         "title": "Misconception autopsy: {concept}",
         "summary": "Students diagnose a wrong explanation of {concept} and rewrite it.",
-        "steps": "1. Present a plausible wrong solution.\n2. Individuals mark the first broken step.\n3. Groups rewrite the explanation.\n4. Compare to a expert model.\n5. Write a one-line 'watch out for…'.",
+        "steps": (
+            "1. Present a plausible wrong solution.\n"
+            "2. Individuals mark the first broken step.\n"
+            "3. Groups rewrite the explanation.\n"
+            "4. Compare to a expert model.\n"
+            "5. Write a one-line 'watch out for…'."
+        ),
         "materials": "Wrong-solution handout",
         "minutes": 18,
         "types": ["misconception", "transfer"],

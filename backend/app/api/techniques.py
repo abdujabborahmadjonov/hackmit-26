@@ -36,8 +36,8 @@ from app.services.llm_service import LLMUnavailable
 from app.services.technique_search_service import (
     load_ratings_for,
     rating_summary_for,
-    refresh_technique_embedding,
     recompute_technique_rating_aggregates,
+    refresh_technique_embedding,
 )
 from app.utils.auth import CurrentUser
 from app.utils.rate_limit import RateLimiter

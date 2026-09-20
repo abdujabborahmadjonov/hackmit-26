@@ -3,12 +3,12 @@
 from __future__ import annotations
 
 from app.services.technique_search_service import (
+    ScoredTechnique,
     bayesian_average,
     class_context_similarity,
     mmr_rerank,
     problem_type_overlap,
     technique_matches_field,
-    ScoredTechnique,
 )
 from app.taxonomy import fields_compatible
 

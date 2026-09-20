@@ -31,7 +31,13 @@ async def test_status_lists_features_when_configured(client, monkeypatch):
     monkeypatch.setattr(settings, "llm_api_key", "sk-ant-test")
     body = (await client.get("/ai/status")).json()
     assert body["enabled"] is True
-    assert set(body["features"]) == {"collaboration_brief", "profile_import"}
+    assert set(body["features"]) == {
+        "collaboration_brief",
+        "profile_import",
+        "class_import",
+        "technique_draft",
+        "technique_search_parse",
+    }
 
 
 async def test_brief_is_503_when_disabled(client, monkeypatch):

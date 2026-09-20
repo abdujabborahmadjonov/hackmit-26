@@ -12,7 +12,6 @@ product runs unchanged without it.
 from __future__ import annotations
 
 import logging
-from collections.abc import AsyncIterator
 from typing import Any
 
 from pydantic import BaseModel, Field
