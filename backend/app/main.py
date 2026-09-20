@@ -17,6 +17,7 @@ from app.api import (
     ai,
     auth,
     connections,
+    forum,
     messages,
     profiles,
     ratings,
@@ -74,6 +75,7 @@ TAGS_METADATA = [
     },
     {"name": "connections", "description": "Connection requests between educators."},
     {"name": "messages", "description": "Direct messaging (HTTPS transport security only)."},
+    {"name": "forum", "description": "Public discussion topics and replies between educators."},
     {"name": "ai", "description": "Generative features: collaboration briefs and syllabus import."},
     {"name": "system", "description": "Health and diagnostics."},
 ]
@@ -169,6 +171,7 @@ def create_app() -> FastAPI:
         student_tokens.router,
         connections.router,
         messages.router,
+        forum.router,
     ):
         app.include_router(router)
 

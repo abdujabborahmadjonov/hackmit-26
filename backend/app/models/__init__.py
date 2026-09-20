@@ -1,6 +1,7 @@
 """SQLAlchemy models. Importing this package registers every table on Base."""
 
 from app.models.connection import Connection, ConnectionStatus
+from app.models.forum import ForumPost, ForumTopic
 from app.models.message import Conversation, ConversationParticipant, Message
 from app.models.profile import TeacherProfile
 from app.models.rating import Rating
@@ -14,6 +15,8 @@ __all__ = [
     "ConnectionStatus",
     "Conversation",
     "ConversationParticipant",
+    "ForumPost",
+    "ForumTopic",
     "Message",
     "Rating",
     "RecommendationEvent",
