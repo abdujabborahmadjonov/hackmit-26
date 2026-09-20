@@ -115,7 +115,7 @@
     "avatar": {
       "enabled": true,
       "kind": "likeness",
-      "model_url": "",
+      "model_url": "/mentors/avatar.fbx",
       "accent": "#4f46e5"
     },
     "likeness_consent": {
@@ -230,7 +230,7 @@
     "avatar": {
       "enabled": true,
       "kind": "stylised",
-      "model_url": "",
+      "model_url": "/mentors/avatar.fbx",
       "accent": "#0d9488"
     },
     "likeness_consent": {
@@ -305,7 +305,7 @@
     "avatar": {
       "enabled": true,
       "kind": "stylised",
-      "model_url": "",
+      "model_url": "/mentors/avatar.fbx",
       "accent": "#b45309"
     },
     "likeness_consent": {

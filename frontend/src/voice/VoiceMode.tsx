@@ -4,6 +4,7 @@ import type { ChatTurn, Mentor } from "../api/types";
 import { Button } from "../components/ui";
 import { Avatar3D } from "./Avatar3D";
 import { CharacterAvatar } from "./CharacterAvatar";
+import { RiggedAvatar } from "./RiggedAvatar";
 import { PortraitAvatar } from "./PortraitAvatar";
 import { useVoice } from "./useVoice";
 
@@ -33,13 +34,20 @@ export function VoiceMode({
   // An API older than this client sends no voice or avatar block. Fall back
   // rather than crashing the page - the two are deployed separately.
   const voiceConfig = mentor.voice ?? DEFAULT_VOICE;
-  const avatarConfig = mentor.avatar ?? { kind: "stylised" as const, accent: "#4f46e5" };
+  const avatarConfig = mentor.avatar ?? {
+    kind: "stylised" as const,
+    accent: "#4f46e5",
+    model_url: "",
+  };
   const [error, setError] = useState<string | null>(null);
   const [live, setLive] = useState("");
   const [searching, setSearching] = useState<string | null>(null);
   // A rigged figure that moves, or his actual photograph which does not. Both
   // are honest; they are honest about different things.
   const [view, setView] = useState<"character" | "portrait">("character");
+  // The rigged model is a 10MB download; if it will not load we drop to the
+  // procedural figure rather than showing an empty stage.
+  const [modelFailed, setModelFailed] = useState(false);
   const abort = useRef<AbortController | null>(null);
   // The loop reads the latest transcript without being re-created each turn.
   const turnsRef = useRef(turns);
@@ -144,6 +152,15 @@ export function VoiceMode({
               state={v.state}
               accent={avatarConfig.accent}
               className="h-72 w-full sm:h-96"
+            />
+          ) : avatarConfig.model_url && !modelFailed ? (
+            <RiggedAvatar
+              src={avatarConfig.model_url}
+              mouth={v.mouth}
+              state={v.state}
+              accent={avatarConfig.accent}
+              className="h-72 w-full sm:h-96"
+              onFailed={() => setModelFailed(true)}
             />
           ) : (
             <CharacterAvatar

@@ -309,6 +309,7 @@ export interface MentorAvatar {
   /** "stylised" is an abstract form; "likeness" needs the person's consent. */
   kind: "stylised" | "character" | "likeness";
   animated?: boolean;
+  /** A rigged model to load, if one is configured. */
   model_url: string;
   accent: string;
 }
