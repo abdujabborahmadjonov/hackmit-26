@@ -3,6 +3,9 @@
 
 import type {
   ChatTurn,
+  ClassProfile,
+  ClassProfileDraft,
+  ClassProfileInput,
   Connection,
   Mentor,
   MentorSource,
@@ -12,9 +15,11 @@ import type {
   ForumTopic,
   Message,
   Page,
+  PlanningResponse,
   Profile,
   ProfileInput,
   Rating,
+  RatingLink,
   RatingSummary,
   RecommendationResponse,
   RecommendedResource,
@@ -23,6 +28,11 @@ import type {
   StudentRatingInput,
   StudentToken,
   TeacherSearchResponse,
+  Technique,
+  TechniqueDraft,
+  TechniqueRatingCreate,
+  TechniqueSearchParseResponse,
+  TechniqueSearchRunResponse,
   TokenResponse,
   UserPrivate,
 } from "./types";
@@ -125,8 +135,6 @@ async function request<T>(
   return body as T;
 }
 
-/** Mentor chat streams, so it bypasses `request()` and reads the body itself.
- *  EventSource is not an option: it cannot POST and cannot send the token. */
 export interface ResearchedPage {
   url: string;
   title: string;
@@ -402,6 +410,129 @@ export const api = {
     else form.append("file", input);
     return request<ProfileDraft>("/ai/profile-from-document", { method: "POST", body: form });
   },
+
+  // --- class profiles ---
+  classProfiles: (params?: Query) =>
+    request<Page<ClassProfile>>("/class-profiles", { query: params }),
+  classProfile: (id: string) => request<ClassProfile>(`/class-profiles/${id}`),
+  createClassProfile: (data: ClassProfileInput) =>
+    request<ClassProfile>("/class-profiles", { method: "POST", body: JSON.stringify(data) }),
+  updateClassProfile: (id: string, data: Partial<ClassProfileInput>) =>
+    request<ClassProfile>(`/class-profiles/${id}`, { method: "PUT", body: JSON.stringify(data) }),
+  promoteClassProfile: (
+    id: string,
+    data: { class_size: number; format?: string; notes?: string | null },
+  ) =>
+    request<ClassProfile>(`/class-profiles/${id}/promote`, {
+      method: "POST",
+      body: JSON.stringify(data),
+    }),
+  deleteClassProfile: (id: string) =>
+    request<{ detail: string }>(`/class-profiles/${id}`, { method: "DELETE" }),
+  classFromDocument: (input: File | string) => {
+    const form = new FormData();
+    if (typeof input === "string") form.append("text", input);
+    else form.append("file", input);
+    return request<ClassProfileDraft>("/class-profiles/from-document", {
+      method: "POST",
+      body: form,
+    });
+  },
+
+  // --- techniques ---
+  techniques: (params?: { mine?: boolean; limit?: number; offset?: number }) =>
+    request<Page<Technique>>("/techniques", { query: params }),
+  technique: (id: string) => request<Technique>(`/techniques/${id}`),
+  createTechnique: (data: Partial<Technique> & {
+    title: string;
+    summary: string;
+    steps: string;
+    concept_ids?: string[];
+    problem_types?: string[];
+  }) => request<Technique>("/techniques", { method: "POST", body: JSON.stringify(data) }),
+  updateTechnique: (id: string, data: Partial<Technique> & { concept_ids?: string[] }) =>
+    request<Technique>(`/techniques/${id}`, { method: "PUT", body: JSON.stringify(data) }),
+  deleteTechnique: (id: string) =>
+    request<{ detail: string }>(`/techniques/${id}`, { method: "DELETE" }),
+  techniqueFromDocument: (input: File | string) => {
+    const form = new FormData();
+    if (typeof input === "string") form.append("text", input);
+    else form.append("file", input);
+    return request<TechniqueDraft>("/techniques/from-document", { method: "POST", body: form });
+  },
+  triedThis: (
+    techniqueId: string,
+    data: {
+      class_profile_id: string;
+      label?: string | null;
+      duration_minutes?: number;
+      max_uses?: number | null;
+    },
+  ) =>
+    request<RatingLink>(`/techniques/${techniqueId}/tried-this`, {
+      method: "POST",
+      body: JSON.stringify(data),
+    }),
+  createTechniqueRatingLink: (
+    techniqueId: string,
+    data: {
+      class_profile_id?: string | null;
+      label?: string | null;
+      duration_minutes?: number;
+      max_uses?: number | null;
+    },
+  ) =>
+    request<RatingLink>(`/techniques/${techniqueId}/rating-links`, {
+      method: "POST",
+      body: JSON.stringify(data),
+    }),
+  previewRate: (token: string) => request<Technique>(`/rate/${token}`),
+  submitRate: (token: string, data: TechniqueRatingCreate) =>
+    request<{ id: string; technique_id: string; rating: number; comment: string | null }>(
+      `/rate/${token}`,
+      { method: "POST", body: JSON.stringify(data) },
+    ),
+
+  // --- technique search & planning ---
+  parseTechniqueSearch: (data: {
+    class_profile_id: string;
+    concept_text: string;
+    problem_text: string;
+    round?: number;
+  }) =>
+    request<TechniqueSearchParseResponse>("/technique-search/parse", {
+      method: "POST",
+      body: JSON.stringify(data),
+    }),
+  refineTechniqueSearch: (data: {
+    class_profile_id: string;
+    concept_chips?: { id?: string | null; label: string }[];
+    problem_chips?: string[];
+    problem_types?: string[];
+    selected_option_ids?: string[];
+    round?: number;
+  }) =>
+    request<TechniqueSearchParseResponse>("/technique-search/refine", {
+      method: "POST",
+      body: JSON.stringify(data),
+    }),
+  runTechniqueSearch: (data: {
+    class_profile_id: string;
+    concept_ids?: string[];
+    concept_labels?: string[];
+    problem_types?: string[];
+    problem_text?: string | null;
+    limit?: number;
+  }) =>
+    request<TechniqueSearchRunResponse>("/technique-search/run", {
+      method: "POST",
+      body: JSON.stringify(data),
+    }),
+  planningMode: (params: {
+    class_profile_id: string;
+    concept_id?: string;
+    concept_label?: string;
+  }) => request<PlanningResponse>("/technique-search/planning", { query: params }),
 
   // --- mentors ---
   mentors: () => request<Mentor[]>("/mentors"),

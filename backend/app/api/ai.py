@@ -74,7 +74,17 @@ async def ai_status() -> AIStatus:
     """Lets the client hide buttons that would only 503."""
     return AIStatus(
         enabled=llm_service.is_enabled(),
-        features=["collaboration_brief", "profile_import"] if llm_service.is_enabled() else [],
+        features=(
+            [
+                "collaboration_brief",
+                "profile_import",
+                "class_import",
+                "technique_draft",
+                "technique_search_parse",
+            ]
+            if llm_service.is_enabled()
+            else []
+        ),
     )
 
 

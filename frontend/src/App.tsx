@@ -15,12 +15,18 @@ import Messages from "./pages/Messages";
 import Mentors from "./pages/Mentors";
 import MentorProfile from "./pages/MentorProfile";
 import Forum from "./pages/Forum";
+import Classes from "./pages/Classes";
+import ClassSearch from "./pages/ClassSearch";
+import ClassPlanning from "./pages/ClassPlanning";
+import TechniqueDetail from "./pages/TechniqueDetail";
+import StudentRate from "./pages/StudentRate";
 
 // Two things are deliberately absent. Mentor is reached from the pinned
 // educators at the top of Discover, in context with the rest of the network;
 // Network itself is in the account menu, with the other things that are yours.
 const NAV = [
   { to: "/", label: "Matches", icon: "spark", end: true },
+  { to: "/classes", label: "Classes", icon: "class" },
   { to: "/search", label: "Discover", icon: "search" },
   { to: "/resources", label: "Resources", icon: "book" },
   { to: "/forum", label: "Forum", icon: "forum" },
@@ -30,6 +36,7 @@ const NAV = [
 function NavIcon({ name }: { name: string }) {
   const paths: Record<string, ReactNode> = {
     spark: <path d="m12 3 1.2 4.1L17 9l-3.8 1.9L12 15l-1.2-4.1L7 9l3.8-1.9L12 3ZM5 14l.7 2.3L8 17.5l-2.3 1.2L5 21l-.7-2.3L2 17.5l2.3-1.2L5 14Z" />,
+    class: <><path d="M4 19V5a1 1 0 0 1 1-1h6v16H5a1 1 0 0 1-1-1Z" /><path d="M14 4h5a1 1 0 0 1 1 1v14a1 1 0 0 1-1 1h-5V4Z" /><path d="M8 8h2M8 12h2" /></>,
     search: <><circle cx="11" cy="11" r="6" /><path d="m16 16 4 4" /></>,
     book: <><path d="M4 5.5A2.5 2.5 0 0 1 6.5 3H11v16H6.5A2.5 2.5 0 0 0 4 21.5v-16Z" /><path d="M20 5.5A2.5 2.5 0 0 0 17.5 3H13v16h4.5a2.5 2.5 0 0 1 2.5 2.5v-16Z" /></>,
     forum: <><path d="M7 7h10M7 12h7M5 4h14v16l-4-3H5V4Z" /></>,
@@ -186,7 +193,7 @@ function Shell({ children }: { children: ReactNode }) {
             </span>
             EduMatch
           </NavLink>
-          <nav className="hidden min-w-0 flex-1 items-center gap-1 md:flex">
+          <nav className="hidden min-w-0 flex-1 items-center gap-1 overflow-x-auto md:flex">
             {NAV.map((item) => (
               <NavLink
                 key={item.to}
@@ -194,7 +201,7 @@ function Shell({ children }: { children: ReactNode }) {
                 end={item.end}
                 className={({ isActive }) =>
                   cx(
-                    "press flex items-center gap-2 rounded-xl px-3 py-2 text-sm font-medium",
+                    "press flex shrink-0 items-center gap-2 rounded-xl px-3 py-2 text-sm font-medium",
                     isActive ? "bg-indigo-50 text-indigo-700" : "text-muted hover:bg-slate-100 hover:text-ink",
                   )
                 }
@@ -210,7 +217,7 @@ function Shell({ children }: { children: ReactNode }) {
       <main key={useLocation().pathname} className="rise mx-auto max-w-6xl px-4 py-8 pb-28 sm:px-6 sm:py-10 md:pb-10">
         {children}
       </main>
-      <nav className="fixed inset-x-0 bottom-0 z-20 grid grid-cols-5 border-t border-line bg-white/95 px-1 pb-[max(0.4rem,env(safe-area-inset-bottom))] pt-1.5 backdrop-blur-xl md:hidden">
+      <nav className="fixed inset-x-0 bottom-0 z-20 grid grid-cols-6 border-t border-line bg-white/95 px-1 pb-[max(0.4rem,env(safe-area-inset-bottom))] pt-1.5 backdrop-blur-xl md:hidden">
         {NAV.map((item) => (
           <NavLink
             key={item.to}
@@ -218,7 +225,7 @@ function Shell({ children }: { children: ReactNode }) {
             end={item.end}
             className={({ isActive }) =>
               cx(
-                "press flex min-w-0 flex-col items-center gap-1 rounded-xl px-1 py-1.5 text-[10px] font-medium",
+                "press flex min-w-0 flex-col items-center gap-1 rounded-xl px-0.5 py-1.5 text-[9px] font-medium sm:text-[10px]",
                 isActive ? "text-indigo-700" : "text-muted",
               )
             }
@@ -256,6 +263,7 @@ export default function App() {
         path="/register"
         element={loading ? <Loading /> : user ? <Navigate to="/" replace /> : <Register />}
       />
+      <Route path="/rate/:token" element={<StudentRate />} />
       <Route
         path="/"
         element={
@@ -340,6 +348,38 @@ export default function App() {
         element={
           <RequireAuth>
             <Forum />
+          </RequireAuth>
+        }
+      />
+      <Route
+        path="/classes"
+        element={
+          <RequireAuth>
+            <Classes />
+          </RequireAuth>
+        }
+      />
+      <Route
+        path="/classes/:classId/search"
+        element={
+          <RequireAuth>
+            <ClassSearch />
+          </RequireAuth>
+        }
+      />
+      <Route
+        path="/classes/:classId/planning"
+        element={
+          <RequireAuth>
+            <ClassPlanning />
+          </RequireAuth>
+        }
+      />
+      <Route
+        path="/techniques/:id"
+        element={
+          <RequireAuth>
+            <TechniqueDetail />
           </RequireAuth>
         }
       />

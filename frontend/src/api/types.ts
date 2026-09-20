@@ -284,6 +284,183 @@ export interface ProfileDraft {
   source_name: string | null;
 }
 
+// --- class profiles & techniques ---
+
+export type ProblemType =
+  | "misconception"
+  | "missing_prerequisite"
+  | "engagement"
+  | "pacing"
+  | "transfer";
+
+export type ClassFormat = "lecture" | "lab" | "online" | "hybrid";
+export type ClassStatus = "planned" | "active" | "archived";
+
+export interface ClassProfileInput {
+  title: string;
+  subject: string;
+  level: string;
+  format: ClassFormat;
+  status?: ClassStatus;
+  class_size?: number | null;
+  class_size_min?: number | null;
+  class_size_max?: number | null;
+  student_background?: string | null;
+  constraints?: string | null;
+  class_length_minutes?: number | null;
+  technology?: string | null;
+  notes?: string | null;
+}
+
+export interface ClassProfile extends ClassProfileInput {
+  id: string;
+  teacher_id: string;
+  status: ClassStatus;
+  format: ClassFormat;
+  created_at: string;
+  updated_at: string;
+}
+
+export interface ClassProfileDraft {
+  title: string | null;
+  subject: string | null;
+  level: string | null;
+  format: ClassFormat | null;
+  class_size: number | null;
+  class_size_min: number | null;
+  class_size_max: number | null;
+  student_background: string | null;
+  constraints: string | null;
+  class_length_minutes: number | null;
+  technology: string | null;
+  notes: string | null;
+  confidence: string;
+}
+
+export interface ConceptChip {
+  id?: string | null;
+  label: string;
+  slug?: string | null;
+  subject?: string | null;
+}
+
+export interface Concept {
+  id: string;
+  slug: string;
+  label: string;
+  subject: string;
+  description: string | null;
+  parent_id: string | null;
+  created_at: string;
+  updated_at: string;
+}
+
+export interface TechniqueRatingSummary {
+  average: number;
+  count: number;
+  distribution: Record<string, number>;
+  similar_class_count: number;
+  sample_comment: string | null;
+}
+
+export interface Technique {
+  id: string;
+  owner_id: string;
+  owner?: UserPublic | null;
+  title: string;
+  summary: string;
+  steps: string;
+  materials: string | null;
+  class_time_minutes: number | null;
+  teaching_style: string | null;
+  context_subject: string | null;
+  context_level: string | null;
+  context_format: string | null;
+  context_class_size: number | null;
+  context_notes: string | null;
+  problem_types: string[];
+  is_draft: boolean;
+  is_published: boolean;
+  average_rating: number;
+  rating_count: number;
+  concepts: Concept[];
+  rating_summary?: TechniqueRatingSummary | null;
+  score?: number | null;
+  score_breakdown?: Record<string, number> | null;
+  created_at: string;
+  updated_at: string;
+}
+
+export interface TechniqueDraft {
+  title: string;
+  summary: string;
+  steps: string;
+  materials: string | null;
+  class_time_minutes: number | null;
+  teaching_style: string | null;
+  problem_types: ProblemType[];
+  concept_labels: string[];
+  confidence: string;
+}
+
+export interface FollowUpOption {
+  id: string;
+  label: string;
+  example: string | null;
+}
+
+export interface TechniqueSearchParseResponse {
+  concept_chips: ConceptChip[];
+  problem_chips: string[];
+  problem_types: ProblemType[];
+  needs_follow_up: boolean;
+  follow_up_kind: "concept" | "problem" | "none";
+  follow_up_prompt: string | null;
+  follow_up_options: FollowUpOption[];
+  vague_vs_specific: string | null;
+  round: number;
+}
+
+export interface TechniqueSearchRunResponse {
+  items: Technique[];
+  query_concepts: ConceptChip[];
+  problem_types: ProblemType[];
+}
+
+export interface PitfallItem {
+  problem_type: ProblemType;
+  label: string;
+  report_count: number;
+  top_techniques: Technique[];
+}
+
+export interface PlanningResponse {
+  class_profile_id: string;
+  concept: ConceptChip | null;
+  pitfalls: PitfallItem[];
+}
+
+export interface RatingLink {
+  id: string;
+  technique_id: string;
+  teacher_id: string;
+  class_profile_id: string | null;
+  label: string | null;
+  expires_at: string;
+  max_uses: number | null;
+  use_count: number;
+  is_revoked: boolean;
+  is_active: boolean;
+  created_at: string;
+  /** Plaintext only on create. */
+  token?: string | null;
+  rate_path?: string | null;
+}
+
+export interface TechniqueRatingCreate {
+  rating: number;
+  comment?: string | null;
+}
 
 /** One thing a guide is allowed to draw on. Shown as a footnote under a reply. */
 export interface MentorSource {
