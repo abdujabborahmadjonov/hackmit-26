@@ -75,6 +75,22 @@ interface FieldError {
 
 /** FastAPI reports errors three different ways; flatten them into one string. */
 function readError(status: number, body: unknown): ApiError {
+  // A 404 with FastAPI's bare "Not Found" means the route does not exist at
+  // all - which, with the web app and the API deployed separately, almost
+  // always means the API is older than this build rather than that anything
+  // is broken. Say that instead of a red "Not Found" next to a working feature.
+  if (
+    status === 404 &&
+    body &&
+    typeof body === "object" &&
+    (body as { detail?: unknown }).detail === "Not Found"
+  ) {
+    return new ApiError(
+      404,
+      "This part of the app needs a newer version of the server than the one " +
+        "currently deployed. The API may still be rebuilding.",
+    );
+  }
   if (body && typeof body === "object") {
     const payload = body as { detail?: unknown; errors?: FieldError[] };
     if (Array.isArray(payload.errors) && payload.errors.length) {
