@@ -151,14 +151,25 @@ export function RiggedAvatar({
         // Upper arms down along the body; forearms left at their bind
         // rotation, which is already straight - bending them here folded the
         // hands together in front of the chest.
-        // The arms are not wanted here and cannot be posed: the model ships
-        // in a bind T-pose with no idle animation, and rotating these bones
-        // does not move the skin. So collapse them instead - scaling a bone to
-        // nothing pulls every vertex weighted to it into the shoulder, where
-        // the torso hides them. The head is the whole point of this view.
-        for (const key of ["leftarm", "rightarm"]) {
-          bones[key]?.scale.setScalar(0.001);
-        }
+        // Hide the arms. The model ships in a bind T-pose with no idle
+        // animation, so there is no pose to put them in, and this is a head
+        // shot anyway.
+        //
+        // It has to go through `skeleton.bones` rather than the scene graph:
+        // the FBX carries several nodes sharing each bone's name, and only the
+        // ones the skeleton holds actually drive the skin. Touching the others
+        // does nothing at all, which cost a few rounds of "why has nothing
+        // changed".
+        const collapsed = new Set<THREE.Bone>();
+        model.traverse((child) => {
+          if (!(child instanceof THREE.SkinnedMesh)) return;
+          for (const bone of child.skeleton.bones) {
+            if (/(left|right)arm$/i.test(bone.name) && !collapsed.has(bone)) {
+              bone.scale.setScalar(0.001);
+              collapsed.add(bone);
+            }
+          }
+        });
 
         for (const side of ["left", "right"] as const) {
           const bone = bones[`${side}arm`];
