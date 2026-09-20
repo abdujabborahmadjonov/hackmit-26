@@ -10,7 +10,13 @@ import { Avatar, Badge, Card } from "./ui";
  *  like a member profile would read as the person's own, which is exactly the
  *  claim we are not making - so it says what it is, and links to the guide
  *  rather than to a profile, a connect button or a message thread. */
-export function PinnedMentors() {
+export function PinnedMentors({
+  title = "Pinned",
+  description = "Learn from their published teaching",
+}: {
+  title?: string;
+  description?: string;
+} = {}) {
   const [mentors, setMentors] = useState<Mentor[]>([]);
 
   useEffect(() => {
@@ -27,8 +33,8 @@ export function PinnedMentors() {
   return (
     <section className="mt-6">
       <div className="mb-2 flex items-baseline justify-between gap-3">
-        <h2 className="text-sm font-semibold text-ink">Pinned</h2>
-        <p className="text-xs text-muted">Learn from their published teaching</p>
+        <h2 className="text-sm font-semibold text-ink">{title}</h2>
+        <p className="text-xs text-muted">{description}</p>
       </div>
       <div className="stagger grid gap-4 sm:grid-cols-2">
         {mentors.map((mentor) => (
