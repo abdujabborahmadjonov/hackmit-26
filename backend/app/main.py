@@ -19,6 +19,7 @@ from app.api import (
     class_profiles,
     connections,
     forum,
+    mentors,
     messages,
     profiles,
     ratings,
@@ -29,8 +30,9 @@ from app.api import (
     technique_search,
     techniques,
     users,
+    voice,
 )
-from app.config import settings
+from app.config import orphaned_env_lines, settings
 from app.database import engine, ensure_extensions
 from app.services.embedding_service import get_embedding_service
 
@@ -52,6 +54,7 @@ colleagues they are most likely to collaborate well with.
 2. `POST /profiles` to describe your teaching.
 3. `GET /recommendations` for your matches - each one explains *why*.
 4. `GET /search/teachers` for filtered/semantic/geographic discovery.
+5. `POST /mentors/{slug}/chat` to talk to an educator persona, streamed live.
 
 ### How matching works
 `score = 0.30*semantic + 0.20*expertise + 0.15*education + 0.15*teaching_level
@@ -86,6 +89,8 @@ TAGS_METADATA = [
         "description": "Concept/problem search, follow-ups, ranking, and planning mode.",
     },
     {"name": "ai", "description": "Generative features: collaboration briefs and syllabus import."},
+    {"name": "mentors", "description": "Live streaming conversation with an educator persona."},
+    {"name": "voice", "description": "Speech synthesis for mentor chat."},
     {"name": "system", "description": "Health and diagnostics."},
 ]
 
@@ -93,6 +98,16 @@ TAGS_METADATA = [
 @asynccontextmanager
 async def lifespan(app: FastAPI):
     logger.info("Starting %s (%s)", settings.app_name, settings.environment)
+
+    orphans = orphaned_env_lines()
+    if orphans:
+        logger.warning(
+            "%s line(s) in .env hold a value with no NAME= in front of them (line %s). "
+            "Those settings are being ignored - check for a key pasted without its "
+            "variable name.",
+            len(orphans),
+            ", ".join(str(n) for n in orphans),
+        )
     try:
         await ensure_extensions()
     except Exception as exc:  # pragma: no cover - surfaced at /health instead
@@ -121,6 +136,10 @@ async def lifespan(app: FastAPI):
         from app.services import elasticsearch_service as es
 
         await es.close_client()
+
+    from app.services import voice_service
+
+    await voice_service.close_client()
     await engine.dispose()
     logger.info("Shutdown complete")
 
@@ -171,6 +190,8 @@ def create_app() -> FastAPI:
     for router in (
         auth.router,
         ai.router,
+        mentors.router,
+        voice.router,
         users.router,
         profiles.router,
         recommendations.router,

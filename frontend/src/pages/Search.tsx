@@ -13,6 +13,7 @@ import { useAuth } from "../auth/AuthContext";
 import { TeacherCard } from "../components/TeacherCard";
 import { TeacherCardSkeleton } from "../components/Skeleton";
 import { Badge, Button, Card, ErrorNote, Field, Input, PageHeader, Select } from "../components/ui";
+import { PinnedMentors } from "../components/PinnedMentors";
 
 function parseRadiusKm(value: string): number | undefined {
   const radius = Number(value);
@@ -107,6 +108,8 @@ export default function Search() {
         description="Describe the kind of educator you want to meet in natural language, then narrow by subject, learner level, location, and classroom context."
         actions={activeFilterCount > 0 ? <Badge tone="indigo">{activeFilterCount} filters active</Badge> : undefined}
       />
+
+      <PinnedMentors />
 
       <Card className="mt-7 overflow-hidden">
         <form

@@ -6,6 +6,7 @@ import json
 import logging
 import re
 from functools import lru_cache
+from pathlib import Path
 from typing import Literal
 from urllib.parse import parse_qsl, urlencode, urlsplit, urlunsplit
 
@@ -121,6 +122,19 @@ class Settings(BaseSettings):
         validation_alias=AliasChoices("LLM_API_KEY", "ANTHROPIC_API_KEY"),
     )
 
+    # --- speech (optional) ---
+    # A Deepgram API key. Unset means mentors fall back to the browser's own
+    # speech synthesis, which works but sounds markedly worse.
+    deepgram_api_key: str = Field(
+        default="",
+        repr=False,
+        validation_alias=AliasChoices("DEEPGRAM_API_KEY", "DG_API_KEY"),
+    )
+    # Aura-2, British, warm baritone - see https://developers.deepgram.com/docs/tts-models
+    deepgram_tts_model: str = "aura-2-draco-en"
+    # One request per spoken sentence, so this is per reply rather than per turn.
+    tts_rate_limit_per_minute: int = 120
+
     # --- search ---
     search_provider: Literal["postgres", "elasticsearch"] = "postgres"
     elasticsearch_url: str = "http://localhost:9200"
@@ -229,6 +243,25 @@ class Settings(BaseSettings):
             return json.loads(self.education_compatibility_json)
         except json.JSONDecodeError as exc:  # pragma: no cover - config error path
             raise ValueError(f"EDUCATION_COMPATIBILITY_JSON is not valid JSON: {exc}") from exc
+
+
+def orphaned_env_lines(env_file: str = ".env") -> list[int]:
+    """Line numbers in .env that hold a value with no NAME= in front of it.
+
+    `echo 'KEY=value' >> .env` loses the name easily - a stray quote, a partial
+    paste - and the result is a file that looks right, parses without error,
+    and silently ignores the setting. Worth one warning at startup rather than
+    half an hour wondering why a key is not picked up.
+    """
+    path = Path(env_file)
+    if not path.exists():
+        return []
+    orphans = []
+    for number, line in enumerate(path.read_text(encoding="utf-8").splitlines(), start=1):
+        stripped = line.strip()
+        if stripped and not stripped.startswith("#") and "=" not in stripped:
+            orphans.append(number)
+    return orphans
 
 
 @lru_cache
