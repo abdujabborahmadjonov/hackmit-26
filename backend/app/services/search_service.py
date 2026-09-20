@@ -318,8 +318,12 @@ class PostgresSearchBackend:
         stmt: Select = select(Resource).where(*filters)
         if material_match_count is not None:
             # Preserve partial matches, but put resources satisfying the largest
-            # intersection of requested materials first.
-            stmt = stmt.order_by(material_match_count.desc())
+            # intersection first. For equal overlap, prefer the resource that
+            # requires the fewest additional materials.
+            stmt = stmt.order_by(
+                material_match_count.desc(),
+                func.cardinality(Resource.required_materials).asc(),
+            )
         score_expr = None
         if q.query:
             embedding = await self.embeddings.generate_embedding(q.query)
@@ -600,6 +604,7 @@ class ElasticsearchSearchBackend:
             "_source": ["resource_id"],
         }
         material_overlap_sort = None
+        material_count_sort = None
         if requested_materials:
             material_overlap_sort = {
                 "_script": {
@@ -614,6 +619,16 @@ class ElasticsearchSearchBackend:
                             "} return matches;"
                         ),
                         "params": {"materials": requested_materials},
+                    },
+                }
+            }
+            material_count_sort = {
+                "_script": {
+                    "type": "number",
+                    "order": "asc",
+                    "script": {
+                        "lang": "painless",
+                        "source": "return doc['required_materials.keyword'].size();",
                     },
                 }
             }
@@ -637,14 +652,19 @@ class ElasticsearchSearchBackend:
                 **({"filter": filters} if filters else {}),
             }
             if material_overlap_sort:
-                body["sort"] = [material_overlap_sort, {"_score": "desc"}]
+                body["sort"] = [
+                    material_overlap_sort,
+                    material_count_sort,
+                    {"_score": "desc"},
+                ]
         elif q.sort in ("newest", "relevance"):
             body["sort"] = [
                 *([material_overlap_sort] if material_overlap_sort else []),
+                *([material_count_sort] if material_count_sort else []),
                 {"created_at": "desc"},
             ]
         elif material_overlap_sort:
-            body["sort"] = [material_overlap_sort]
+            body["sort"] = [material_overlap_sort, material_count_sort]
 
         response = await client.search(index=settings.elasticsearch_resource_index, body=body)
         hits_raw = response["hits"]["hits"]

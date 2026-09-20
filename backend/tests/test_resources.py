@@ -77,6 +77,16 @@ async def test_filters_and_search(client):
         },
         headers=account["headers"],
     )
+    await client.post(
+        "/resources",
+        json={
+            **RESOURCE,
+            "title": "Laptop-only Python Practice",
+            "tags": ["laptop-only"],
+            "required_materials": ["Laptops"],
+        },
+        headers=account["headers"],
+    )
 
     by_subject = (await client.get("/resources?subject=biology")).json()
     assert by_subject["total"] == 1
@@ -86,17 +96,20 @@ async def test_filters_and_search(client):
     assert by_tag["total"] == 1
 
     by_material = (await client.get("/resources?required_materials=laptops")).json()
-    assert by_material["total"] == 1
-    assert by_material["items"][0]["resource"]["subject"] == "computer_science"
+    assert by_material["total"] == 2
+    assert by_material["items"][0]["resource"]["title"] == "Laptop-only Python Practice"
+    assert by_material["items"][1]["resource"]["title"] == RESOURCE["title"]
 
     by_material_intersection = (
         await client.get(
             "/resources?required_materials=Internet%20Access&required_materials=Laptops"
         )
     ).json()
-    assert by_material_intersection["total"] == 2
+    assert by_material_intersection["total"] == 3
     assert by_material_intersection["items"][0]["resource"]["title"] == RESOURCE["title"]
-    assert by_material_intersection["items"][1]["resource"]["title"] == "Offline Python Practice"
+    assert {
+        item["resource"]["title"] for item in by_material_intersection["items"][1:]
+    } == {"Offline Python Practice", "Laptop-only Python Practice"}
 
     search_by_material = (await client.get("/search/resources?required_materials=microscope")).json()
     assert search_by_material["total"] == 1
