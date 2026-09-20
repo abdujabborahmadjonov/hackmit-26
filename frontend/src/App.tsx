@@ -149,7 +149,7 @@ function AccountMenu({
 
           <NavLink role="menuitem" to="/mentor" className={cx(item, "text-ink hover:bg-slate-100")}>
             <NavIcon name="mentor" />
-            Mentors
+            AI Mentor
           </NavLink>
 
           <NavLink role="menuitem" to={myPageTo} className={cx(item, "text-ink hover:bg-slate-100")}>
