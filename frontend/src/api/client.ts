@@ -5,6 +5,8 @@ import type {
   Connection,
   ProfileDraft,
   Conversation,
+  ForumPost,
+  ForumTopic,
   Message,
   Page,
   Profile,
@@ -245,6 +247,40 @@ export const api = {
     request<{ detail: string }>(`/messages/conversations/${conversationId}/read`, {
       method: "POST",
     }),
+
+  // --- forum ---
+  forumTopics: (params?: Query) =>
+    request<Page<ForumTopic>>("/forum/topics", { query: params }),
+  forumTopic: (topicId: string) => request<ForumTopic>(`/forum/topics/${topicId}`),
+  createForumTopic: (data: { title: string; body: string; category?: string }) =>
+    request<ForumTopic>("/forum/topics", {
+      method: "POST",
+      body: JSON.stringify(data),
+    }),
+  updateForumTopic: (
+    topicId: string,
+    data: { title?: string; body?: string; category?: string },
+  ) =>
+    request<ForumTopic>(`/forum/topics/${topicId}`, {
+      method: "PUT",
+      body: JSON.stringify(data),
+    }),
+  deleteForumTopic: (topicId: string) =>
+    request<{ detail: string }>(`/forum/topics/${topicId}`, { method: "DELETE" }),
+  forumPosts: (topicId: string, params?: Query) =>
+    request<Page<ForumPost>>(`/forum/topics/${topicId}/posts`, { query: params }),
+  createForumPost: (topicId: string, content: string) =>
+    request<ForumPost>(`/forum/topics/${topicId}/posts`, {
+      method: "POST",
+      body: JSON.stringify({ content }),
+    }),
+  updateForumPost: (postId: string, content: string) =>
+    request<ForumPost>(`/forum/posts/${postId}`, {
+      method: "PUT",
+      body: JSON.stringify({ content }),
+    }),
+  deleteForumPost: (postId: string) =>
+    request<{ detail: string }>(`/forum/posts/${postId}`, { method: "DELETE" }),
 
   // --- generative features (503 when the deployment has no key) ---
   aiStatus: () => request<{ enabled: boolean; features: string[] }>("/ai/status"),

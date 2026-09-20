@@ -12,11 +12,13 @@ import TeacherDetail from "./pages/TeacherDetail";
 import Resources from "./pages/Resources";
 import Connections from "./pages/Connections";
 import Messages from "./pages/Messages";
+import Forum from "./pages/Forum";
 
 const NAV = [
   { to: "/", label: "Matches", icon: "spark", end: true },
   { to: "/search", label: "Discover", icon: "search" },
   { to: "/resources", label: "Resources", icon: "book" },
+  { to: "/forum", label: "Forum", icon: "forum" },
   { to: "/connections", label: "Network", icon: "people" },
   { to: "/messages", label: "Messages", icon: "message" },
 ];
@@ -26,6 +28,7 @@ function NavIcon({ name }: { name: string }) {
     spark: <path d="m12 3 1.2 4.1L17 9l-3.8 1.9L12 15l-1.2-4.1L7 9l3.8-1.9L12 3ZM5 14l.7 2.3L8 17.5l-2.3 1.2L5 21l-.7-2.3L2 17.5l2.3-1.2L5 14Z" />,
     search: <><circle cx="11" cy="11" r="6" /><path d="m16 16 4 4" /></>,
     book: <><path d="M4 5.5A2.5 2.5 0 0 1 6.5 3H11v16H6.5A2.5 2.5 0 0 0 4 21.5v-16Z" /><path d="M20 5.5A2.5 2.5 0 0 0 17.5 3H13v16h4.5a2.5 2.5 0 0 1 2.5 2.5v-16Z" /></>,
+    forum: <><path d="M7 7h10M7 12h7M5 4h14v16l-4-3H5V4Z" /></>,
     people: <><circle cx="9" cy="8" r="3" /><path d="M3 19c.5-3.5 2.5-5 6-5s5.5 1.5 6 5M16 5.5a3 3 0 0 1 0 5.8M17 14c2.3.4 3.6 1.8 4 4" /></>,
     message: <path d="M4 5h16v11H9l-5 4V5Z" />,
   };
@@ -110,7 +113,7 @@ function Shell({ children }: { children: ReactNode }) {
       <main key={useLocation().pathname} className="rise mx-auto max-w-6xl px-4 py-8 pb-28 sm:px-6 sm:py-10 md:pb-10">
         {children}
       </main>
-      <nav className="fixed inset-x-0 bottom-0 z-20 grid grid-cols-5 border-t border-line bg-white/95 px-1 pb-[max(0.4rem,env(safe-area-inset-bottom))] pt-1.5 backdrop-blur-xl md:hidden">
+      <nav className="fixed inset-x-0 bottom-0 z-20 grid grid-cols-6 border-t border-line bg-white/95 px-1 pb-[max(0.4rem,env(safe-area-inset-bottom))] pt-1.5 backdrop-blur-xl md:hidden">
         {NAV.map((item) => (
           <NavLink
             key={item.to}
@@ -216,6 +219,14 @@ export default function App() {
         element={
           <RequireAuth>
             <Messages />
+          </RequireAuth>
+        }
+      />
+      <Route
+        path="/forum"
+        element={
+          <RequireAuth>
+            <Forum />
           </RequireAuth>
         }
       />

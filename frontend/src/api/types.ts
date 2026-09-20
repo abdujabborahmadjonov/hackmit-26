@@ -231,6 +231,37 @@ export interface Conversation {
   updated_at?: string | null;
 }
 
+export type ForumCategory =
+  | "general"
+  | "collaboration"
+  | "curriculum"
+  | "classroom"
+  | "resources"
+  | "technology";
+
+export interface ForumTopic {
+  id: string;
+  author_id: string;
+  author: UserPublic | null;
+  title: string;
+  body: string;
+  category: ForumCategory | string;
+  reply_count: number;
+  last_activity_at?: string | null;
+  created_at?: string | null;
+  updated_at?: string | null;
+}
+
+export interface ForumPost {
+  id: string;
+  topic_id: string;
+  author_id: string;
+  author: UserPublic | null;
+  content: string;
+  created_at?: string | null;
+  updated_at?: string | null;
+}
+
 export interface Page<T> {
   items: T[];
   total: number;
