@@ -294,6 +294,23 @@ async def test_falls_back_to_postgres_when_the_cluster_is_down(monkeypatch, db_s
     assert outcome.engine == "postgres"
 
 
+@requires_db
+@pytest.mark.integration
+async def test_falls_back_to_postgres_when_hits_do_not_resolve(monkeypatch, db_session):
+    """A stale ES index (IDs that no longer exist in Postgres) must not blank the page."""
+    from app.services.search_service import SearchOutcome, SearchService
+
+    monkeypatch.setattr(settings, "search_provider", "elasticsearch")
+    service = SearchService(db_session)
+
+    async def stale(_query):
+        return SearchOutcome(hits=[], total=10, engine="elasticsearch", took_ms=1)
+
+    monkeypatch.setattr(service.elastic, "search_teachers", stale)
+    outcome = await service.search_teachers(TeacherSearchQuery(limit=5))
+    assert outcome.engine == "postgres"
+
+
 # --------------------------------------------------------------------------- #
 # End-to-end (only with a live cluster)
 # --------------------------------------------------------------------------- #

@@ -97,6 +97,7 @@ export function Input({ className, ...props }: InputHTMLAttributes<HTMLInputElem
         "w-full rounded-xl bg-white px-3.5 py-2.5 text-sm text-ink ring-1 ring-line",
         "transition duration-150 placeholder:text-slate-400 hover:ring-slate-300",
         "focus:outline-none focus:ring-2 focus:ring-indigo-500",
+        "disabled:cursor-not-allowed disabled:bg-slate-50 disabled:text-slate-400 disabled:hover:ring-line",
         className,
       )}
       {...props}
