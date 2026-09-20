@@ -99,7 +99,32 @@
       "A wristwatch with an accelerometer that counts swimming strokes and knows when you push off the wall is a more sophisticated computer than the one NASA flew on Voyager 1 and Voyager 2 in 1977 - the spacecraft that, as of 2012, was about to leave the solar system."
     ],
     "avatar_url": "/mentors/osmar-zaiane.webp",
-    "avatar_credit": "Photograph supplied by the EduMatch team. Confirm the photographer's terms before using it anywhere public."
+    "avatar_credit": "Photograph supplied by the EduMatch team. Confirm the photographer's terms before using it anywhere public.",
+    "voice": {
+      "enabled": true,
+      "provider": "browser",
+      "prefer": [
+        "Daniel",
+        "Google UK English Male",
+        "Alex"
+      ],
+      "pitch": 1.0,
+      "rate": 0.98,
+      "clone_of": null
+    },
+    "avatar": {
+      "enabled": true,
+      "kind": "stylised",
+      "model_url": "",
+      "accent": "#4f46e5"
+    },
+    "likeness_consent": {
+      "granted": false,
+      "covers": [],
+      "source": null,
+      "scope": null,
+      "note": "Separate from speaking consent. To use a real likeness or a voice cloned from this person, set granted true with 'likeness' and/or 'voice' in covers, and record what they actually agreed to. Until then the avatar is an abstract form and the voice is a generic synthesised one."
+    }
   },
   {
     "slug": "elena-vasquez",
@@ -180,6 +205,31 @@
       "granted": true,
       "source": "composite persona - no real individual",
       "scope": "everything in this dossier"
+    },
+    "voice": {
+      "enabled": true,
+      "provider": "browser",
+      "prefer": [
+        "Daniel",
+        "Google UK English Male",
+        "Alex"
+      ],
+      "pitch": 1.0,
+      "rate": 0.98,
+      "clone_of": null
+    },
+    "avatar": {
+      "enabled": true,
+      "kind": "stylised",
+      "model_url": "",
+      "accent": "#0d9488"
+    },
+    "likeness_consent": {
+      "granted": false,
+      "covers": [],
+      "source": null,
+      "scope": null,
+      "note": "Separate from speaking consent. To use a real likeness or a voice cloned from this person, set granted true with 'likeness' and/or 'voice' in covers, and record what they actually agreed to. Until then the avatar is an abstract form and the voice is a generic synthesised one."
     }
   },
   {
@@ -225,6 +275,31 @@
     ],
     "collaborates_on": [],
     "opening_line": "I'm a guide to Gilbert Strang's published teaching - not Professor Strang himself. Ask me how he sequences a linear algebra course or what he has said about teaching it, and I'll answer from cited material or tell you I don't have any.",
-    "suggested_questions": []
+    "suggested_questions": [],
+    "voice": {
+      "enabled": true,
+      "provider": "browser",
+      "prefer": [
+        "Daniel",
+        "Google UK English Male",
+        "Alex"
+      ],
+      "pitch": 1.0,
+      "rate": 0.98,
+      "clone_of": null
+    },
+    "avatar": {
+      "enabled": true,
+      "kind": "stylised",
+      "model_url": "",
+      "accent": "#b45309"
+    },
+    "likeness_consent": {
+      "granted": false,
+      "covers": [],
+      "source": null,
+      "scope": null,
+      "note": "Separate from speaking consent. To use a real likeness or a voice cloned from this person, set granted true with 'likeness' and/or 'voice' in covers, and record what they actually agreed to. Until then the avatar is an abstract form and the voice is a generic synthesised one."
+    }
   }
 ]

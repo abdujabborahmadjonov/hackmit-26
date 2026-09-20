@@ -219,6 +219,25 @@ export interface MentorSource {
   kind: "interview" | "talk" | "book" | "course" | "article" | "other";
 }
 
+export interface MentorVoice {
+  enabled: boolean;
+  provider: "browser" | "none";
+  prefer: string[];
+  pitch: number;
+  rate: number;
+  /** Names a real person this voice imitates. Requires likeness consent, so
+   *  it is null on every persona until someone records that permission. */
+  clone_of: string | null;
+}
+
+export interface MentorAvatar {
+  enabled: boolean;
+  /** "stylised" is an abstract form; "likeness" needs the person's consent. */
+  kind: "stylised" | "likeness";
+  model_url: string;
+  accent: string;
+}
+
 /** An educator you can hold a live conversation with. The persona is data on
  *  the server - `available` is false when that deployment has no model key.
  *
@@ -237,6 +256,9 @@ export interface Mentor {
   tagline: string;
   avatar_seed: string;
   avatar_url: string;
+  /** Absent when the API predates voice mode - always guard. */
+  voice?: MentorVoice;
+  avatar?: MentorAvatar;
   synthetic: boolean;
   disclaimer: string;
   subjects: string[];

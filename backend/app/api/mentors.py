@@ -31,7 +31,9 @@ from app.services.mentor_service import (
     MAX_HISTORY_MESSAGES,
     MAX_MESSAGE_CHARS,
     Mentor,
+    MentorAvatar,
     MentorSource,
+    MentorVoice,
 )
 from app.utils.auth import CurrentUser
 from app.utils.rate_limit import RateLimiter
@@ -87,6 +89,8 @@ class MentorCard(BaseModel):
     tagline: str
     avatar_seed: str
     avatar_url: str
+    voice: MentorVoice
+    avatar: MentorAvatar
     synthetic: bool
     disclaimer: str
     subjects: list[str]
@@ -116,6 +120,8 @@ class MentorCard(BaseModel):
             tagline=mentor.tagline,
             avatar_seed=mentor.avatar_seed or mentor.name,
             avatar_url=mentor.avatar_url,
+            voice=mentor.voice,
+            avatar=mentor.avatar,
             synthetic=mentor.synthetic,
             disclaimer=mentor.disclaimer,
             subjects=mentor.teaches.subjects,

@@ -1,8 +1,13 @@
-import { useEffect, useRef, useState } from "react";
+import { Suspense, lazy, useEffect, useRef, useState } from "react";
 import { Link, useNavigate, useParams } from "react-router-dom";
 import { api, streamMentorChat } from "../api/client";
 import type { MentorReplyEnd } from "../api/client";
 import type { ChatTurn, Mentor as MentorPersona, MentorSource } from "../api/types";
+// Three.js is ~500kB and most visitors never open voice mode, so it is only
+// fetched when someone actually switches to it.
+const VoiceMode = lazy(() =>
+  import("../voice/VoiceMode").then((m) => ({ default: m.VoiceMode })),
+);
 import {
   Avatar,
   Badge,
@@ -41,6 +46,7 @@ export default function Mentor() {
   const [streaming, setStreaming] = useState<string | null>(null);
   const [draft, setDraft] = useState("");
   const [error, setError] = useState<unknown>(null);
+  const [mode, setMode] = useState<"text" | "voice">("text");
 
   const abort = useRef<AbortController | null>(null);
   const transcript = useRef<HTMLDivElement>(null);
@@ -62,6 +68,7 @@ export default function Mentor() {
     setTurns([]);
     setStreaming(null);
     setError(null);
+    setMode("text");
   }, [slug]);
 
   useEffect(() => {
@@ -177,6 +184,42 @@ export default function Mentor() {
         </div>
       )}
 
+      {mentor.voice?.enabled && mentor.avatar?.enabled && ready && (
+        <div className="mb-4 inline-flex rounded-full bg-slate-100 p-1">
+          {(["text", "voice"] as const).map((option) => (
+            <button
+              key={option}
+              type="button"
+              onClick={() => setMode(option)}
+              className={
+                "press rounded-full px-4 py-1.5 text-sm font-medium capitalize " +
+                (mode === option ? "bg-white text-ink shadow-sm" : "text-muted hover:text-ink")
+              }
+            >
+              {option}
+            </button>
+          ))}
+        </div>
+      )}
+
+      {mode === "voice" ? (
+        <Suspense
+          fallback={
+            <div className="grid h-72 place-items-center rounded-2xl bg-slate-950 ring-1 ring-slate-800 sm:h-96">
+              <span className="inline-flex items-center gap-2 text-sm text-white/50">
+                <Spinner className="h-4 w-4" />
+                Waking him up…
+              </span>
+            </div>
+          }
+        >
+          <VoiceMode
+            mentor={mentor}
+            turns={turns.map(({ role, content }) => ({ role, content }))}
+            onTurns={(next) => setTurns(next)}
+          />
+        </Suspense>
+      ) : (
       <Card className="overflow-hidden">
         {/* --- who you are talking to --- */}
         <div className="flex flex-wrap items-start gap-4 border-b border-line bg-slate-50/60 p-5">
@@ -316,6 +359,7 @@ export default function Mentor() {
           </div>
         </form>
       </Card>
+      )}
 
       {mentor.disclaimer && (
         <p className="mt-3 px-1 text-xs leading-5 text-muted">

@@ -57,6 +57,51 @@ class MentorConsent(BaseModel):
     note: str = ""
 
 
+class MentorVoice(BaseModel):
+    """How a persona sounds, if it speaks.
+
+    `clone_of` names a real person whose voice this imitates. Setting it
+    requires likeness consent covering "voice" - a synthesised voice is the
+    most abusable thing this product could produce, and the gate is in the
+    loader for the same reason the first-person gate is.
+    """
+
+    enabled: bool = False
+    provider: Literal["browser", "none"] = "browser"
+    # A hint the client matches against the voices the browser offers.
+    prefer: list[str] = Field(default_factory=list)
+    pitch: float = Field(default=1.0, ge=0.5, le=1.5)
+    rate: float = Field(default=1.0, ge=0.5, le=1.5)
+    clone_of: str | None = None
+
+
+class MentorAvatar(BaseModel):
+    """What the persona looks like.
+
+    `stylised` means a form nobody could mistake for a photograph of a person.
+    Anything else is a likeness and needs consent covering "likeness".
+    """
+
+    enabled: bool = False
+    kind: Literal["stylised", "likeness"] = "stylised"
+    model_url: str = ""
+    accent: str = "#4f46e5"
+
+
+class LikenessConsent(BaseModel):
+    """Separate from speaking consent, because it is a separate permission.
+
+    Agreeing to have your teaching represented in text is not agreeing to a
+    synthesised version of your face and voice saying words you never said.
+    """
+
+    granted: bool = False
+    covers: list[Literal["voice", "likeness"]] = Field(default_factory=list)
+    source: str | None = None
+    scope: str | None = None
+    note: str = ""
+
+
 class MentorSource(BaseModel):
     """One piece of published material the guide is allowed to draw on."""
 
@@ -98,6 +143,9 @@ class Mentor(BaseModel):
     avatar_seed: str = ""
     avatar_url: str = Field(default="", description="A photograph, served from the client")
     avatar_credit: str = ""
+    voice: MentorVoice = Field(default_factory=MentorVoice)
+    avatar: MentorAvatar = Field(default_factory=MentorAvatar)
+    likeness_consent: LikenessConsent = Field(default_factory=LikenessConsent)
     teaches: MentorTeaches = Field(default_factory=MentorTeaches)
 
     # --- guide mode ---
@@ -121,6 +169,19 @@ class Mentor(BaseModel):
             raise ValueError(
                 f"{self.slug}: a first-person persona needs consent.granted - speaking as a real "
                 "person without it puts words in their mouth. Use mode 'guide' instead."
+            )
+        # Voice and likeness are separate permissions from speaking consent.
+        covered = set(self.likeness_consent.covers) if self.likeness_consent.granted else set()
+        if self.voice.clone_of and "voice" not in covered:
+            raise ValueError(
+                f"{self.slug}: voice.clone_of imitates a real person's voice, which needs "
+                "likeness_consent.granted with 'voice' in covers. A synthesised voice saying "
+                "words they never said is not covered by agreeing to a text persona."
+            )
+        if self.avatar.kind == "likeness" and "likeness" not in covered:
+            raise ValueError(
+                f"{self.slug}: avatar.kind 'likeness' needs likeness_consent.granted with "
+                "'likeness' in covers. Use kind 'stylised' until then."
             )
         known = {source.id for source in self.sources}
         for claim in self.claims:

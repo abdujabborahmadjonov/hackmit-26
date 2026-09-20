@@ -254,3 +254,61 @@ def test_the_provenance_file_exists_and_covers_every_source():
     assert "He begins at **07:06**" in doc
     # Anything inferred rather than said must be flagged as such.
     assert "not something he says" in doc
+
+
+# --------------------------------------------------------------------------- #
+# Voice and likeness - a separate permission from speaking
+# --------------------------------------------------------------------------- #
+def test_a_cloned_voice_needs_likeness_consent():
+    """Agreeing to a text persona is not agreeing to a synthesised voice."""
+    with pytest.raises(ValidationError, match="likeness_consent"):
+        Mentor.model_validate(
+            {**REAL_PERSON, "mode": "guide", "voice": {"enabled": True, "clone_of": "Real Person"}}
+        )
+
+
+def test_a_likeness_avatar_needs_likeness_consent():
+    with pytest.raises(ValidationError, match="likeness_consent"):
+        Mentor.model_validate(
+            {**REAL_PERSON, "mode": "guide", "avatar": {"enabled": True, "kind": "likeness"}}
+        )
+
+
+def test_speaking_consent_alone_does_not_unlock_voice_or_face():
+    """The gap this closes: someone who said yes to words has not said yes to
+    a synthetic version of their face and voice."""
+    with pytest.raises(ValidationError, match="likeness_consent"):
+        Mentor.model_validate({**CONSENTED, "teaching_style": "x",
+                               "voice": {"enabled": True, "clone_of": "Real Person"}})
+
+
+@pytest.mark.parametrize(
+    ("covers", "extra"),
+    [
+        (["voice"], {"voice": {"enabled": True, "clone_of": "Real Person"}}),
+        (["likeness"], {"avatar": {"enabled": True, "kind": "likeness"}}),
+    ],
+    ids=["voice", "likeness"],
+)
+def test_the_right_permission_unlocks_the_right_thing(covers, extra):
+    mentor = Mentor.model_validate(
+        {**REAL_PERSON, "mode": "guide", **extra,
+         "likeness_consent": {"granted": True, "covers": covers, "source": "email, 2026-09-20"}}
+    )
+    assert mentor.likeness_consent.granted
+
+
+def test_consent_for_one_does_not_cover_the_other():
+    """Permission for a voice is not permission for a face."""
+    with pytest.raises(ValidationError, match="likeness_consent"):
+        Mentor.model_validate(
+            {**REAL_PERSON, "mode": "guide", "avatar": {"enabled": True, "kind": "likeness"},
+             "likeness_consent": {"granted": True, "covers": ["voice"], "source": "email"}}
+        )
+
+
+def test_every_shipped_persona_is_stylised_with_a_generic_voice():
+    for mentor in mentor_service.list_mentors():
+        assert mentor.avatar.kind == "stylised", mentor.slug
+        assert mentor.voice.clone_of is None, mentor.slug
+        assert mentor.likeness_consent.granted is False, mentor.slug
