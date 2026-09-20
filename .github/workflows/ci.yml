@@ -334,6 +334,33 @@ jobs:
         if: always()
         run: docker compose down --volumes --remove-orphans
 
+  frontend:
+    name: Frontend (typecheck + build)
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    defaults:
+      run:
+        working-directory: frontend
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "22"
+          cache: npm
+          cache-dependency-path: frontend/package-lock.json
+
+      # `npm ci` rather than `npm install` on purpose: it installs exactly the
+      # lockfile and fails on a dependency that package.json does not declare.
+      # A package left in a developer's node_modules but dropped from the
+      # manifest builds fine locally and fails only on a clean machine, which
+      # is how a frontend that could not build reached main with CI green.
+      - name: npm ci
+        run: npm ci
+
+      - name: Typecheck and build
+        run: npm run build
+
   audit:
     name: Dependency audit (advisory)
     runs-on: ubuntu-latest
@@ -357,7 +384,7 @@ jobs:
     name: CI
     # The single status check to require on main: it turns red if any job above
     # failed, and stays correct when jobs are added or renamed.
-    needs: [lint, unit, tests, migrations, elasticsearch, docker]
+    needs: [lint, unit, tests, migrations, elasticsearch, docker, frontend]
     if: always()
     runs-on: ubuntu-latest
     defaults:
