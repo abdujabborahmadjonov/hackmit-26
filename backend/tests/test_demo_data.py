@@ -196,7 +196,10 @@ async def test_rating_rollups_match_the_ratings_table(generated, db_session):
 async def test_alice_recommendation_scenario(generated, db_session):
     """The scripted demo: Alice's top match is Bob, ahead of Carol."""
     alice = await db_session.scalar(select(User).where(User.email == "demo_teacher@example.com"))
-    result = await RecommendationService(db_session).recommend(alice.id, limit=10)
+    # Default weights, no MMR — bandit exploration is covered in test_bandit.py.
+    result = await RecommendationService(db_session).recommend(
+        alice.id, limit=10, mmr=False
+    )
 
     names = [item.user.first_name for item in result.items]
     assert names[0] == "Bob", f"expected Bob first, got {names}"

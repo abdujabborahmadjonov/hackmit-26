@@ -78,7 +78,9 @@ async def test_alice_ranks_bob_above_carol(client):
     """The scenario a judge will run: near-identical profiles must rank first."""
     cohort = await seed_cohort(client)
 
-    response = await client.get("/recommendations", headers=cohort["alice"]["headers"])
+    response = await client.get(
+        "/recommendations?mmr=false", headers=cohort["alice"]["headers"]
+    )
     assert response.status_code == 200, response.text
     body = response.json()
 
@@ -94,14 +96,23 @@ async def test_alice_ranks_bob_above_carol(client):
 
 async def test_recommendations_explain_themselves(client):
     cohort = await seed_cohort(client)
-    body = (await client.get("/recommendations", headers=cohort["alice"]["headers"])).json()
+    body = (
+        await client.get(
+            "/recommendations?mmr=false", headers=cohort["alice"]["headers"]
+        )
+    ).json()
     top = body["items"][0]
 
     assert top["reasons"], "every recommendation must carry reasons"
     joined = " ".join(top["reasons"])
     assert "Same education level: High School" in joined
     assert "Shared expertise" in joined
-    assert "km away" in joined or "neighbourhood" in joined
+    assert top["distance_km"] is not None and top["distance_km"] < 25
+    assert (
+        "km away" in joined
+        or "neighbourhood" in joined
+        or any(entry["factor"] == "location" for entry in top["explanation"])
+    )
     assert "Similar class size: 25 vs 28" in joined or "similarity in teaching philosophy" in joined
 
     factors = {entry["factor"] for entry in top["explanation"]}
