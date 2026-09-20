@@ -12,7 +12,6 @@ import TeacherDetail from "./pages/TeacherDetail";
 import Resources from "./pages/Resources";
 import Connections from "./pages/Connections";
 import Messages from "./pages/Messages";
-import Mentor from "./pages/Mentor";
 import Forum from "./pages/Forum";
 import Classes from "./pages/Classes";
 import ClassSearch from "./pages/ClassSearch";
@@ -24,7 +23,6 @@ const NAV = [
   { to: "/", label: "Matches", icon: "spark", end: true },
   { to: "/classes", label: "Classes", icon: "class" },
   { to: "/search", label: "Discover", icon: "search" },
-  { to: "/mentor", label: "Mentor", icon: "mentor" },
   { to: "/resources", label: "Resources", icon: "book" },
   { to: "/forum", label: "Forum", icon: "forum" },
   { to: "/connections", label: "Network", icon: "people" },
@@ -40,7 +38,6 @@ function NavIcon({ name }: { name: string }) {
     forum: <><path d="M7 7h10M7 12h7M5 4h14v16l-4-3H5V4Z" /></>,
     people: <><circle cx="9" cy="8" r="3" /><path d="M3 19c.5-3.5 2.5-5 6-5s5.5 1.5 6 5M16 5.5a3 3 0 0 1 0 5.8M17 14c2.3.4 3.6 1.8 4 4" /></>,
     message: <path d="M4 5h16v11H9l-5 4V5Z" />,
-    mentor: <><circle cx="12" cy="7.5" r="3.5" /><path d="M5 20c.6-4 3.3-6 7-6s6.4 2 7 6" /><path d="M17.5 3.2a3 3 0 0 1 0 4.6" /></>,
   };
   return (
     <svg aria-hidden="true" className="h-[18px] w-[18px]" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round">
@@ -206,22 +203,6 @@ export default function App() {
         element={
           <RequireAuth>
             <TeacherDetail />
-          </RequireAuth>
-        }
-      />
-      <Route
-        path="/mentor"
-        element={
-          <RequireAuth>
-            <Mentor />
-          </RequireAuth>
-        }
-      />
-      <Route
-        path="/mentor/:slug"
-        element={
-          <RequireAuth>
-            <Mentor />
           </RequireAuth>
         }
       />
