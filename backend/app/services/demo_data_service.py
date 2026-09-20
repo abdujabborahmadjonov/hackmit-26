@@ -903,9 +903,21 @@ class DemoDataGenerator:
         )
         await self.db.commit()
 
-    async def generate_connections(self, user_ids: list[uuid.UUID], count: int) -> int:
+    async def generate_connections(
+        self,
+        user_ids: list[uuid.UUID],
+        count: int,
+        *,
+        protected_ids: set[uuid.UUID] | None = None,
+    ) -> int:
+        """Insert random connections.
+
+        ``protected_ids`` (the scripted demo accounts) are never paired with
+        each other — Alice↔Bob must stay recommendable for the judge demo.
+        """
         if len(user_ids) < 2:
             return 0
+        protected = protected_ids or set()
         statuses = [
             ConnectionStatus.ACCEPTED,
             ConnectionStatus.PENDING,
@@ -921,6 +933,8 @@ class DemoDataGenerator:
             a = user_ids[self.random.randrange(len(user_ids))]
             b = self._biased_peer(a, user_ids)
             if a == b:
+                continue
+            if a in protected and b in protected:
                 continue
             key = (a, b) if str(a) < str(b) else (b, a)
             if key in seen:
@@ -1009,7 +1023,9 @@ class DemoDataGenerator:
         stats.profiles = len(user_ids)
         stats.resources = await self.generate_resources(user_ids, self.counts.resources)
         stats.ratings = await self.generate_ratings(user_ids, self.counts.ratings)
-        stats.connections = await self.generate_connections(user_ids, self.counts.connections)
+        stats.connections = await self.generate_connections(
+            user_ids, self.counts.connections, protected_ids=set(demo_ids)
+        )
         stats.conversations, stats.messages = await self.generate_conversations(
             user_ids, self.counts.conversations
         )

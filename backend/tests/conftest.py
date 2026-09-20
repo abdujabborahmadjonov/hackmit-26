@@ -124,6 +124,19 @@ def default_search_provider(monkeypatch):
     monkeypatch.setattr(settings, "search_provider", "postgres")
 
 
+@pytest.fixture(autouse=True)
+def deterministic_recommendations(monkeypatch):
+    """Disable the bandit so ranking assertions stay stable across CI runs.
+
+    Thompson sampling is covered by ``test_bandit.py``. MMR stays on so its
+    integration paths remain covered; tests that need pure score order pass
+    ``?mmr=false`` explicitly. Response caching is off so connect/hide flows
+    always see a fresh pool.
+    """
+    monkeypatch.setattr(settings, "rec_bandit_enabled", False)
+    monkeypatch.setattr(settings, "rec_response_cache_ttl_seconds", 0.0)
+
+
 # --------------------------------------------------------------------------- #
 # Convenience helpers
 # --------------------------------------------------------------------------- #

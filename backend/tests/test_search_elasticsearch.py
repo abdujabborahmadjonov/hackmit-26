@@ -132,6 +132,11 @@ def test_geo_filter_uses_geo_distance():
 
 
 def test_client_kwargs_prefer_api_key(monkeypatch):
+    monkeypatch.setattr(
+        settings,
+        "elasticsearch_url",
+        "https://my-vectordb-project-b04eea.es.us-central1.gcp.elastic.cloud:443",
+    )
     monkeypatch.setattr(settings, "elasticsearch_api_key", "id:secret")
     monkeypatch.setattr(settings, "elasticsearch_username", "elastic")
     monkeypatch.setattr(settings, "elasticsearch_password", "pwd")
@@ -141,6 +146,11 @@ def test_client_kwargs_prefer_api_key(monkeypatch):
 
 
 def test_client_kwargs_basic_auth_without_api_key(monkeypatch):
+    monkeypatch.setattr(
+        settings,
+        "elasticsearch_url",
+        "https://my-vectordb-project-b04eea.es.us-central1.gcp.elastic.cloud:443",
+    )
     monkeypatch.setattr(settings, "elasticsearch_api_key", "  ")
     monkeypatch.setattr(settings, "elasticsearch_username", "elastic")
     monkeypatch.setattr(settings, "elasticsearch_password", "pwd")
@@ -148,11 +158,14 @@ def test_client_kwargs_basic_auth_without_api_key(monkeypatch):
 
 
 def test_client_kwargs_unauthenticated_local_cluster(monkeypatch):
-    monkeypatch.setattr(settings, "elasticsearch_api_key", "")
-    monkeypatch.setattr(settings, "elasticsearch_username", "")
+    monkeypatch.setattr(settings, "elasticsearch_url", "http://localhost:9200")
+    monkeypatch.setattr(settings, "elasticsearch_api_key", "id:secret")
+    monkeypatch.setattr(settings, "elasticsearch_username", "elastic")
     kwargs = es.client_kwargs()
     assert "api_key" not in kwargs
     assert "basic_auth" not in kwargs
+    assert kwargs["request_timeout"] == 3
+    assert kwargs["max_retries"] == 0
 
 
 def test_cloud_index_settings_leave_replicas_to_the_cluster(monkeypatch):

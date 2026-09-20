@@ -16,7 +16,7 @@ from sqlalchemy import (
     Text,
     text,
 )
-from sqlalchemy.dialects.postgresql import ARRAY
+from sqlalchemy.dialects.postgresql import ARRAY, JSONB
 from sqlalchemy.dialects.postgresql import UUID as PGUUID
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
@@ -84,6 +84,9 @@ class TeacherProfile(UUIDPrimaryKeyMixin, TimestampMixin, Base):
     teaching_style_embedding: Mapped[list[float] | None] = mapped_column(
         Vector(settings.embedding_dim)
     )
+
+    # Personal recommendation factor weights (overrides bandit when set).
+    recommendation_weights: Mapped[dict | None] = mapped_column(JSONB, nullable=True)
 
     user: Mapped[User] = relationship(back_populates="profile")
 

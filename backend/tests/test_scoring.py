@@ -5,15 +5,22 @@ from __future__ import annotations
 import pytest
 
 from app.models.profile import TeacherProfile
+from app.models.recommendation import BanditArm
+from app.services.bandit_service import default_arm_specs, thompson_select
 from app.services.recommendation_service import (
+    RecommendationItem,
     build_reasons,
     class_size_similarity,
     education_similarity,
     expertise_similarity,
+    mmr_rerank,
+    quality_similarity,
     score_profiles,
     semantic_similarity,
+    social_similarity,
     teaching_level_similarity,
 )
+from app.services.relatedness_service import clear_cooccurrence_cache, combined_relatedness
 from app.utils.geo import distance_similarity, haversine_km, location_similarity
 
 
@@ -174,10 +181,72 @@ def test_weights_are_normalised_and_applied():
         "teaching_level": 0.0,
         "location": 0.0,
         "class_size": 0.0,
+        "social": 0.0,
+        "quality": 0.0,
     }
     breakdown = score_profiles(profile, profile, weights)
     assert breakdown.total == pytest.approx(1.0)
     assert breakdown.components["semantic"] == pytest.approx(1.0)
+
+
+def test_social_and_quality_components():
+    assert social_similarity(shared_neighbors=0, is_friend_of_friend=False) == 0.0
+    assert social_similarity(shared_neighbors=0, is_friend_of_friend=True) == pytest.approx(0.45)
+    assert social_similarity(shared_neighbors=3, is_friend_of_friend=False) > 0.7
+
+    unrated = quality_similarity(0.0, 0)
+    strong = quality_similarity(5.0, 20)
+    weak = quality_similarity(5.0, 1)
+    assert 0.0 <= unrated <= 1.0
+    assert strong > weak > unrated
+
+
+def test_mmr_prefers_diverse_second_pick():
+    alice = make_profile(subjects=["computer_science"], teaching_style_embedding=[1.0, 0.0, 0.0])
+    twin = make_profile(subjects=["computer_science"], teaching_style_embedding=[0.99, 0.01, 0.0])
+    other = make_profile(
+        subjects=["history"],
+        education_levels=["high_school"],
+        teaching_style_embedding=[0.0, 0.0, 1.0],
+    )
+    twin_bd = score_profiles(alice, twin)
+    other_bd = score_profiles(alice, other)
+    twin_bd.total = 0.9
+    other_bd.total = 0.85
+    from app.models.user import User
+
+    user = User(email="t@example.com", password_hash="x", first_name="T", last_name="T")
+    items = [
+        RecommendationItem(
+            profile=twin, user=user, breakdown=twin_bd, reasons=[], explanation=[]
+        ),
+        RecommendationItem(
+            profile=other, user=user, breakdown=other_bd, reasons=[], explanation=[]
+        ),
+    ]
+    reranked = mmr_rerank(items, lambda_=0.5, limit=2)
+    assert reranked[0].profile is twin
+    assert len(reranked) == 2
+
+
+def test_history_social_studies_relatedness():
+    clear_cooccurrence_cache()
+    assert combined_relatedness("history", "social_studies") >= 0.8
+    assert combined_relatedness("esl", "linguistics") >= 0.7
+
+
+def test_bandit_arm_catalogue_and_thompson():
+    specs = default_arm_specs()
+    assert "default" in specs
+    assert "semantic_heavy" in specs
+    arms = [
+        BanditArm(arm_id=arm_id, weights=weights, alpha=1.0, beta=1.0, pulls=0)
+        for arm_id, weights in specs.items()
+    ]
+    import random
+
+    chosen = thompson_select(arms, rng=random.Random(0))
+    assert chosen.arm_id in specs
 
 
 def test_reasons_are_human_readable_and_ordered():

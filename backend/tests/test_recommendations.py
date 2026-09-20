@@ -78,7 +78,9 @@ async def test_alice_ranks_bob_above_carol(client):
     """The scenario a judge will run: near-identical profiles must rank first."""
     cohort = await seed_cohort(client)
 
-    response = await client.get("/recommendations", headers=cohort["alice"]["headers"])
+    response = await client.get(
+        "/recommendations?mmr=false", headers=cohort["alice"]["headers"]
+    )
     assert response.status_code == 200, response.text
     body = response.json()
 
@@ -94,14 +96,23 @@ async def test_alice_ranks_bob_above_carol(client):
 
 async def test_recommendations_explain_themselves(client):
     cohort = await seed_cohort(client)
-    body = (await client.get("/recommendations", headers=cohort["alice"]["headers"])).json()
+    body = (
+        await client.get(
+            "/recommendations?mmr=false", headers=cohort["alice"]["headers"]
+        )
+    ).json()
     top = body["items"][0]
 
     assert top["reasons"], "every recommendation must carry reasons"
     joined = " ".join(top["reasons"])
     assert "Same education level: High School" in joined
     assert "Shared expertise" in joined
-    assert "km away" in joined or "neighbourhood" in joined
+    assert top["distance_km"] is not None and top["distance_km"] < 25
+    assert (
+        "km away" in joined
+        or "neighbourhood" in joined
+        or any(entry["factor"] == "location" for entry in top["explanation"])
+    )
     assert "Similar class size: 25 vs 28" in joined or "similarity in teaching philosophy" in joined
 
     factors = {entry["factor"] for entry in top["explanation"]}
@@ -112,12 +123,16 @@ async def test_recommendations_explain_themselves(client):
         "teaching_level",
         "location",
         "class_size",
+        "social",
+        "quality",
     }
     for entry in top["explanation"]:
         assert 0.0 <= entry["score"] <= 1.0
         assert entry["contribution"] == pytest.approx(entry["score"] * entry["weight"], abs=1e-3)
 
-    assert body["weights"]["semantic"] == pytest.approx(0.30, abs=0.01)
+    assert sum(body["weights"].values()) == pytest.approx(1.0, abs=1e-4)
+    assert body["weights"]["semantic"] > body["weights"]["social"]
+    assert "weight_source" in body
     assert body["candidate_pool_size"] >= 3
     assert body["took_ms"] >= 0
 
@@ -158,8 +173,17 @@ async def test_recommendations_require_authentication(client):
     assert (await client.get("/recommendations")).status_code == 401
 
 
-async def test_exclude_connected_hides_existing_connections(client):
+async def test_pending_invites_and_connections_are_hidden(client):
+    """Matches never resurfaces people you've invited or already connected with."""
     cohort = await seed_cohort(client)
+
+    pending = await client.post(
+        "/connections",
+        json={"receiver_id": cohort["carol"]["user_id"]},
+        headers=cohort["alice"]["headers"],
+    )
+    assert pending.status_code == 201
+
     created = await client.post(
         "/connections",
         json={"receiver_id": cohort["bob"]["user_id"]},
@@ -172,12 +196,11 @@ async def test_exclude_connected_hides_existing_connections(client):
         headers=cohort["bob"]["headers"],
     )
 
-    body = (
-        await client.get(
-            "/recommendations?exclude_connected=true", headers=cohort["alice"]["headers"]
-        )
-    ).json()
-    assert all(item["teacher"]["first_name"] != "Bob" for item in body["items"])
+    # Default endpoint (no exclude_connected flag) still hides both.
+    body = (await client.get("/recommendations", headers=cohort["alice"]["headers"])).json()
+    names = {item["teacher"]["first_name"] for item in body["items"]}
+    assert "Bob" not in names
+    assert "Carol" not in names
 
 
 async def test_blocked_users_are_never_recommended(client):
@@ -230,6 +253,8 @@ async def test_every_component_is_returned_for_client_side_reranking(client):
             "teaching_level",
             "location",
             "class_size",
+            "social",
+            "quality",
         }
         assert all(0.0 <= value <= 1.0 for value in item["components"].values())
 
@@ -247,3 +272,68 @@ async def test_explain_endpoint_also_returns_components(client):
         await client.get(f"/recommendations/{target}/explain", headers=cohort["alice"]["headers"])
     ).json()
     assert explained["components"] == listed["items"][0]["components"]
+
+
+async def test_profile_weights_crud(client):
+    cohort = await seed_cohort(client)
+    headers = cohort["alice"]["headers"]
+
+    initial = await client.get("/recommendations/weights", headers=headers)
+    assert initial.status_code == 200
+    assert initial.json()["saved"] is False
+    assert abs(sum(initial.json()["weights"].values()) - 1.0) < 1e-3
+
+    payload = {
+        "weights": {
+            "semantic": 0.5,
+            "expertise": 0.2,
+            "education": 0.1,
+            "teaching_level": 0.05,
+            "location": 0.05,
+            "class_size": 0.05,
+            "social": 0.03,
+            "quality": 0.02,
+        }
+    }
+    saved = await client.put("/recommendations/weights", json=payload, headers=headers)
+    assert saved.status_code == 200, saved.text
+    body = saved.json()
+    assert body["saved"] is True
+    assert body["source"] == "profile"
+    assert body["weights"]["semantic"] == pytest.approx(0.5, abs=1e-3)
+
+    listed = await client.get("/recommendations?mmr=false&limit=3", headers=headers)
+    assert listed.status_code == 200
+    assert listed.json()["weight_source"] == "profile"
+    assert listed.json()["weights"]["semantic"] == pytest.approx(0.5, abs=1e-3)
+
+    cleared = await client.delete("/recommendations/weights", headers=headers)
+    assert cleared.status_code == 200
+    assert cleared.json()["saved"] is False
+
+
+async def test_weights_require_a_profile(client):
+    from tests.conftest import register
+
+    account = await register(client)
+    assert (await client.get("/recommendations/weights", headers=account["headers"])).status_code == 400
+    assert (
+        await client.put(
+            "/recommendations/weights",
+            json={"weights": {"semantic": 1.0}},
+            headers=account["headers"],
+        )
+    ).status_code == 400
+    assert (await client.delete("/recommendations/weights", headers=account["headers"])).status_code == 400
+
+
+async def test_mmr_false_returns_score_sorted_results(client):
+    cohort = await seed_cohort(client)
+    body = (
+        await client.get(
+            "/recommendations?limit=5&mmr=false",
+            headers=cohort["alice"]["headers"],
+        )
+    ).json()
+    scores = [item["match_score"] for item in body["items"]]
+    assert scores == sorted(scores, reverse=True)

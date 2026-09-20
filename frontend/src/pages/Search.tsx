@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import { api } from "../api/client";
 import type { TeacherSearchResponse } from "../api/types";
 import {
@@ -10,6 +10,11 @@ import {
   humanize,
 } from "../api/vocab";
 import { useAuth } from "../auth/AuthContext";
+import {
+  getSearchCache,
+  searchCacheKey,
+  setSearchCache,
+} from "../cache/searchCache";
 import { TeacherCard } from "../components/TeacherCard";
 import { TeacherCardSkeleton } from "../components/Skeleton";
 import { Badge, Button, Card, ErrorNote, Field, Input, PageHeader, Select } from "../components/ui";
@@ -40,57 +45,80 @@ const EMPTY: Filters = {
   teaching_level: "",
   teaching_method: "",
   city: "",
-  radius_km: "50",
+  // Empty by default — a fixed 50km radius + profile coords forced a geo
+  // filter on every Discover visit (and a second fetch when profile loaded).
+  radius_km: "",
   minimum_rating: "",
   class_size: "",
   sort: "relevance",
 };
 
 export default function Search() {
-  const { profile } = useAuth();
+  const { profile, loading: authLoading } = useAuth();
+  const profileCoords = useRef<{ lat?: number; lon?: number }>({});
+  profileCoords.current = {
+    lat: profile?.latitude ?? undefined,
+    lon: profile?.longitude ?? undefined,
+  };
   const [filters, setFilters] = useState<Filters>(EMPTY);
-  const [data, setData] = useState<TeacherSearchResponse | null>(null);
-  const [loading, setLoading] = useState(false);
+  const defaultCacheKey = searchCacheKey({
+    sort: "relevance",
+    limit: 24,
+  });
+  const cachedDefault = getSearchCache(defaultCacheKey);
+  const [data, setData] = useState<TeacherSearchResponse | null>(cachedDefault);
+  const [loading, setLoading] = useState(!cachedDefault);
   const [error, setError] = useState<unknown>(null);
 
   const run = useCallback(async (active: Filters) => {
-    setLoading(true);
     setError(null);
     const city = CITIES.find((c) => c.name === active.city);
     const radiusKm = parseRadiusKm(active.radius_km);
-    const latitude = city?.lat ?? profile?.latitude ?? undefined;
-    const longitude = city?.lon ?? profile?.longitude ?? undefined;
+    const latitude = city?.lat ?? profileCoords.current.lat;
+    const longitude = city?.lon ?? profileCoords.current.lon;
     const hasGeo = radiusKm !== undefined && latitude != null && longitude != null;
+    const params = {
+      query: active.query || undefined,
+      subject: active.subject || undefined,
+      education_level: active.education_level || undefined,
+      teaching_level: active.teaching_level || undefined,
+      teaching_method: active.teaching_method || undefined,
+      latitude: hasGeo ? latitude : undefined,
+      longitude: hasGeo ? longitude : undefined,
+      radius_km: hasGeo ? radiusKm : undefined,
+      minimum_rating: active.minimum_rating || undefined,
+      class_size: active.class_size || undefined,
+      sort: active.sort,
+      limit: 24,
+    };
+    const key = searchCacheKey(params);
+    const cached = getSearchCache(key);
+    if (cached) {
+      setData(cached);
+      setLoading(false);
+      return;
+    }
+    setLoading(true);
     try {
-      setData(
-        await api.searchTeachers({
-          query: active.query || undefined,
-          subject: active.subject || undefined,
-          education_level: active.education_level || undefined,
-          teaching_level: active.teaching_level || undefined,
-          teaching_method: active.teaching_method || undefined,
-          latitude: hasGeo ? latitude : undefined,
-          longitude: hasGeo ? longitude : undefined,
-          radius_km: hasGeo ? radiusKm : undefined,
-          minimum_rating: active.minimum_rating || undefined,
-          class_size: active.class_size || undefined,
-          sort: active.sort,
-          limit: 24,
-        }),
-      );
+      const result = await api.searchTeachers(params);
+      setSearchCache(key, result);
+      setData(result);
     } catch (err) {
       setError(err);
     } finally {
       setLoading(false);
     }
-  }, [profile?.latitude, profile?.longitude]);
+  }, []);
 
+  // First paint: hydrate from cache immediately, then fetch once auth is ready
+  // (geo filters need profile coords only when a radius is set).
   useEffect(() => {
-    const handle = window.setTimeout(() => void run(filters), 250);
+    if (authLoading) return;
+    const handle = window.setTimeout(() => void run(filters), cachedDefault ? 0 : 250);
     return () => window.clearTimeout(handle);
     // Geographic controls apply as they change; other filters still use Submit.
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [filters.city, filters.radius_km, run]);
+  }, [authLoading, filters.city, filters.radius_km, run]);
 
   function set<K extends keyof Filters>(key: K, value: Filters[K]) {
     setFilters((current) => ({ ...current, [key]: value }));

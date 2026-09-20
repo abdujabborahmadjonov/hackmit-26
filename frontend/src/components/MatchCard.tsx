@@ -54,9 +54,9 @@ export function WhyThisMatch({
           <Donut
             segments={rows.map((row) => ({
               key: row.factor,
-              label: row.meta.label,
+              label: row.meta?.label ?? row.factor,
               value: row.contribution,
-              colour: row.meta.colour,
+              colour: row.meta?.colour ?? "#94a3b8",
             }))}
             total={1}
             centreValue={`${Math.round(match_score * 100)}%`}
@@ -83,9 +83,9 @@ export function WhyThisMatch({
                   <span className="flex items-center gap-2">
                     <span
                       className="h-2.5 w-2.5 shrink-0 rounded-sm"
-                      style={{ background: row.meta.colour }}
+                      style={{ background: row.meta?.colour ?? "#94a3b8" }}
                     />
-                    <span className="text-ink">{row.meta.label}</span>
+                    <span className="text-ink">{row.meta?.label ?? row.factor}</span>
                   </span>
                   {row.label && <span className="block pl-[18px] text-xs text-muted">{row.label}</span>}
                 </td>
@@ -201,16 +201,14 @@ export function MatchCard({
         <CollaborationBrief teacherId={teacher.user_id} teacherName={name} />
       )}
 
-      {/* Grid-rows trick: animates open without measuring the content height. */}
-      <div className="collapsible" data-open={showWhy}>
-        <div>
-          <WhyThisMatch
-            recommendation={recommendation}
-            displayScore={match_score}
-            weights={weights}
-          />
-        </div>
-      </div>
+      {/* Only mount the breakdown when open — avoids 10× Donut work on every render. */}
+      {showWhy && (
+        <WhyThisMatch
+          recommendation={recommendation}
+          displayScore={match_score}
+          weights={weights}
+        />
+      )}
 
       <div className="mt-4 flex flex-wrap items-center gap-2">
         <Button size="sm" variant="secondary" onClick={() => setShowWhy((open) => !open)}>

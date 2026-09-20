@@ -1,7 +1,15 @@
-import { useCallback, useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { api } from "../api/client";
 import type { Recommendation, RecommendationResponse } from "../api/types";
+import {
+  clearRecommendationsCache,
+  getRecommendationsCache,
+  loadRecommendationsShared,
+  patchRecommendationsCache,
+  recommendationsCacheIsStale,
+  setRecommendationsCache,
+} from "../cache/recommendationsCache";
 import { MatchCard } from "../components/MatchCard";
 import { PinnedMentors } from "../components/PinnedMentors";
 import { MatchCardSkeleton } from "../components/Skeleton";
@@ -17,50 +25,159 @@ import { Button, Card, ErrorNote, PageHeader } from "../components/ui";
 
 /** How many candidates to pull. We show ten, but re-weighting only makes sense
  *  if there are others that can overtake them. */
-const POOL = 30;
+const POOL = 20;
 const SHOWN = 10;
+/** Keep the ANN+score pool modest — enough diversity without multi-second loads. */
+const CANDIDATE_POOL = 80;
+
+function writeCache(parts: {
+  data: RecommendationResponse;
+  weights: Weights;
+  weightsSaved: boolean;
+  dismissed: Set<string>;
+  connected: Set<string>;
+  aiEnabled: boolean;
+}) {
+  setRecommendationsCache({
+    data: parts.data,
+    weights: parts.weights,
+    weightsSaved: parts.weightsSaved,
+    dismissed: [...parts.dismissed],
+    connected: [...parts.connected],
+    aiEnabled: parts.aiEnabled,
+    fetchedAt: Date.now(),
+  });
+}
 
 export default function Recommendations() {
   const navigate = useNavigate();
-  const [data, setData] = useState<RecommendationResponse | null>(null);
-  const [weights, setWeights] = useState<Weights | null>(null);
+  const initial = getRecommendationsCache();
+
+  const [data, setData] = useState<RecommendationResponse | null>(initial?.data ?? null);
+  const [weights, setWeights] = useState<Weights | null>(initial?.weights ?? null);
   const [error, setError] = useState<unknown>(null);
-  const [loading, setLoading] = useState(true);
-  const [excludeConnected, setExcludeConnected] = useState(false);
+  const [loading, setLoading] = useState(!initial);
   const [tuning, setTuning] = useState(false);
   const [connecting, setConnecting] = useState<string | null>(null);
-  const [connected, setConnected] = useState<Set<string>>(new Set());
-  const [dismissed, setDismissed] = useState<Set<string>>(new Set());
-  const [aiEnabled, setAiEnabled] = useState(false);
+  const [connected, setConnected] = useState<Set<string>>(
+    () => new Set(initial?.connected ?? []),
+  );
+  const [dismissed, setDismissed] = useState<Set<string>>(
+    () => new Set(initial?.dismissed ?? []),
+  );
+  const [aiEnabled, setAiEnabled] = useState(initial?.aiEnabled ?? false);
+  const [weightsSaved, setWeightsSaved] = useState(initial?.weightsSaved ?? false);
+  const [savingWeights, setSavingWeights] = useState(false);
+  const [refreshing, setRefreshing] = useState(false);
 
-  const load = useCallback(async () => {
-    setLoading(true);
+  // Mount-only fetch. Do NOT depend on connected/dismissed/weights — that
+  // previously caused an infinite setState → load → setState loop that froze
+  // the whole SPA after Connect / Not a fit.
+  useEffect(() => {
+    let cancelled = false;
+
+    async function fetchMatches(force: boolean) {
+      const cached = getRecommendationsCache();
+      if (!force && cached && !recommendationsCacheIsStale(cached)) return;
+
+      if (cached && !force) {
+        // Stale-while-revalidate: keep painting cached rows, refresh quietly.
+        setRefreshing(true);
+      } else if (force && cached) {
+        setRefreshing(true);
+      } else if (!cached) {
+        setLoading(true);
+      }
+
+      setError(null);
+      try {
+        const result = await loadRecommendationsShared(() =>
+          api.recommendations({
+            limit: POOL,
+            exclude_connected: true,
+            candidate_pool: CANDIDATE_POOL,
+          }),
+        );
+        // Always persist — StrictMode may cancel the first mount before paint.
+        writeCache({
+          data: result,
+          weights: result.weights,
+          weightsSaved: result.weight_source === "profile",
+          dismissed: force ? new Set() : new Set(getRecommendationsCache()?.dismissed ?? []),
+          connected: force ? new Set() : new Set(getRecommendationsCache()?.connected ?? []),
+          aiEnabled: getRecommendationsCache()?.aiEnabled ?? false,
+        });
+        if (cancelled) return;
+        setData(result);
+        setWeights(result.weights);
+        setWeightsSaved(result.weight_source === "profile");
+        if (force) {
+          setDismissed(new Set());
+          setConnected(new Set());
+        }
+      } catch (err) {
+        if (!cancelled) setError(err);
+      } finally {
+        if (!cancelled) {
+          setLoading(false);
+          setRefreshing(false);
+        }
+      }
+    }
+
+    void fetchMatches(false);
+
+    if (initial?.aiEnabled === undefined) {
+      void api
+        .aiStatus()
+        .then((status) => {
+          if (cancelled) return;
+          setAiEnabled(status.enabled);
+          patchRecommendationsCache({ aiEnabled: status.enabled });
+        })
+        .catch(() => {
+          if (cancelled) return;
+          setAiEnabled(false);
+          patchRecommendationsCache({ aiEnabled: false });
+        });
+    }
+
+    return () => {
+      cancelled = true;
+    };
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- intentional mount-only
+  }, []);
+
+  async function refresh() {
+    clearRecommendationsCache();
+    setRefreshing(true);
     setError(null);
     try {
       const result = await api.recommendations({
         limit: POOL,
-        exclude_connected: excludeConnected,
+        exclude_connected: true,
+        candidate_pool: CANDIDATE_POOL,
       });
       setData(result);
       setWeights(result.weights);
+      setWeightsSaved(result.weight_source === "profile");
+      setDismissed(new Set());
+      setConnected(new Set());
+      writeCache({
+        data: result,
+        weights: result.weights,
+        weightsSaved: result.weight_source === "profile",
+        dismissed: new Set(),
+        connected: new Set(),
+        aiEnabled,
+      });
     } catch (err) {
       setError(err);
     } finally {
+      setRefreshing(false);
       setLoading(false);
     }
-  }, [excludeConnected]);
-
-  useEffect(() => {
-    void load();
-  }, [load]);
-
-  useEffect(() => {
-    // One probe, so buttons that would only 503 never render.
-    void api
-      .aiStatus()
-      .then((status) => setAiEnabled(status.enabled))
-      .catch(() => setAiEnabled(false));
-  }, []);
+  }
 
   const defaults = data?.weights ?? null;
   const changed = useMemo(() => {
@@ -69,12 +186,13 @@ export default function Recommendations() {
     return FACTOR_ORDER.some((f) => Math.abs((a[f] ?? 0) - (defaults[f] ?? 0)) > 0.005);
   }, [weights, defaults]);
 
-  /** Server order, then the order under the current sliders, so cards can show
-   *  how far they moved. */
   const ranked = useMemo(() => {
     if (!data) return [] as (Recommendation & { localScore: number; delta: number })[];
     const serverRank = new Map(data.items.map((item, index) => [item.teacher.user_id, index]));
-    const active = data.items.filter((item) => !dismissed.has(item.teacher.user_id));
+    const active = data.items.filter(
+      (item) =>
+        !dismissed.has(item.teacher.user_id) && !connected.has(item.teacher.user_id),
+    );
     const scored = active.map((item) => ({
       ...item,
       localScore: weights && changed ? scoreWith(item.components, weights) : item.match_score,
@@ -84,13 +202,17 @@ export default function Recommendations() {
       ...item,
       delta: (serverRank.get(item.teacher.user_id) ?? index) - index,
     }));
-  }, [data, weights, changed, dismissed]);
+  }, [data, weights, changed, dismissed, connected]);
 
   async function connect(userId: string) {
     setConnecting(userId);
     try {
       await api.connect(userId);
-      setConnected((current) => new Set(current).add(userId));
+      setConnected((current) => {
+        const next = new Set(current).add(userId);
+        patchRecommendationsCache({ connected: [...next] });
+        return next;
+      });
       void api.feedback(userId, "connected").catch(() => undefined);
     } catch (err) {
       setError(err);
@@ -109,8 +231,40 @@ export default function Recommendations() {
   }
 
   function dismiss(userId: string) {
-    setDismissed((current) => new Set(current).add(userId));
+    setDismissed((current) => {
+      const next = new Set(current).add(userId);
+      patchRecommendationsCache({ dismissed: [...next] });
+      return next;
+    });
     void api.feedback(userId, "dismissed").catch(() => undefined);
+  }
+
+  async function saveWeights() {
+    if (!weights) return;
+    setSavingWeights(true);
+    try {
+      const prefs = await api.saveRecommendationWeights(normalise(weights));
+      setWeightsSaved(true);
+      setWeights(prefs.weights);
+      await refresh();
+    } catch (err) {
+      setError(err);
+    } finally {
+      setSavingWeights(false);
+    }
+  }
+
+  async function clearSavedWeights() {
+    setSavingWeights(true);
+    try {
+      await api.clearRecommendationWeights();
+      setWeightsSaved(false);
+      await refresh();
+    } catch (err) {
+      setError(err);
+    } finally {
+      setSavingWeights(false);
+    }
   }
 
   return (
@@ -118,25 +272,24 @@ export default function Recommendations() {
       <PageHeader
         eyebrow="Personalized for your classroom"
         title="Your best matches"
-        description="Educators ranked by teaching philosophy, subject overlap, learner level, proximity, and class size. Every recommendation shows its work."
+        description="Hybrid ranking over teaching philosophy, subjects, levels, proximity, class size, network overlap, and peer quality. People you've already invited or connected with are hidden."
         actions={
           <>
-          <label className="flex items-center gap-2 text-sm text-muted">
-            <input
-              type="checkbox"
-              className="h-4 w-4 rounded border-line text-indigo-600 focus:ring-indigo-500"
-              checked={excludeConnected}
-              onChange={(e) => setExcludeConnected(e.target.checked)}
-            />
-            Hide connections
-          </label>
-          <Button
-            size="sm"
-            variant={tuning ? "primary" : "secondary"}
-            onClick={() => setTuning((open) => !open)}
-          >
-            {tuning ? "Done tuning" : "Tune the algorithm"}
-          </Button>
+            <Button
+              size="sm"
+              variant="ghost"
+              disabled={loading || refreshing}
+              onClick={() => void refresh()}
+            >
+              {refreshing ? "Refreshing…" : "Refresh"}
+            </Button>
+            <Button
+              size="sm"
+              variant={tuning ? "primary" : "secondary"}
+              onClick={() => setTuning((open) => !open)}
+            >
+              {tuning ? "Done tuning" : "Tune the algorithm"}
+            </Button>
           </>
         }
       />
@@ -148,12 +301,17 @@ export default function Recommendations() {
             defaults={defaults}
             onChange={setWeights}
             changed={changed}
+            onSave={() => void saveWeights()}
+            onClearSaved={() => void clearSavedWeights()}
+            saving={savingWeights}
+            saved={weightsSaved}
+            weightSource={data?.weight_source}
           />
         </div>
       )}
 
       {data && !loading && (
-        <div className="mt-6 grid grid-cols-2 gap-2 sm:gap-3">
+        <div className="mt-6 grid grid-cols-2 gap-2 sm:gap-3 lg:grid-cols-4">
           <Card className="p-3 sm:p-4">
             <p className="text-xs text-muted">Candidates considered</p>
             <p className="mt-1 text-2xl font-semibold text-ink">{data.candidate_pool_size}</p>
@@ -162,6 +320,18 @@ export default function Recommendations() {
             <p className="text-xs text-muted">Top match</p>
             <p className="mt-1 text-2xl font-semibold text-ink">
               {ranked[0] ? `${Math.round(ranked[0].localScore * 100)}%` : "—"}
+            </p>
+          </Card>
+          <Card className="p-3 sm:p-4">
+            <p className="text-xs text-muted">Weight source</p>
+            <p className="mt-1 text-lg font-semibold capitalize text-ink">
+              {data.weight_source ?? "default"}
+            </p>
+          </Card>
+          <Card className="p-3 sm:p-4">
+            <p className="text-xs text-muted">Bandit arm</p>
+            <p className="mt-1 truncate text-lg font-semibold text-ink">
+              {data.bandit_arm_id ?? "—"}
             </p>
           </Card>
         </div>
@@ -183,7 +353,7 @@ export default function Recommendations() {
           ))}
         </div>
       ) : ranked.length > 0 ? (
-        <div className="stagger mt-6 space-y-4">
+        <div className="mt-6 space-y-4">
           {ranked.slice(0, SHOWN).map((recommendation) => (
             <MatchCard
               key={recommendation.teacher.user_id}

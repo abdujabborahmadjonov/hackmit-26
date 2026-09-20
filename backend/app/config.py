@@ -136,7 +136,7 @@ class Settings(BaseSettings):
     tts_rate_limit_per_minute: int = 120
 
     # --- search ---
-    search_provider: Literal["postgres", "elasticsearch"] = "postgres"
+    search_provider: Literal["postgres", "elasticsearch"] = "elasticsearch"
     elasticsearch_url: str = "http://localhost:9200"
     elasticsearch_api_key: str = Field(
         default="",
@@ -180,10 +180,21 @@ class Settings(BaseSettings):
     rec_weight_teaching_level: float = 0.15
     rec_weight_location: float = 0.10
     rec_weight_class_size: float = 0.10
-    rec_candidate_pool: int = 300
+    rec_weight_social: float = 0.08
+    rec_weight_quality: float = 0.07
+    rec_candidate_pool: int = 80
     rec_default_limit: int = 10
     # Optional JSON override, e.g. {"high_school": {"university": 0.4}}
     education_compatibility_json: str = ""
+
+    # --- recommendation bandit / MMR ---
+    rec_bandit_enabled: bool = True
+    rec_mmr_enabled: bool = True
+    rec_mmr_lambda: float = 0.7
+    rec_quality_prior: float = 3.5
+    rec_quality_prior_strength: float = 5.0
+    # Short in-process cache for identical Matches requests (per worker).
+    rec_response_cache_ttl_seconds: float = 45.0
 
     @field_validator("database_url", mode="after")
     @classmethod
@@ -229,11 +240,10 @@ class Settings(BaseSettings):
             "teaching_level": self.rec_weight_teaching_level,
             "location": self.rec_weight_location,
             "class_size": self.rec_weight_class_size,
+            "social": self.rec_weight_social,
+            "quality": self.rec_weight_quality,
         }
-        total = sum(weights.values())
-        if total <= 0:
-            raise ValueError("Recommendation weights must sum to a positive number")
-        return {key: value / total for key, value in weights.items()}
+        return normalise_recommendation_weights(weights)
 
     @property
     def education_compatibility_overrides(self) -> dict[str, dict[str, float]]:
@@ -243,6 +253,39 @@ class Settings(BaseSettings):
             return json.loads(self.education_compatibility_json)
         except json.JSONDecodeError as exc:  # pragma: no cover - config error path
             raise ValueError(f"EDUCATION_COMPATIBILITY_JSON is not valid JSON: {exc}") from exc
+
+
+RECOMMENDATION_FACTORS = (
+    "semantic",
+    "expertise",
+    "education",
+    "teaching_level",
+    "location",
+    "class_size",
+    "social",
+    "quality",
+)
+
+
+def normalise_recommendation_weights(weights: dict[str, float]) -> dict[str, float]:
+    """Keep known factors, fill missing with 0, renormalise to sum 1."""
+    cleaned = {factor: float(weights.get(factor, 0.0) or 0.0) for factor in RECOMMENDATION_FACTORS}
+    total = sum(cleaned.values())
+    if total <= 0:
+        raise ValueError("Recommendation weights must sum to a positive number")
+    return {key: value / total for key, value in cleaned.items()}
+
+
+def publish_recommendation_weights(
+    weights: dict[str, float], *, ndigits: int = 4
+) -> dict[str, float]:
+    """Round for API responses while keeping the published sum at 1.0."""
+    rounded = {key: round(float(weights.get(key, 0.0) or 0.0), ndigits) for key in RECOMMENDATION_FACTORS}
+    drift = round(1.0 - sum(rounded.values()), ndigits)
+    if drift:
+        pivot = max(rounded, key=rounded.get)
+        rounded[pivot] = round(rounded[pivot] + drift, ndigits)
+    return rounded
 
 
 def orphaned_env_lines(env_file: str = ".env") -> list[int]:

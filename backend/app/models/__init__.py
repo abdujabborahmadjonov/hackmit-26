@@ -13,7 +13,7 @@ from app.models.forum import ForumPost, ForumTopic
 from app.models.message import Conversation, ConversationParticipant, Message
 from app.models.profile import TeacherProfile
 from app.models.rating import Rating
-from app.models.recommendation import RecommendationEvent, RecommendationFeedback
+from app.models.recommendation import BanditArm, RecommendationEvent, RecommendationFeedback
 from app.models.resource import Resource
 from app.models.technique import RatingLink, Technique, TechniqueConcept, TechniqueRating
 from app.models.user import User
@@ -36,6 +36,7 @@ __all__ = [
     "Message",
     "Rating",
     "RatingLink",
+    "BanditArm",
     "RecommendationEvent",
     "RecommendationFeedback",
     "Resource",

@@ -23,7 +23,12 @@ class MatchReason(BaseModel):
         }
     )
 
-    factor: str = Field(description="semantic | expertise | education | teaching_level | location | class_size")
+    factor: str = Field(
+        description=(
+            "semantic | expertise | education | teaching_level | location | "
+            "class_size | social | quality"
+        )
+    )
     label: str = Field(description="Ready-to-display explanation")
     score: float = Field(ge=0.0, le=1.0, description="Component score, 0-1")
     weight: float = Field(ge=0.0, le=1.0, description="Weight this component carries")
@@ -79,6 +84,39 @@ class RecommendationResponse(BaseModel):
     )
     took_ms: float
     weights: dict[str, float]
+    bandit_arm_id: str | None = None
+    weight_source: str = Field(
+        default="default",
+        description="profile | bandit | default — where the weights came from",
+    )
+
+
+class RecommendationWeightsUpdate(BaseModel):
+    model_config = ConfigDict(
+        json_schema_extra={
+            "example": {
+                "weights": {
+                    "semantic": 0.3,
+                    "expertise": 0.2,
+                    "education": 0.15,
+                    "teaching_level": 0.15,
+                    "location": 0.1,
+                    "class_size": 0.1,
+                    "social": 0.08,
+                    "quality": 0.07,
+                }
+            }
+        }
+    )
+
+    weights: dict[str, float] = Field(description="Factor weights; renormalised server-side")
+
+
+class RecommendationWeightsRead(BaseModel):
+    weights: dict[str, float]
+    saved: bool = Field(description="True when personal profile weights are stored")
+    source: str
+    bandit_arm_id: str | None = None
 
 
 class RecommendationFeedbackRequest(BaseModel):

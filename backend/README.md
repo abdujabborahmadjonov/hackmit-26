@@ -70,6 +70,8 @@ ELASTICSEARCH_URL=https://my-vectordb-project-b04eea.es.us-central1.gcp.elastic.
 ELASTICSEARCH_API_KEY=<your encoded API key>
 ```
 
+Elasticsearch starts with the default compose stack. Reindex after demo data:
+
 ```bash
 docker compose up --build
 docker compose exec backend python scripts/reindex_elasticsearch.py
@@ -86,8 +88,9 @@ python scripts/reindex_elasticsearch.py
 # then set SEARCH_PROVIDER=elasticsearch on the Render service
 ```
 
-For a local cluster instead: `docker compose --profile elasticsearch up --build`
-with `ELASTICSEARCH_URL=http://elasticsearch:9200` and no API key.
+To skip Elasticsearch locally: `SEARCH_PROVIDER=postgres docker compose up --build`
+(you may still want to comment out the elasticsearch `depends_on` if you are
+not running the ES service).
 
 `GET /search/engine` reports which engine is live. If Elasticsearch goes down,
 search transparently falls back to Postgres (`SEARCH_FALLBACK_TO_POSTGRES=true`).
@@ -147,17 +150,22 @@ backend/
 `GET /recommendations` returns the top matches for the authenticated teacher.
 
 ```
-score = 0.30 · semantic teaching-style similarity   (pgvector cosine)
-      + 0.20 · subject / expertise similarity        (soft Jaccard + synonyms)
-      + 0.15 · education-level compatibility         (configurable matrix)
-      + 0.15 · teaching-level compatibility          (beginner→advanced ladder)
-      + 0.10 · geographic proximity                  (haversine distance bands)
-      + 0.10 · class-size similarity                 (1 − |a−b| / max(a,b))
+score = w · semantic teaching-style similarity   (pgvector cosine)
+      + w · subject / expertise similarity        (soft Jaccard + synonyms + co-occurrence)
+      + w · education-level compatibility         (configurable matrix)
+      + w · teaching-level compatibility          (beginner→advanced ladder)
+      + w · geographic proximity                  (haversine distance bands)
+      + w · class-size similarity                 (1 − |a−b| / max(a,b))
+      + w · social / network overlap              (shared colleagues + friends-of-friends)
+      + w · Bayesian peer quality                 (rating average with prior)
 ```
 
 Every component is normalised to 0–1 and every weight is configurable
-(`REC_WEIGHT_SEMANTIC`, `REC_WEIGHT_EXPERTISE`, …); they are re-normalised so
-they always sum to 1.
+(`REC_WEIGHT_SEMANTIC`, …, `REC_WEIGHT_SOCIAL`, `REC_WEIGHT_QUALITY`); they
+are re-normalised so they always sum to 1. Saved profile weights override the
+online Thompson-sampling bandit; otherwise an arm is sampled and updated from
+`saved | dismissed | connected` feedback. Optional MMR (`REC_MMR_ENABLED`)
+diversifies the final top-N.
 
 **Expertise matching** canonicalises synonyms (`ML` → `machine_learning`,
 `AI` → `artificial_intelligence`) and scores adjacent fields partially, so
@@ -197,7 +205,21 @@ array for a "Why this match?" panel:
 
 `GET /recommendations/{user_id}/explain` gives the same breakdown for any single
 educator. `POST /recommendations/{user_id}/feedback` records
-`saved | dismissed | connected` for later weight tuning.
+`saved | dismissed | connected` and updates the Thompson-sampling arm that
+served the match. `GET/PUT/DELETE /recommendations/weights` manage personal
+weights stored on the teacher profile (overrides the bandit while set).
+
+Offline quality eval (synthetic relevance labels):
+
+```bash
+python scripts/eval_recommendations.py --viewers 25 --k 10
+```
+
+After switching embedding providers, re-embed so ANN indexes stay coherent:
+
+```bash
+python scripts/reembed_profiles.py --only all
+```
 
 ### Performance
 
@@ -235,12 +257,14 @@ are selected with `EMBEDDING_PROVIDER`:
 
 | Provider | Notes |
 | --- | --- |
-| `hashing` (default) | Deterministic local bag-of-n-grams. No API key, reproducible, ideal for demos and tests. |
+| `voyage` | `voyage-3-lite` by default. Preferred for demos when `EMBEDDING_API_KEY` is set. |
 | `openai` | `text-embedding-3-small` by default; requests `EMBEDDING_DIM` dimensions. |
-| `voyage` | `voyage-3-lite` by default. |
+| `hashing` | Deterministic local bag-of-n-grams. No API key; used by CI and as fallback. |
 
 A hosted provider with no `EMBEDDING_API_KEY` logs a warning and falls back to
-`hashing` rather than failing at boot. The embedded text is
+`hashing` rather than failing at boot. After switching providers, run
+`python scripts/reembed_profiles.py` so ANN indexes stay in one vector space.
+The embedded text is
 `teaching_style + bio + teaching_methods + fields_of_expertise + subjects +
 education_levels`.
 

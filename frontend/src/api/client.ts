@@ -26,6 +26,7 @@ import type {
   RatingLink,
   RatingSummary,
   RecommendationResponse,
+  RecommendationWeights,
   RecommendedResource,
   Resource,
   ResourceSearchResponse,
@@ -293,8 +294,12 @@ export const api = {
     request<Profile>("/profiles/me", { method: "PUT", body: JSON.stringify(data) }),
 
   // --- the main event ---
-  recommendations: (params?: { limit?: number; exclude_connected?: boolean }) =>
-    request<RecommendationResponse>("/recommendations", { query: params }),
+  recommendations: (params?: {
+    limit?: number;
+    exclude_connected?: boolean;
+    mmr?: boolean;
+    candidate_pool?: number;
+  }) => request<RecommendationResponse>("/recommendations", { query: params }),
 
   explain: (userId: string) =>
     request<RecommendationResponse["items"][number]>(`/recommendations/${userId}/explain`),
@@ -304,6 +309,17 @@ export const api = {
       method: "POST",
       body: JSON.stringify({ feedback }),
     }),
+
+  recommendationWeights: () => request<RecommendationWeights>("/recommendations/weights"),
+
+  saveRecommendationWeights: (weights: Record<string, number>) =>
+    request<RecommendationWeights>("/recommendations/weights", {
+      method: "PUT",
+      body: JSON.stringify({ weights }),
+    }),
+
+  clearRecommendationWeights: () =>
+    request<RecommendationWeights>("/recommendations/weights", { method: "DELETE" }),
 
   // --- search ---
   searchTeachers: (params: Query) =>
