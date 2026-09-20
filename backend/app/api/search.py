@@ -119,6 +119,10 @@ async def search_resources(
     teaching_method: Annotated[str | None, Query()] = None,
     resource_type: Annotated[str | None, Query()] = None,
     tags: Annotated[list[str] | None, Query(description="Repeat the parameter for multiple tags")] = None,
+    required_materials: Annotated[
+        list[str] | None,
+        Query(description="Repeat the parameter to match any required material"),
+    ] = None,
     sort: Annotated[str, Query(pattern="^(relevance|newest|popular)$")] = "relevance",
     limit: Annotated[int, Query(ge=1, le=100)] = 20,
     offset: Annotated[int, Query(ge=0)] = 0,
@@ -132,6 +136,7 @@ async def search_resources(
             teaching_method=teaching_method,
             resource_type=resource_type,
             tags=tags or [],
+            required_materials=required_materials or [],
             sort=sort,
             limit=limit,
             offset=offset,

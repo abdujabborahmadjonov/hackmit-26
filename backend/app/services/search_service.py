@@ -74,6 +74,7 @@ class ResourceSearchQuery:
     teaching_method: str | None = None
     resource_type: str | None = None
     tags: list[str] = field(default_factory=list)
+    required_materials: list[str] = field(default_factory=list)
     owner_id: uuid.UUID | None = None
     sort: str = "relevance"
     limit: int = 20
@@ -289,6 +290,12 @@ class PostgresSearchBackend:
             filters.append(Resource.resource_type == slugify(q.resource_type))
         if q.tags:
             filters.append(Resource.tags.overlap([canonical_term(t) for t in q.tags]))
+        if q.required_materials:
+            filters.append(
+                Resource.required_materials.overlap(
+                    [canonical_term(material) for material in q.required_materials]
+                )
+            )
         if q.owner_id:
             filters.append(Resource.owner_id == q.owner_id)
 
@@ -304,7 +311,10 @@ class PostgresSearchBackend:
             document = func.to_tsvector(
                 "english",
                 func.concat_ws(
-                    " ", func.coalesce(Resource.title, ""), func.coalesce(Resource.description, "")
+                    " ",
+                    func.coalesce(Resource.title, ""),
+                    func.coalesce(Resource.description, ""),
+                    func.coalesce(func.array_to_string(Resource.required_materials, " "), ""),
                 ),
             )
             lexical = func.ts_rank_cd(document, func.websearch_to_tsquery("english", q.query), 32)
@@ -544,6 +554,16 @@ class ElasticsearchSearchBackend:
             filters.append({"term": {"resource_type": slugify(q.resource_type)}})
         if q.tags:
             filters.append({"terms": {"tags": [canonical_term(t) for t in q.tags]}})
+        if q.required_materials:
+            filters.append(
+                {
+                    "terms": {
+                        "required_materials.keyword": [
+                            canonical_term(material) for material in q.required_materials
+                        ]
+                    }
+                }
+            )
         if q.owner_id:
             filters.append({"term": {"owner_id": str(q.owner_id)}})
 
@@ -559,7 +579,7 @@ class ElasticsearchSearchBackend:
                 {
                     "multi_match": {
                         "query": q.query,
-                        "fields": ["title^3", "description", "tags^2"],
+                        "fields": ["title^3", "description", "tags^2", "required_materials^2"],
                         "fuzziness": "AUTO",
                     }
                 }
