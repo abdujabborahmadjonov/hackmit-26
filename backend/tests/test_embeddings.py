@@ -92,12 +92,10 @@ def test_resource_text_builder():
         teaching_method="project_based",
         difficulty="beginner",
         tags=["python"],
-        required_materials=["laptop", "internet_access"],
     )
     assert "Intro to Functions" in text
     assert "Subject: Computer Science" in text
     assert "Tags: Python" in text
-    assert "Required materials: Laptop, Internet Access" in text
 
 
 def test_provider_falls_back_when_api_key_missing():

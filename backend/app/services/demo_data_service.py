@@ -753,18 +753,6 @@ class DemoDataGenerator:
         # rebuilding the cumulative array on every one of N resource draws.
         owner_weights = [1.0 / ((i + 1) ** 0.55) for i in range(len(owners))]
         owner_cum_weights = list(accumulate(owner_weights))
-        materials_by_type = {
-            "lesson_plan": ["projector", "whiteboard"],
-            "worksheet": ["printer", "pencils"],
-            "slide_deck": ["projector", "computer"],
-            "project_brief": ["laptop", "internet_access"],
-            "assessment": ["printer", "pencils"],
-            "reading": ["printer"],
-            "video_guide": ["computer", "internet_access", "speakers"],
-            "rubric": ["printer"],
-            "syllabus": ["printer"],
-            "homework": ["paper", "pencils"],
-        }
 
         rows: list[dict] = []
         texts: list[str] = []
@@ -820,7 +808,6 @@ class DemoDataGenerator:
             tags = [subject, topic.split()[0].lower(), method, difficulty]
             if self.random.random() < 0.4:
                 tags.append(level)
-            required_materials = list(materials_by_type.get(resource_type, []))
             rows.append(
                 {
                     "id": uuid.uuid4(),
@@ -833,7 +820,6 @@ class DemoDataGenerator:
                     "difficulty": difficulty,
                     "teaching_method": method,
                     "tags": tags,
-                    "required_materials": required_materials,
                     "file_url": None,
                     "download_count": int(self.random.paretovariate(1.4) * 8) % 2500,
                 }
@@ -847,7 +833,6 @@ class DemoDataGenerator:
                     teaching_method=method,
                     difficulty=difficulty,
                     tags=tags,
-                    required_materials=required_materials,
                 )
             )
 

@@ -39,7 +39,6 @@ class ResourceBase(BaseModel):
     difficulty: str | None = None
     teaching_method: str | None = None
     tags: list[str] = Field(default_factory=list)
-    required_materials: list[str] = Field(default_factory=list)
 
     @field_validator("resource_type")
     @classmethod
@@ -86,16 +85,16 @@ class ResourceBase(BaseModel):
     def check_subject(cls, v: str | None) -> str | None:
         return canonical_term(v) if v else None
 
-    @field_validator("tags", "required_materials")
+    @field_validator("tags")
     @classmethod
-    def check_term_lists(cls, v: list[str] | None) -> list[str]:
+    def check_tags(cls, v: list[str] | None) -> list[str]:
         cleaned: list[str] = []
-        for value in v or []:
-            term = canonical_term(value)
+        for tag in v or []:
+            term = canonical_term(tag)
             if term and term not in cleaned:
                 cleaned.append(term)
         if len(cleaned) > 20:
-            raise ValueError("At most 20 entries allowed")
+            raise ValueError("At most 20 tags allowed")
         return cleaned
 
 
@@ -111,7 +110,6 @@ class ResourceCreate(ResourceBase):
                 "difficulty": "beginner",
                 "teaching_method": "project_based",
                 "tags": ["python", "functions", "projects"],
-                "required_materials": ["laptop", "python"],
             }
         }
     )
@@ -132,7 +130,6 @@ class ResourceUpdate(ResourceBase):
 
     title: str | None = Field(default=None, min_length=3, max_length=250)
     tags: list[str] | None = None
-    required_materials: list[str] | None = None
     file_url: str | None = Field(default=None, max_length=1000)
 
 

@@ -125,7 +125,6 @@ export interface Resource {
   difficulty: string | null;
   teaching_method: string | null;
   tags: string[];
-  required_materials: string[];
   file_url: string | null;
   file_name: string | null;
   file_size_bytes?: number | null;

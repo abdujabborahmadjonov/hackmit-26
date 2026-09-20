@@ -250,7 +250,6 @@ class EmbeddingService:
         teaching_method: str | None = None,
         difficulty: str | None = None,
         tags: Iterable[str] | None = None,
-        required_materials: Iterable[str] | None = None,
     ) -> str:
         from app.taxonomy import humanize
 
@@ -267,11 +266,6 @@ class EmbeddingService:
             parts.append(f"Difficulty: {humanize(difficulty)}")
         if tags:
             parts.append("Tags: " + ", ".join(humanize(t) for t in tags))
-        if required_materials:
-            parts.append(
-                "Required materials: "
-                + ", ".join(humanize(material) for material in required_materials)
-            )
         return "\n".join(parts).strip()
 
 

@@ -383,11 +383,6 @@ export default function TeacherDetail() {
                     <Badge tone="amber">{humanize(resource.education_level)}</Badge>
                   )}
                   {resource.difficulty && <Badge>{humanize(resource.difficulty)}</Badge>}
-                  {resource.required_materials.length > 0 && (
-                    <span className="text-xs text-muted">
-                      Requires: {resource.required_materials.map(humanize).join(", ")}
-                    </span>
-                  )}
                   {resource.file_url && (
                     <a
                       href={resource.file_url}

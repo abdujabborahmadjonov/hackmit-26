@@ -74,7 +74,6 @@ class ResourceSearchQuery:
     teaching_method: str | None = None
     resource_type: str | None = None
     tags: list[str] = field(default_factory=list)
-    required_materials: list[str] = field(default_factory=list)
     owner_id: uuid.UUID | None = None
     sort: str = "relevance"
     limit: int = 20
@@ -278,7 +277,6 @@ class PostgresSearchBackend:
     async def search_resources(self, q: ResourceSearchQuery) -> SearchOutcome:
         started = time.perf_counter()
         filters = []
-        material_match_count = None
         if q.subject:
             filters.append(Resource.subject == canonical_term(q.subject))
         if q.education_level:
@@ -291,23 +289,6 @@ class PostgresSearchBackend:
             filters.append(Resource.resource_type == slugify(q.resource_type))
         if q.tags:
             filters.append(Resource.tags.overlap([canonical_term(t) for t in q.tags]))
-        if q.required_materials:
-            requested_materials = [
-                canonical_term(material) for material in q.required_materials
-            ]
-            material_rows = (
-                func.unnest(Resource.required_materials)
-                .table_valued("material")
-                .render_derived(name="required_material")
-            )
-            material_match_count = (
-                select(func.count())
-                .select_from(material_rows)
-                .where(material_rows.c.material.in_(requested_materials))
-                .correlate(Resource)
-                .scalar_subquery()
-            )
-            filters.append(material_match_count > 0)
         if q.owner_id:
             filters.append(Resource.owner_id == q.owner_id)
 
@@ -316,14 +297,6 @@ class PostgresSearchBackend:
         ) or 0
 
         stmt: Select = select(Resource).where(*filters)
-        if material_match_count is not None:
-            # Preserve partial matches, but put resources satisfying the largest
-            # intersection first. For equal overlap, prefer the resource that
-            # requires the fewest additional materials.
-            stmt = stmt.order_by(
-                material_match_count.desc(),
-                func.cardinality(Resource.required_materials).asc(),
-            )
         score_expr = None
         if q.query:
             embedding = await self.embeddings.generate_embedding(q.query)
@@ -331,10 +304,7 @@ class PostgresSearchBackend:
             document = func.to_tsvector(
                 "english",
                 func.concat_ws(
-                    " ",
-                    func.coalesce(Resource.title, ""),
-                    func.coalesce(Resource.description, ""),
-                    func.coalesce(func.array_to_string(Resource.required_materials, " "), ""),
+                    " ", func.coalesce(Resource.title, ""), func.coalesce(Resource.description, "")
                 ),
             )
             lexical = func.ts_rank_cd(document, func.websearch_to_tsquery("english", q.query), 32)
@@ -569,7 +539,6 @@ class ElasticsearchSearchBackend:
         started = time.perf_counter()
         client = es.get_client()
         filters: list[dict] = []
-        requested_materials: list[str] = []
         if q.subject:
             filters.append({"term": {"subject": canonical_term(q.subject)}})
         if q.education_level:
@@ -582,17 +551,6 @@ class ElasticsearchSearchBackend:
             filters.append({"term": {"resource_type": slugify(q.resource_type)}})
         if q.tags:
             filters.append({"terms": {"tags": [canonical_term(t) for t in q.tags]}})
-        if q.required_materials:
-            requested_materials = [
-                canonical_term(material) for material in q.required_materials
-            ]
-            filters.append(
-                {
-                    "terms": {
-                        "required_materials.keyword": requested_materials
-                    }
-                }
-            )
         if q.owner_id:
             filters.append({"term": {"owner_id": str(q.owner_id)}})
 
@@ -603,41 +561,12 @@ class ElasticsearchSearchBackend:
             "track_total_hits": True,
             "_source": ["resource_id"],
         }
-        material_overlap_sort = None
-        material_count_sort = None
-        if requested_materials:
-            material_overlap_sort = {
-                "_script": {
-                    "type": "number",
-                    "order": "desc",
-                    "script": {
-                        "lang": "painless",
-                        "source": (
-                            "int matches = 0; "
-                            "for (def value : doc['required_materials.keyword']) { "
-                            "if (params.materials.contains(value)) { matches++; } "
-                            "} return matches;"
-                        ),
-                        "params": {"materials": requested_materials},
-                    },
-                }
-            }
-            material_count_sort = {
-                "_script": {
-                    "type": "number",
-                    "order": "asc",
-                    "script": {
-                        "lang": "painless",
-                        "source": "return doc['required_materials.keyword'].size();",
-                    },
-                }
-            }
         if q.query:
             body["query"]["bool"]["should"] = [
                 {
                     "multi_match": {
                         "query": q.query,
-                        "fields": ["title^3", "description", "tags^2", "required_materials^2"],
+                        "fields": ["title^3", "description", "tags^2"],
                         "fuzziness": "AUTO",
                     }
                 }
@@ -651,20 +580,8 @@ class ElasticsearchSearchBackend:
                 "boost": 2.0,
                 **({"filter": filters} if filters else {}),
             }
-            if material_overlap_sort:
-                body["sort"] = [
-                    material_overlap_sort,
-                    material_count_sort,
-                    {"_score": "desc"},
-                ]
         elif q.sort in ("newest", "relevance"):
-            body["sort"] = [
-                *([material_overlap_sort] if material_overlap_sort else []),
-                *([material_count_sort] if material_count_sort else []),
-                {"created_at": "desc"},
-            ]
-        elif material_overlap_sort:
-            body["sort"] = [material_overlap_sort, material_count_sort]
+            body["sort"] = [{"created_at": "desc"}]
 
         response = await client.search(index=settings.elasticsearch_resource_index, body=body)
         hits_raw = response["hits"]["hits"]

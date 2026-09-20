@@ -19,7 +19,6 @@ RESOURCE = {
     "difficulty": "beginner",
     "teaching_method": "project_based",
     "tags": ["python", "functions"],
-    "required_materials": ["Laptops", "Internet Access"],
 }
 
 
@@ -30,7 +29,6 @@ async def test_create_and_fetch_resource(client):
     body = created.json()
     assert body["title"] == RESOURCE["title"]
     assert body["subject"] == "computer_science"
-    assert body["required_materials"] == ["laptops", "internet_access"]
     assert body["owner_id"] == (await client.get("/auth/me", headers=account["headers"])).json()["id"]
 
     fetched = await client.get(f"/resources/{body['id']}", headers=account["headers"])
@@ -63,27 +61,6 @@ async def test_filters_and_search(client):
             "resource_type": "worksheet",
             "teaching_method": "inquiry_based",
             "tags": ["mitosis"],
-            "required_materials": ["microscope", "slides"],
-        },
-        headers=account["headers"],
-    )
-    await client.post(
-        "/resources",
-        json={
-            **RESOURCE,
-            "title": "Offline Python Practice",
-            "tags": ["offline"],
-            "required_materials": ["Internet Access"],
-        },
-        headers=account["headers"],
-    )
-    await client.post(
-        "/resources",
-        json={
-            **RESOURCE,
-            "title": "Laptop-only Python Practice",
-            "tags": ["laptop-only"],
-            "required_materials": ["Laptops"],
         },
         headers=account["headers"],
     )
@@ -94,26 +71,6 @@ async def test_filters_and_search(client):
 
     by_tag = (await client.get("/resources?tags=python")).json()
     assert by_tag["total"] == 1
-
-    by_material = (await client.get("/resources?required_materials=laptops")).json()
-    assert by_material["total"] == 2
-    assert by_material["items"][0]["resource"]["title"] == "Laptop-only Python Practice"
-    assert by_material["items"][1]["resource"]["title"] == RESOURCE["title"]
-
-    by_material_intersection = (
-        await client.get(
-            "/resources?required_materials=Internet%20Access&required_materials=Laptops"
-        )
-    ).json()
-    assert by_material_intersection["total"] == 3
-    assert by_material_intersection["items"][0]["resource"]["title"] == RESOURCE["title"]
-    assert {
-        item["resource"]["title"] for item in by_material_intersection["items"][1:]
-    } == {"Offline Python Practice", "Laptop-only Python Practice"}
-
-    search_by_material = (await client.get("/search/resources?required_materials=microscope")).json()
-    assert search_by_material["total"] == 1
-    assert search_by_material["items"][0]["resource"]["subject"] == "biology"
 
     semantic = (await client.get("/resources?query=students build a text adventure game")).json()
     assert semantic["items"][0]["resource"]["subject"] == "computer_science"
@@ -158,7 +115,6 @@ async def test_upload_accepts_allowed_types(client):
         "education_level": "middle_school",
         "resource_type": "lesson_plan",
         "tags": "ratios,proportions",
-        "required_materials": "calculators, graph paper",
     }
     response = await client.post(
         "/resources/upload", files=files, data=data, headers=account["headers"]
@@ -169,7 +125,6 @@ async def test_upload_accepts_allowed_types(client):
     assert body["mime_type"] == "application/pdf"
     assert body["file_size_bytes"] == len(b"%PDF-1.4 fake pdf bytes")
     assert body["tags"] == ["ratios", "proportions"]
-    assert body["required_materials"] == ["calculators", "graph_paper"]
 
 
 async def test_upload_rejects_disallowed_types(client):
