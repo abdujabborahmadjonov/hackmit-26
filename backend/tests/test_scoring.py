@@ -5,7 +5,10 @@ from __future__ import annotations
 import pytest
 
 from app.models.profile import TeacherProfile
+from app.models.recommendation import BanditArm
+from app.services.bandit_service import default_arm_specs, thompson_select
 from app.services.recommendation_service import (
+    RecommendationItem,
     build_reasons,
     class_size_similarity,
     education_similarity,
@@ -16,11 +19,8 @@ from app.services.recommendation_service import (
     semantic_similarity,
     social_similarity,
     teaching_level_similarity,
-    RecommendationItem,
 )
-from app.services.relatedness_service import combined_relatedness, clear_cooccurrence_cache
-from app.services.bandit_service import default_arm_specs, thompson_select
-from app.models.recommendation import BanditArm
+from app.services.relatedness_service import clear_cooccurrence_cache, combined_relatedness
 from app.utils.geo import distance_similarity, haversine_km, location_similarity
 
 

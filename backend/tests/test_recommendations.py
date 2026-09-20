@@ -261,3 +261,68 @@ async def test_explain_endpoint_also_returns_components(client):
         await client.get(f"/recommendations/{target}/explain", headers=cohort["alice"]["headers"])
     ).json()
     assert explained["components"] == listed["items"][0]["components"]
+
+
+async def test_profile_weights_crud(client):
+    cohort = await seed_cohort(client)
+    headers = cohort["alice"]["headers"]
+
+    initial = await client.get("/recommendations/weights", headers=headers)
+    assert initial.status_code == 200
+    assert initial.json()["saved"] is False
+    assert abs(sum(initial.json()["weights"].values()) - 1.0) < 1e-3
+
+    payload = {
+        "weights": {
+            "semantic": 0.5,
+            "expertise": 0.2,
+            "education": 0.1,
+            "teaching_level": 0.05,
+            "location": 0.05,
+            "class_size": 0.05,
+            "social": 0.03,
+            "quality": 0.02,
+        }
+    }
+    saved = await client.put("/recommendations/weights", json=payload, headers=headers)
+    assert saved.status_code == 200, saved.text
+    body = saved.json()
+    assert body["saved"] is True
+    assert body["source"] == "profile"
+    assert body["weights"]["semantic"] == pytest.approx(0.5, abs=1e-3)
+
+    listed = await client.get("/recommendations?mmr=false&limit=3", headers=headers)
+    assert listed.status_code == 200
+    assert listed.json()["weight_source"] == "profile"
+    assert listed.json()["weights"]["semantic"] == pytest.approx(0.5, abs=1e-3)
+
+    cleared = await client.delete("/recommendations/weights", headers=headers)
+    assert cleared.status_code == 200
+    assert cleared.json()["saved"] is False
+
+
+async def test_weights_require_a_profile(client):
+    from tests.conftest import register
+
+    account = await register(client)
+    assert (await client.get("/recommendations/weights", headers=account["headers"])).status_code == 400
+    assert (
+        await client.put(
+            "/recommendations/weights",
+            json={"weights": {"semantic": 1.0}},
+            headers=account["headers"],
+        )
+    ).status_code == 400
+    assert (await client.delete("/recommendations/weights", headers=account["headers"])).status_code == 400
+
+
+async def test_mmr_false_returns_score_sorted_results(client):
+    cohort = await seed_cohort(client)
+    body = (
+        await client.get(
+            "/recommendations?limit=5&mmr=false",
+            headers=cohort["alice"]["headers"],
+        )
+    ).json()
+    scores = [item["match_score"] for item in body["items"]]
+    assert scores == sorted(scores, reverse=True)

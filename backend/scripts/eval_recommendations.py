@@ -126,10 +126,10 @@ async def evaluate(args: argparse.Namespace) -> int:
                 user_id, limit=args.k, pool_size=args.pool, log_events=False, mmr=False
             )
 
-            def labels(result):
+            def labels(result, viewer_profile=viewer):
                 return [
                     is_relevant(
-                        viewer,
+                        viewer_profile,
                         item.profile,
                         edu_min=args.edu_min,
                         semantic_min=args.semantic_min,

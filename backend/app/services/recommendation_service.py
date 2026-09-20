@@ -143,11 +143,11 @@ def quality_similarity(
     m = settings.rec_quality_prior_strength if prior_strength is None else prior_strength
     count = max(0, int(rating_count or 0))
     avg = float(average_rating or 0.0)
-    if count <= 0 or avg <= 0:
-        # Unrated teachers sit at the prior, slightly below a well-rated peer.
-        bayesian = prior
-    else:
-        bayesian = (m * prior + count * avg) / (m + count)
+    bayesian = (
+        prior
+        if count <= 0 or avg <= 0
+        else (m * prior + count * avg) / (m + count)
+    )
     return max(0.0, min(1.0, (bayesian - 1.0) / 4.0))
 
 
@@ -528,7 +528,7 @@ class RecommendationService:
             viewer_friends.add(b if a == viewer_id else a)
 
         if not viewer_friends:
-            return {cid: (0.0, 0) for cid in candidate_ids}
+            return dict.fromkeys(candidate_ids, (0.0, 0))
 
         # 2-hop: edges among friends (and to candidates) so we can count overlap.
         # Cap friend fan-out so a hub account cannot explode this query.

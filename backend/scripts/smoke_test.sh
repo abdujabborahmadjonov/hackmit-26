@@ -85,7 +85,7 @@ print(f"  {location} / {subjects}")
 
 # --------------------------------------------------------------------------- #
 step "Recommendations come back scored and explained"
-recs=$(curl -fsS "${BASE_URL}/recommendations?limit=5" -H "$AUTH")
+recs=$(curl -fsS "${BASE_URL}/recommendations?limit=5&mmr=false" -H "$AUTH")
 printf '%s' "$recs" | assert_json '
 items = body["items"]
 assert items, "no recommendations returned"
@@ -94,11 +94,23 @@ score = top["match_score"]
 assert 0.0 <= score <= 1.0, f"match_score out of range: {score}"
 assert top["reasons"], "the top recommendation has no reasons"
 assert top["explanation"], "the top recommendation has no explanation breakdown"
+assert "social" in top["components"] or "quality" in top["components"] or len(top["components"]) >= 6, (
+    f"expected expanded component breakdown, got {sorted(top['components'])}"
+)
 scores = [item["match_score"] for item in items]
 assert scores == sorted(scores, reverse=True), f"results are not sorted by score: {scores}"
 reason = top["reasons"][0]
 print(f"  top match {score:.2f}: {reason}")
 ' "/recommendations"
+
+# MMR may diversify order away from pure score ranking — still must return valid rows.
+curl -fsS "${BASE_URL}/recommendations?limit=5&mmr=true" -H "$AUTH" | assert_json '
+items = body["items"]
+assert items, "MMR recommendations returned nothing"
+assert all(0.0 <= item["match_score"] <= 1.0 for item in items)
+assert all(item["reasons"] for item in items)
+print(f"  MMR returned {len(items)} explained matches")
+' "/recommendations?mmr=true"
 
 TOP_ID=$(printf '%s' "$recs" | python3 -c 'import json,sys; print(json.load(sys.stdin)["items"][0]["teacher"]["user_id"])')
 
