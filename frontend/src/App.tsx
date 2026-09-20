@@ -1,7 +1,7 @@
 import { Navigate, NavLink, Route, Routes, useLocation } from "react-router-dom";
-import type { ReactNode } from "react";
+import { useEffect, useRef, useState, type ReactNode } from "react";
 import { useAuth } from "./auth/AuthContext";
-import { Avatar, Button, Loading, cx } from "./components/ui";
+import { Avatar, Loading, cx } from "./components/ui";
 import Landing from "./pages/Landing";
 import Login from "./pages/Login";
 import Register from "./pages/Register";
@@ -16,14 +16,14 @@ import Mentors from "./pages/Mentors";
 import MentorProfile from "./pages/MentorProfile";
 import Forum from "./pages/Forum";
 
-// Mentor is deliberately not here: it is reached from the pinned educators at
-// the top of Discover, where it sits in context with the rest of the network.
+// Two things are deliberately absent. Mentor is reached from the pinned
+// educators at the top of Discover, in context with the rest of the network;
+// Network itself is in the account menu, with the other things that are yours.
 const NAV = [
   { to: "/", label: "Matches", icon: "spark", end: true },
   { to: "/search", label: "Discover", icon: "search" },
   { to: "/resources", label: "Resources", icon: "book" },
   { to: "/forum", label: "Forum", icon: "forum" },
-  { to: "/connections", label: "Network", icon: "people" },
   { to: "/messages", label: "Messages", icon: "message" },
 ];
 
@@ -35,12 +35,137 @@ function NavIcon({ name }: { name: string }) {
     forum: <><path d="M7 7h10M7 12h7M5 4h14v16l-4-3H5V4Z" /></>,
     people: <><circle cx="9" cy="8" r="3" /><path d="M3 19c.5-3.5 2.5-5 6-5s5.5 1.5 6 5M16 5.5a3 3 0 0 1 0 5.8M17 14c2.3.4 3.6 1.8 4 4" /></>,
     message: <path d="M4 5h16v11H9l-5 4V5Z" />,
+    edit: <path d="M4 20h4L19 9a2.5 2.5 0 0 0-3.5-3.5L4 16v4Z" />,
+    exit: <><path d="M10 4H5v16h5" /><path d="M15 8l4 4-4 4M19 12H9" /></>,
     mentor: <><circle cx="12" cy="7.5" r="3.5" /><path d="M5 20c.6-4 3.3-6 7-6s6.4 2 7 6" /><path d="M17.5 3.2a3 3 0 0 1 0 4.6" /></>,
   };
   return (
     <svg aria-hidden="true" className="h-[18px] w-[18px]" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round">
       {paths[name]}
     </svg>
+  );
+}
+
+/** Everything about you, behind your own face.
+ *
+ *  These were three controls competing for the same corner. One button that
+ *  looks like you, holding the things that are yours. */
+function AccountMenu({
+  name,
+  firstName,
+  myPageTo,
+  onSignOut,
+}: {
+  name: string;
+  firstName?: string;
+  myPageTo: string;
+  onSignOut: () => void;
+}) {
+  const [open, setOpen] = useState(false);
+  const wrapper = useRef<HTMLDivElement>(null);
+  const button = useRef<HTMLButtonElement>(null);
+  const location = useLocation();
+
+  // Navigating away should close it, however the navigation happened.
+  useEffect(() => setOpen(false), [location.pathname]);
+
+  useEffect(() => {
+    if (!open) return;
+    const onPointerDown = (event: PointerEvent) => {
+      if (!wrapper.current?.contains(event.target as Node)) setOpen(false);
+    };
+    const onKey = (event: KeyboardEvent) => {
+      if (event.key === "Escape") {
+        setOpen(false);
+        button.current?.focus();
+      }
+    };
+    document.addEventListener("pointerdown", onPointerDown);
+    document.addEventListener("keydown", onKey);
+    return () => {
+      document.removeEventListener("pointerdown", onPointerDown);
+      document.removeEventListener("keydown", onKey);
+    };
+  }, [open]);
+
+  const item =
+    "press flex w-full items-center gap-2.5 rounded-lg px-2.5 py-2 text-left text-sm font-medium";
+
+  return (
+    <div ref={wrapper} className="relative shrink-0">
+      <button
+        ref={button}
+        type="button"
+        onClick={() => setOpen((was) => !was)}
+        aria-haspopup="menu"
+        aria-expanded={open}
+        className={cx(
+          "press flex items-center gap-2 rounded-xl p-1.5 hover:bg-slate-100",
+          open && "bg-slate-100",
+        )}
+      >
+        <span className="relative">
+          <Avatar name={name} size={32} />
+          <span className="absolute bottom-0 right-0 h-2.5 w-2.5 rounded-full border-2 border-paper bg-emerald-500" />
+        </span>
+        <span className="hidden text-sm font-medium text-ink sm:block">{firstName}</span>
+        <svg
+          aria-hidden="true"
+          viewBox="0 0 24 24"
+          className={cx(
+            "h-3.5 w-3.5 text-muted transition-transform",
+            open && "rotate-180",
+          )}
+          fill="none"
+          stroke="currentColor"
+          strokeWidth="2.2"
+          strokeLinecap="round"
+          strokeLinejoin="round"
+        >
+          <path d="m6 9 6 6 6-6" />
+        </svg>
+      </button>
+
+      {open && (
+        <div
+          role="menu"
+          className="rise absolute right-0 top-full z-30 mt-2 w-56 rounded-2xl bg-white p-1.5 shadow-lg ring-1 ring-line"
+        >
+          <div className="px-2.5 pb-2 pt-1.5">
+            <p className="truncate text-sm font-semibold text-ink">{name}</p>
+          </div>
+          <div className="my-1 h-px bg-line" />
+
+          <NavLink role="menuitem" to={myPageTo} className={cx(item, "text-ink hover:bg-slate-100")}>
+            <NavIcon name="people" />
+            My public page
+          </NavLink>
+          <NavLink role="menuitem" to="/profile" className={cx(item, "text-ink hover:bg-slate-100")}>
+            <NavIcon name="edit" />
+            Edit profile
+          </NavLink>
+          <NavLink
+            role="menuitem"
+            to="/connections"
+            className={cx(item, "text-ink hover:bg-slate-100")}
+          >
+            <NavIcon name="people" />
+            Network
+          </NavLink>
+
+          <div className="my-1 h-px bg-line" />
+          <button
+            role="menuitem"
+            type="button"
+            onClick={onSignOut}
+            className={cx(item, "text-rose-600 hover:bg-rose-50")}
+          >
+            <NavIcon name="exit" />
+            Sign out
+          </button>
+        </div>
+      )}
+    </div>
   );
 }
 
@@ -79,46 +204,13 @@ function Shell({ children }: { children: ReactNode }) {
               </NavLink>
             ))}
           </nav>
-          <div className="flex shrink-0 items-center gap-1.5 sm:gap-2">
-            <NavLink
-              to={myPageTo}
-              title="My public page"
-              className={({ isActive }) =>
-                cx(
-                  "press flex items-center gap-2 rounded-xl p-1.5 hover:bg-slate-100",
-                  isActive && "bg-indigo-50",
-                )
-              }
-            >
-              <span className="relative">
-                <Avatar name={name} size={32} />
-                <span className="absolute bottom-0 right-0 h-2.5 w-2.5 rounded-full border-2 border-paper bg-emerald-500" />
-              </span>
-              <span className="hidden text-sm font-medium text-ink sm:block">
-                {user?.first_name}
-              </span>
-            </NavLink>
-            <NavLink
-              to="/profile"
-              className={({ isActive }) =>
-                cx(
-                  "press hidden rounded-xl px-2.5 py-1.5 text-sm font-medium sm:inline-flex",
-                  isActive ? "bg-slate-100 text-ink" : "text-muted hover:bg-slate-100 hover:text-ink",
-                )
-              }
-            >
-              Edit profile
-            </NavLink>
-            <Button variant="ghost" size="sm" onClick={logout}>
-              Sign out
-            </Button>
-          </div>
+          <AccountMenu name={name} firstName={user?.first_name} myPageTo={myPageTo} onSignOut={logout} />
         </div>
       </header>
       <main key={useLocation().pathname} className="rise mx-auto max-w-6xl px-4 py-8 pb-28 sm:px-6 sm:py-10 md:pb-10">
         {children}
       </main>
-      <nav className="fixed inset-x-0 bottom-0 z-20 grid grid-cols-6 border-t border-line bg-white/95 px-1 pb-[max(0.4rem,env(safe-area-inset-bottom))] pt-1.5 backdrop-blur-xl md:hidden">
+      <nav className="fixed inset-x-0 bottom-0 z-20 grid grid-cols-5 border-t border-line bg-white/95 px-1 pb-[max(0.4rem,env(safe-area-inset-bottom))] pt-1.5 backdrop-blur-xl md:hidden">
         {NAV.map((item) => (
           <NavLink
             key={item.to}
