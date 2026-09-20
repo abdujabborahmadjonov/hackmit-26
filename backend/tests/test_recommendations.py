@@ -162,8 +162,17 @@ async def test_recommendations_require_authentication(client):
     assert (await client.get("/recommendations")).status_code == 401
 
 
-async def test_exclude_connected_hides_existing_connections(client):
+async def test_pending_invites_and_connections_are_hidden(client):
+    """Matches never resurfaces people you've invited or already connected with."""
     cohort = await seed_cohort(client)
+
+    pending = await client.post(
+        "/connections",
+        json={"receiver_id": cohort["carol"]["user_id"]},
+        headers=cohort["alice"]["headers"],
+    )
+    assert pending.status_code == 201
+
     created = await client.post(
         "/connections",
         json={"receiver_id": cohort["bob"]["user_id"]},
@@ -176,12 +185,11 @@ async def test_exclude_connected_hides_existing_connections(client):
         headers=cohort["bob"]["headers"],
     )
 
-    body = (
-        await client.get(
-            "/recommendations?exclude_connected=true", headers=cohort["alice"]["headers"]
-        )
-    ).json()
-    assert all(item["teacher"]["first_name"] != "Bob" for item in body["items"])
+    # Default endpoint (no exclude_connected flag) still hides both.
+    body = (await client.get("/recommendations", headers=cohort["alice"]["headers"])).json()
+    names = {item["teacher"]["first_name"] for item in body["items"]}
+    assert "Bob" not in names
+    assert "Carol" not in names
 
 
 async def test_blocked_users_are_never_recommended(client):

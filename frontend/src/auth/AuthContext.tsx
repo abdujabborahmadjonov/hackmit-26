@@ -8,6 +8,9 @@ import {
   type ReactNode,
 } from "react";
 import { api, setToken, getToken } from "../api/client";
+import { clearRecommendationsCache } from "../cache/recommendationsCache";
+import { clearMentorsCache } from "../cache/mentorsCache";
+import { clearSearchCache } from "../cache/searchCache";
 import type { Profile, UserPrivate } from "../api/types";
 
 interface AuthState {
@@ -84,6 +87,9 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     setToken(null);
     setUser(null);
     setProfile(null);
+    clearRecommendationsCache();
+    clearMentorsCache();
+    clearSearchCache();
   }, []);
 
   const refreshProfile = useCallback(async () => {

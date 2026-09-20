@@ -471,8 +471,8 @@ class ElasticsearchSearchBackend:
             body["knn"] = {
                 "field": "embedding",
                 "query_vector": embedding,
-                "k": max(q.limit + q.offset, 50),
-                "num_candidates": max((q.limit + q.offset) * 10, 200),
+                "k": max(q.limit + q.offset, 24),
+                "num_candidates": max((q.limit + q.offset) * 5, 50),
                 "boost": 2.0,
                 **({"filter": filters} if filters else {}),
             }
@@ -578,8 +578,8 @@ class ElasticsearchSearchBackend:
             body["knn"] = {
                 "field": "embedding",
                 "query_vector": embedding,
-                "k": max(q.limit + q.offset, 50),
-                "num_candidates": max((q.limit + q.offset) * 10, 200),
+                "k": max(q.limit + q.offset, 24),
+                "num_candidates": max((q.limit + q.offset) * 5, 50),
                 "boost": 2.0,
                 **({"filter": filters} if filters else {}),
             }

@@ -62,9 +62,12 @@ async def get_recommendations(
     exclude_connected: Annotated[
         bool,
         Query(
-            description="Hide people you are already connected to or have pending requests with"
+            description=(
+                "Deprecated: pending invitations and accepted connections are "
+                "always hidden from Matches. Kept for client compatibility."
+            )
         ),
-    ] = False,
+    ] = True,
     candidate_pool: Annotated[
         int | None, Query(ge=10, le=2000, description="Override the ANN candidate pool size")
     ] = None,

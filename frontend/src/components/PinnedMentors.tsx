@@ -1,7 +1,7 @@
 import { useEffect, useState } from "react";
 import { Link } from "react-router-dom";
-import { api } from "../api/client";
 import type { Mentor } from "../api/types";
+import { getPinnedMentors } from "../cache/mentorsCache";
 import { Avatar, Badge, Card } from "./ui";
 
 /** Educators pinned to the top of the directory.
@@ -20,12 +20,17 @@ export function PinnedMentors({
   const [mentors, setMentors] = useState<Mentor[]>([]);
 
   useEffect(() => {
-    // A directory that renders without its pinned row is fine; an error here
-    // should not take the search page down with it.
-    api
-      .mentors()
-      .then((all) => setMentors(all.filter((mentor) => mentor.pinned)))
-      .catch(() => setMentors([]));
+    let cancelled = false;
+    void getPinnedMentors()
+      .then((pinned) => {
+        if (!cancelled) setMentors(pinned);
+      })
+      .catch(() => {
+        if (!cancelled) setMentors([]);
+      });
+    return () => {
+      cancelled = true;
+    };
   }, []);
 
   if (mentors.length === 0) return null;
@@ -36,7 +41,7 @@ export function PinnedMentors({
         <h2 className="text-sm font-semibold text-ink">{title}</h2>
         <p className="text-xs text-muted">{description}</p>
       </div>
-      <div className="stagger grid gap-4 sm:grid-cols-2">
+      <div className="grid gap-4 sm:grid-cols-2">
         {mentors.map((mentor) => (
           <Card key={mentor.slug} className="h-full p-5" interactive>
             <Link to={`/mentor/${mentor.slug}`} className="flex h-full items-start gap-4">

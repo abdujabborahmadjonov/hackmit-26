@@ -408,15 +408,24 @@ class RecommendationService:
             select(TeacherProfile).where(TeacherProfile.user_id == user_id)
         )
 
-    def _exclusion_clause(self, user_id: uuid.UUID, exclude_connected: bool):
-        """Never recommend people who blocked/rejected you (optionally: connections)."""
-        blocked_states = [ConnectionStatus.BLOCKED, ConnectionStatus.REJECTED]
-        if exclude_connected:
-            blocked_states += [ConnectionStatus.ACCEPTED, ConnectionStatus.PENDING]
+    def _exclusion_clause(self, user_id: uuid.UUID, exclude_connected: bool = True):
+        """Hide anyone already in your connection graph from Matches.
+
+        Always excludes pending invitations (sent or received), accepted
+        connections, blocks, and rejections. ``exclude_connected`` is retained
+        for API compatibility and has no effect.
+        """
+        del exclude_connected  # API compat; pending/accepted are always hidden
+        excluded = [
+            ConnectionStatus.BLOCKED,
+            ConnectionStatus.REJECTED,
+            ConnectionStatus.PENDING,
+            ConnectionStatus.ACCEPTED,
+        ]
         return ~exists(
             select(Connection.id).where(
                 and_(
-                    Connection.status.in_(blocked_states),
+                    Connection.status.in_(excluded),
                     or_(
                         and_(
                             Connection.requester_id == user_id,

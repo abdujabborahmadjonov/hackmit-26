@@ -10,6 +10,11 @@ import {
   humanize,
 } from "../api/vocab";
 import { useAuth } from "../auth/AuthContext";
+import {
+  getSearchCache,
+  searchCacheKey,
+  setSearchCache,
+} from "../cache/searchCache";
 import { TeacherCard } from "../components/TeacherCard";
 import { TeacherCardSkeleton } from "../components/Skeleton";
 import { Badge, Button, Card, ErrorNote, Field, Input, PageHeader, Select } from "../components/ui";
@@ -61,30 +66,38 @@ export default function Search() {
   const [error, setError] = useState<unknown>(null);
 
   const run = useCallback(async (active: Filters) => {
-    setLoading(true);
     setError(null);
     const city = CITIES.find((c) => c.name === active.city);
     const radiusKm = parseRadiusKm(active.radius_km);
     const latitude = city?.lat ?? profileCoords.current.lat;
     const longitude = city?.lon ?? profileCoords.current.lon;
     const hasGeo = radiusKm !== undefined && latitude != null && longitude != null;
+    const params = {
+      query: active.query || undefined,
+      subject: active.subject || undefined,
+      education_level: active.education_level || undefined,
+      teaching_level: active.teaching_level || undefined,
+      teaching_method: active.teaching_method || undefined,
+      latitude: hasGeo ? latitude : undefined,
+      longitude: hasGeo ? longitude : undefined,
+      radius_km: hasGeo ? radiusKm : undefined,
+      minimum_rating: active.minimum_rating || undefined,
+      class_size: active.class_size || undefined,
+      sort: active.sort,
+      limit: 24,
+    };
+    const key = searchCacheKey(params);
+    const cached = getSearchCache(key);
+    if (cached) {
+      setData(cached);
+      setLoading(false);
+      return;
+    }
+    setLoading(true);
     try {
-      setData(
-        await api.searchTeachers({
-          query: active.query || undefined,
-          subject: active.subject || undefined,
-          education_level: active.education_level || undefined,
-          teaching_level: active.teaching_level || undefined,
-          teaching_method: active.teaching_method || undefined,
-          latitude: hasGeo ? latitude : undefined,
-          longitude: hasGeo ? longitude : undefined,
-          radius_km: hasGeo ? radiusKm : undefined,
-          minimum_rating: active.minimum_rating || undefined,
-          class_size: active.class_size || undefined,
-          sort: active.sort,
-          limit: 24,
-        }),
-      );
+      const result = await api.searchTeachers(params);
+      setSearchCache(key, result);
+      setData(result);
     } catch (err) {
       setError(err);
     } finally {
