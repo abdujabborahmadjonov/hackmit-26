@@ -167,6 +167,19 @@ RELATED_TERMS: list[tuple[str, str, float]] = [
     ("robotics", "computer_science", 0.6),
     ("web_development", "software_engineering", 0.8),
     ("web_development", "computer_science", 0.6),
+    # Course-level subjects used by class profiles / technique seed data.
+    ("calculus", "mathematics", 0.95),
+    ("precalculus", "calculus", 0.9),
+    ("precalculus", "mathematics", 0.9),
+    ("algebra", "mathematics", 0.9),
+    ("geometry", "mathematics", 0.85),
+    ("linear_algebra", "mathematics", 0.9),
+    ("linear_algebra", "calculus", 0.7),
+    ("calculus", "statistics", 0.55),
+    ("intro_cs", "computer_science", 0.95),
+    ("intro_biology", "biology", 0.95),
+    ("organic_chemistry", "chemistry", 0.95),
+    ("general_chemistry", "chemistry", 0.95),
 ]
 
 # Exact synonyms collapse to a single canonical slug before any comparison.
@@ -190,6 +203,13 @@ SYNONYMS: dict[str, str] = {
     "programming_languages": "programming",
     "deep_learning": "machine_learning",
     "data_analytics": "data_science",
+    "calc": "calculus",
+    "differential_calculus": "calculus",
+    "integral_calculus": "calculus",
+    "intro_to_cs": "intro_cs",
+    "introductory_cs": "intro_cs",
+    "intro_to_biology": "intro_biology",
+    "introductory_biology": "intro_biology",
 }
 
 _SLUG_RE = re.compile(r"[^a-z0-9]+")
@@ -229,6 +249,34 @@ def term_relatedness(a: str, b: str) -> float:
     if a == b:
         return 1.0
     return _RELATEDNESS.get((a, b), 0.0)
+
+
+# Minimum relatedness for "same or closely related field" hard filters.
+CLOSE_FIELD_THRESHOLD = 0.6
+
+
+def fields_compatible(
+    a: str | None,
+    b: str | None,
+    *,
+    min_score: float = CLOSE_FIELD_THRESHOLD,
+) -> bool:
+    """True when two subject labels are the same field or closely adjacent."""
+    if not a or not b:
+        return False
+    ca, cb = canonical_term(a), canonical_term(b)
+    if ca == cb:
+        return True
+    if term_relatedness(ca, cb) >= min_score:
+        return True
+    # Free-text containment for labels like "ap_calculus" vs "calculus".
+    shorter, longer = (ca, cb) if len(ca) <= len(cb) else (cb, ca)
+    return len(shorter) >= 4 and (
+        longer == shorter
+        or longer.startswith(f"{shorter}_")
+        or longer.endswith(f"_{shorter}")
+        or f"_{shorter}_" in longer
+    )
 
 
 def education_compatibility(a: str, b: str, overrides: dict[str, dict[str, float]] | None = None) -> float:

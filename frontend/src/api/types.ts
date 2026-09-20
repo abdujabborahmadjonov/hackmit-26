@@ -284,72 +284,180 @@ export interface ProfileDraft {
   source_name: string | null;
 }
 
+// --- class profiles & techniques ---
 
-/** One thing a guide is allowed to draw on. Shown as a footnote under a reply. */
-export interface MentorSource {
+export type ProblemType =
+  | "misconception"
+  | "missing_prerequisite"
+  | "engagement"
+  | "pacing"
+  | "transfer";
+
+export type ClassFormat = "lecture" | "lab" | "online" | "hybrid";
+export type ClassStatus = "planned" | "active" | "archived";
+
+export interface ClassProfileInput {
+  title: string;
+  subject: string;
+  level: string;
+  format: ClassFormat;
+  status?: ClassStatus;
+  class_size?: number | null;
+  class_size_min?: number | null;
+  class_size_max?: number | null;
+  student_background?: string | null;
+  constraints?: string | null;
+  class_length_minutes?: number | null;
+  technology?: string | null;
+  notes?: string | null;
+}
+
+export interface ClassProfile extends ClassProfileInput {
+  id: string;
+  teacher_id: string;
+  status: ClassStatus;
+  format: ClassFormat;
+  created_at: string;
+  updated_at: string;
+}
+
+export interface ClassProfileDraft {
+  title: string | null;
+  subject: string | null;
+  level: string | null;
+  format: ClassFormat | null;
+  class_size: number | null;
+  class_size_min: number | null;
+  class_size_max: number | null;
+  student_background: string | null;
+  constraints: string | null;
+  class_length_minutes: number | null;
+  technology: string | null;
+  notes: string | null;
+  confidence: string;
+}
+
+export interface ConceptChip {
+  id?: string | null;
+  label: string;
+  slug?: string | null;
+  subject?: string | null;
+}
+
+export interface Concept {
+  id: string;
+  slug: string;
+  label: string;
+  subject: string;
+  description: string | null;
+  parent_id: string | null;
+  created_at: string;
+  updated_at: string;
+}
+
+export interface TechniqueRatingSummary {
+  average: number;
+  count: number;
+  distribution: Record<string, number>;
+  similar_class_count: number;
+  sample_comment: string | null;
+}
+
+export interface Technique {
+  id: string;
+  owner_id: string;
+  owner?: UserPublic | null;
+  title: string;
+  summary: string;
+  steps: string;
+  materials: string | null;
+  class_time_minutes: number | null;
+  teaching_style: string | null;
+  context_subject: string | null;
+  context_level: string | null;
+  context_format: string | null;
+  context_class_size: number | null;
+  context_notes: string | null;
+  problem_types: string[];
+  is_draft: boolean;
+  is_published: boolean;
+  average_rating: number;
+  rating_count: number;
+  concepts: Concept[];
+  rating_summary?: TechniqueRatingSummary | null;
+  score?: number | null;
+  score_breakdown?: Record<string, number> | null;
+  created_at: string;
+  updated_at: string;
+}
+
+export interface TechniqueDraft {
+  title: string;
+  summary: string;
+  steps: string;
+  materials: string | null;
+  class_time_minutes: number | null;
+  teaching_style: string | null;
+  problem_types: ProblemType[];
+  concept_labels: string[];
+  confidence: string;
+}
+
+export interface FollowUpOption {
   id: string;
   label: string;
-  url: string;
-  kind: "interview" | "talk" | "book" | "course" | "article" | "other";
+  example: string | null;
 }
 
-export interface MentorVoice {
-  enabled: boolean;
-  provider: "browser" | "none";
-  prefer: string[];
-  pitch: number;
-  rate: number;
-  /** Names a real person this voice imitates. Requires likeness consent, so
-   *  it is null on every persona until someone records that permission. */
-  clone_of: string | null;
+export interface TechniqueSearchParseResponse {
+  concept_chips: ConceptChip[];
+  problem_chips: string[];
+  problem_types: ProblemType[];
+  needs_follow_up: boolean;
+  follow_up_kind: "concept" | "problem" | "none";
+  follow_up_prompt: string | null;
+  follow_up_options: FollowUpOption[];
+  vague_vs_specific: string | null;
+  round: number;
 }
 
-export interface MentorAvatar {
-  enabled: boolean;
-  /** "stylised" is an abstract form; "likeness" needs the person's consent. */
-  kind: "stylised" | "character" | "likeness";
-  animated?: boolean;
-  model_url: string;
-  accent: string;
+export interface TechniqueSearchRunResponse {
+  items: Technique[];
+  query_concepts: ConceptChip[];
+  problem_types: ProblemType[];
 }
 
-/** An educator you can hold a live conversation with. The persona is data on
- *  the server - `available` is false when that deployment has no model key.
- *
- *  `mode` is the difference that matters: a `first_person` persona speaks as
- *  the educator (only ever a composite, or someone who agreed to it), while a
- *  `guide` speaks *about* a real educator's published teaching and cites it. */
-export interface Mentor {
-  slug: string;
-  name: string;
-  title: string;
-  institution: string;
-  mode: "first_person" | "guide";
-  pinned: boolean;
-  location_name: string;
-  known_for: string;
-  tagline: string;
-  avatar_seed: string;
-  avatar_url: string;
-  /** Absent when the API predates voice mode - always guard. */
-  voice?: MentorVoice;
-  avatar?: MentorAvatar;
-  /** Whether this persona may look things up mid-conversation. */
-  research?: boolean;
-  synthetic: boolean;
-  disclaimer: string;
-  subjects: string[];
-  years_experience: number | null;
-  opening_line: string;
-  suggested_questions: string[];
-  collaborates_on: string[];
-  sources: MentorSource[];
-  /** False for a guide whose sources have not been filled in yet. */
-  has_material: boolean;
-  available: boolean;
+export interface PitfallItem {
+  problem_type: ProblemType;
+  label: string;
+  report_count: number;
+  top_techniques: Technique[];
 }
 
-export interface ChatTurn {
-  role: "user" | "assistant";
-  content: string;
+export interface PlanningResponse {
+  class_profile_id: string;
+  concept: ConceptChip | null;
+  pitfalls: PitfallItem[];
+}
+
+export interface RatingLink {
+  id: string;
+  technique_id: string;
+  teacher_id: string;
+  class_profile_id: string | null;
+  label: string | null;
+  expires_at: string;
+  max_uses: number | null;
+  use_count: number;
+  is_revoked: boolean;
+  is_active: boolean;
+  created_at: string;
+  /** Plaintext only on create. */
+  token?: string | null;
+  rate_path?: string | null;
+}
+
+export interface TechniqueRatingCreate {
+  rating: number;
+  comment?: string | null;
 }

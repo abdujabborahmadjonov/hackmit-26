@@ -16,9 +16,9 @@ from fastapi.staticfiles import StaticFiles
 from app.api import (
     ai,
     auth,
+    class_profiles,
     connections,
     forum,
-    mentors,
     messages,
     profiles,
     ratings,
@@ -26,8 +26,9 @@ from app.api import (
     resources,
     search,
     student_tokens,
+    technique_search,
+    techniques,
     users,
-    voice,
 )
 from app.config import orphaned_env_lines, settings
 from app.database import engine, ensure_extensions
@@ -51,7 +52,6 @@ colleagues they are most likely to collaborate well with.
 2. `POST /profiles` to describe your teaching.
 3. `GET /recommendations` for your matches - each one explains *why*.
 4. `GET /search/teachers` for filtered/semantic/geographic discovery.
-5. `POST /mentors/{slug}/chat` to talk to an educator persona, streamed live.
 
 ### How matching works
 `score = 0.30*semantic + 0.20*expertise + 0.15*education + 0.15*teaching_level
@@ -79,9 +79,13 @@ TAGS_METADATA = [
     {"name": "connections", "description": "Connection requests between educators."},
     {"name": "messages", "description": "Direct messaging (HTTPS transport security only)."},
     {"name": "forum", "description": "Public discussion topics and replies between educators."},
+    {"name": "class-profiles", "description": "Per-class teaching context for technique search."},
+    {"name": "techniques", "description": "Teaching technique cards, drafts, and student ratings."},
+    {
+        "name": "technique-search",
+        "description": "Concept/problem search, follow-ups, ranking, and planning mode.",
+    },
     {"name": "ai", "description": "Generative features: collaboration briefs and syllabus import."},
-    {"name": "mentors", "description": "Live streaming conversation with an educator persona."},
-    {"name": "voice", "description": "Speech synthesis for mentor chat."},
     {"name": "system", "description": "Health and diagnostics."},
 ]
 
@@ -128,9 +132,6 @@ async def lifespan(app: FastAPI):
 
         await es.close_client()
 
-    from app.services import voice_service
-
-    await voice_service.close_client()
     await engine.dispose()
     logger.info("Shutdown complete")
 
@@ -181,8 +182,6 @@ def create_app() -> FastAPI:
     for router in (
         auth.router,
         ai.router,
-        mentors.router,
-        voice.router,
         users.router,
         profiles.router,
         recommendations.router,
@@ -193,6 +192,9 @@ def create_app() -> FastAPI:
         connections.router,
         messages.router,
         forum.router,
+        class_profiles.router,
+        techniques.router,
+        technique_search.router,
     ):
         app.include_router(router)
 

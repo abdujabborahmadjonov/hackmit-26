@@ -10,12 +10,6 @@ attributes (subjects, education level, class size, location) with semantic
 embeddings of their teaching style to recommend the colleagues they are most
 likely to collaborate well with — and explains every recommendation.
 
-It also lets them **talk to a mentor**: a live, streamed conversation with an
-educator, answered in the context of their own profile. For a real educator
-who has not consented to being voiced, the mentor is a *guide* — it speaks
-about their published teaching and cites every claim, and the server checks
-the citations. See [Mentor chat](backend/README.md#mentor-chat).
-
 ## Repository
 
 | Path | What it is |

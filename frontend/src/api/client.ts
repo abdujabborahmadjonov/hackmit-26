@@ -2,19 +2,21 @@
  *  the base URL, and how the API reports errors. */
 
 import type {
-  ChatTurn,
+  ClassProfile,
+  ClassProfileDraft,
+  ClassProfileInput,
   Connection,
-  Mentor,
-  MentorSource,
   ProfileDraft,
   Conversation,
   ForumPost,
   ForumTopic,
   Message,
   Page,
+  PlanningResponse,
   Profile,
   ProfileInput,
   Rating,
+  RatingLink,
   RatingSummary,
   RecommendationResponse,
   RecommendedResource,
@@ -23,6 +25,11 @@ import type {
   StudentRatingInput,
   StudentToken,
   TeacherSearchResponse,
+  Technique,
+  TechniqueDraft,
+  TechniqueRatingCreate,
+  TechniqueSearchParseResponse,
+  TechniqueSearchRunResponse,
   TokenResponse,
   UserPrivate,
 } from "./types";
@@ -123,111 +130,6 @@ async function request<T>(
     throw readError(response.status, body);
   }
   return body as T;
-}
-
-/** Mentor chat streams, so it bypasses `request()` and reads the body itself.
- *  EventSource is not an option: it cannot POST and cannot send the token. */
-export interface ResearchedPage {
-  url: string;
-  title: string;
-}
-
-export interface MentorReplyEnd {
-  /** The sources this reply actually cited, in the order it cited them. */
-  citations: MentorSource[];
-  /** Keys the model wrote that match no source. The server checks; we show
-   *  them as unverified rather than pretending they are references. */
-  unverified: string[];
-  /** Pages looked up mid-answer. Deliberately separate from `citations`:
-   *  those are the educator's own material, these are not. */
-  researched: ResearchedPage[];
-}
-
-export async function streamMentorChat(
-  slug: string,
-  messages: ChatTurn[],
-  options: {
-    onDelta: (text: string) => void;
-    onEnd?: (end: MentorReplyEnd) => void;
-    /** Fires when the mentor starts looking something up. A search can add
-     *  half a minute, and a silent spinner that long reads as a hang. */
-    onSearching?: (query: string | null) => void;
-    signal?: AbortSignal;
-  },
-): Promise<void> {
-  const token = getToken();
-  const response = await fetch(`${API_URL}/mentors/${slug}/chat`, {
-    method: "POST",
-    headers: {
-      "Content-Type": "application/json",
-      Accept: "text/event-stream",
-      ...(token ? { Authorization: `Bearer ${token}` } : {}),
-    },
-    body: JSON.stringify({ messages }),
-    signal: options.signal,
-  });
-
-  if (!response.ok) {
-    if (response.status === 401 && token) setToken(null);
-    const text = await response.text();
-    throw readError(response.status, text ? (JSON.parse(text) as unknown) : null);
-  }
-  if (!response.body) throw new ApiError(500, "This browser cannot read a streamed reply.");
-
-  const reader = response.body.pipeThrough(new TextDecoderStream()).getReader();
-  let buffer = "";
-
-  /** Returns true when the stream said it was finished. */
-  const handleFrame = (frame: string): boolean => {
-    let event = "message";
-    let data = "";
-    for (const line of frame.split("\n")) {
-      if (line.startsWith("event:")) event = line.slice(6).trim();
-      // A frame may carry several data lines; SSE joins them with a newline.
-      else if (line.startsWith("data:")) data += (data ? "\n" : "") + line.slice(5).trim();
-    }
-    const payload = data
-      ? (JSON.parse(data) as {
-          text?: string;
-          detail?: string;
-          citations?: MentorSource[];
-          unverified?: string[];
-          researched?: ResearchedPage[];
-          query?: string | null;
-        })
-      : {};
-    if (event === "delta" && payload.text) options.onDelta(payload.text);
-    if (event === "searching") options.onSearching?.(payload.query ?? null);
-    // The 200 was sent before the model spoke, so a failure arrives in-band.
-    if (event === "error") throw new ApiError(502, payload.detail ?? "The conversation dropped.");
-    if (event === "done") {
-      options.onEnd?.({
-        citations: payload.citations ?? [],
-        unverified: payload.unverified ?? [],
-        researched: payload.researched ?? [],
-      });
-      return true;
-    }
-    return false;
-  };
-
-  try {
-    for (;;) {
-      const { done, value } = await reader.read();
-      if (done) break;
-      buffer += value.replace(/\r\n/g, "\n");
-      let boundary = buffer.indexOf("\n\n");
-      while (boundary !== -1) {
-        const frame = buffer.slice(0, boundary);
-        buffer = buffer.slice(boundary + 2);
-        if (frame.trim() && handleFrame(frame)) return;
-        boundary = buffer.indexOf("\n\n");
-      }
-    }
-  } finally {
-    // Stops the request when the caller aborts or a frame threw.
-    await reader.cancel().catch(() => {});
-  }
 }
 
 export const api = {
@@ -403,10 +305,128 @@ export const api = {
     return request<ProfileDraft>("/ai/profile-from-document", { method: "POST", body: form });
   },
 
-  // --- mentors ---
-  mentors: () => request<Mentor[]>("/mentors"),
-  mentor: (slug: string) => request<Mentor>(`/mentors/${slug}`),
-  // The conversation itself streams - see streamMentorChat above.
+  // --- class profiles ---
+  classProfiles: (params?: Query) =>
+    request<Page<ClassProfile>>("/class-profiles", { query: params }),
+  classProfile: (id: string) => request<ClassProfile>(`/class-profiles/${id}`),
+  createClassProfile: (data: ClassProfileInput) =>
+    request<ClassProfile>("/class-profiles", { method: "POST", body: JSON.stringify(data) }),
+  updateClassProfile: (id: string, data: Partial<ClassProfileInput>) =>
+    request<ClassProfile>(`/class-profiles/${id}`, { method: "PUT", body: JSON.stringify(data) }),
+  promoteClassProfile: (
+    id: string,
+    data: { class_size: number; format?: string; notes?: string | null },
+  ) =>
+    request<ClassProfile>(`/class-profiles/${id}/promote`, {
+      method: "POST",
+      body: JSON.stringify(data),
+    }),
+  deleteClassProfile: (id: string) =>
+    request<{ detail: string }>(`/class-profiles/${id}`, { method: "DELETE" }),
+  classFromDocument: (input: File | string) => {
+    const form = new FormData();
+    if (typeof input === "string") form.append("text", input);
+    else form.append("file", input);
+    return request<ClassProfileDraft>("/class-profiles/from-document", {
+      method: "POST",
+      body: form,
+    });
+  },
+
+  // --- techniques ---
+  techniques: (params?: { mine?: boolean; limit?: number; offset?: number }) =>
+    request<Page<Technique>>("/techniques", { query: params }),
+  technique: (id: string) => request<Technique>(`/techniques/${id}`),
+  createTechnique: (data: Partial<Technique> & {
+    title: string;
+    summary: string;
+    steps: string;
+    concept_ids?: string[];
+    problem_types?: string[];
+  }) => request<Technique>("/techniques", { method: "POST", body: JSON.stringify(data) }),
+  updateTechnique: (id: string, data: Partial<Technique> & { concept_ids?: string[] }) =>
+    request<Technique>(`/techniques/${id}`, { method: "PUT", body: JSON.stringify(data) }),
+  deleteTechnique: (id: string) =>
+    request<{ detail: string }>(`/techniques/${id}`, { method: "DELETE" }),
+  techniqueFromDocument: (input: File | string) => {
+    const form = new FormData();
+    if (typeof input === "string") form.append("text", input);
+    else form.append("file", input);
+    return request<TechniqueDraft>("/techniques/from-document", { method: "POST", body: form });
+  },
+  triedThis: (
+    techniqueId: string,
+    data: {
+      class_profile_id: string;
+      label?: string | null;
+      duration_minutes?: number;
+      max_uses?: number | null;
+    },
+  ) =>
+    request<RatingLink>(`/techniques/${techniqueId}/tried-this`, {
+      method: "POST",
+      body: JSON.stringify(data),
+    }),
+  createTechniqueRatingLink: (
+    techniqueId: string,
+    data: {
+      class_profile_id?: string | null;
+      label?: string | null;
+      duration_minutes?: number;
+      max_uses?: number | null;
+    },
+  ) =>
+    request<RatingLink>(`/techniques/${techniqueId}/rating-links`, {
+      method: "POST",
+      body: JSON.stringify(data),
+    }),
+  previewRate: (token: string) => request<Technique>(`/rate/${token}`),
+  submitRate: (token: string, data: TechniqueRatingCreate) =>
+    request<{ id: string; technique_id: string; rating: number; comment: string | null }>(
+      `/rate/${token}`,
+      { method: "POST", body: JSON.stringify(data) },
+    ),
+
+  // --- technique search & planning ---
+  parseTechniqueSearch: (data: {
+    class_profile_id: string;
+    concept_text: string;
+    problem_text: string;
+    round?: number;
+  }) =>
+    request<TechniqueSearchParseResponse>("/technique-search/parse", {
+      method: "POST",
+      body: JSON.stringify(data),
+    }),
+  refineTechniqueSearch: (data: {
+    class_profile_id: string;
+    concept_chips?: { id?: string | null; label: string }[];
+    problem_chips?: string[];
+    problem_types?: string[];
+    selected_option_ids?: string[];
+    round?: number;
+  }) =>
+    request<TechniqueSearchParseResponse>("/technique-search/refine", {
+      method: "POST",
+      body: JSON.stringify(data),
+    }),
+  runTechniqueSearch: (data: {
+    class_profile_id: string;
+    concept_ids?: string[];
+    concept_labels?: string[];
+    problem_types?: string[];
+    problem_text?: string | null;
+    limit?: number;
+  }) =>
+    request<TechniqueSearchRunResponse>("/technique-search/run", {
+      method: "POST",
+      body: JSON.stringify(data),
+    }),
+  planningMode: (params: {
+    class_profile_id: string;
+    concept_id?: string;
+    concept_label?: string;
+  }) => request<PlanningResponse>("/technique-search/planning", { query: params }),
 
   // --- system ---
   health: () => request<{ status: string; database: string }>("/health"),

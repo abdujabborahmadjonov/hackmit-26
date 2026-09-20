@@ -79,6 +79,16 @@ export const RESOURCE_TYPES = [
 
 export const DIFFICULTIES = ["beginner", "intermediate", "advanced"] as const;
 
+export const CLASS_FORMATS = ["lecture", "lab", "online", "hybrid"] as const;
+export const CLASS_STATUSES = ["planned", "active", "archived"] as const;
+export const PROBLEM_TYPES = [
+  "misconception",
+  "missing_prerequisite",
+  "engagement",
+  "pacing",
+  "transfer",
+] as const;
+
 export const ALLOWED_UPLOAD_EXTENSIONS = [
   ".pdf",
   ".ppt",

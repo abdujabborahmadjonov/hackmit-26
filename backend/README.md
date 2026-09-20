@@ -126,11 +126,10 @@ backend/
 │   ├── schemas/                Pydantic v2 request/response models
 │   ├── api/                    Routers: auth, users, profiles, recommendations,
 │   │                           search, resources, ratings, connections,
-│   │                           messages, ai, mentors
-│   ├── data/                   mentors.json - the mentor personas, as data
+│   │                           messages, ai, techniques, class profiles
 │   ├── services/               recommendation · embedding · search ·
 │   │                           elasticsearch · storage · profile · demo data ·
-│   │                           llm · mentor
+│   │                           llm · technique search
 │   └── utils/                  auth (JWT/Argon2), geo (haversine), rate limiting
 ├── migrations/                 Alembic (async)
 ├── scripts/                    generate_demo_data.py · reindex_elasticsearch.py
@@ -284,7 +283,6 @@ rebuilds both indices from scratch.
 | Connections | `POST /connections` · `GET /connections` · `PUT /connections/{id}` · `DELETE /connections/{id}` |
 | Messages | `POST /messages/conversations` · `GET /messages/conversations` · `GET/POST /messages/conversations/{id}/messages` · `POST /messages/conversations/{id}/read` |
 | AI | `GET /ai/status` · `GET /ai/brief/{teacher_id}` · `POST /ai/profile-from-document` |
-| Mentors | `GET /mentors` · `GET /mentors/{slug}` · `POST /mentors/{slug}/chat` (streams) |
 | System | `GET /` · `GET /health` |
 
 Uploads accept PDF, PPT/PPTX, DOC/DOCX, TXT, PNG/JPG up to `MAX_UPLOAD_SIZE_MB`
@@ -381,95 +379,6 @@ Want the same thing through search instead? Try:
 curl -s "http://localhost:8000/search/teachers?query=students%20build%20real%20software%20in%20teams&latitude=42.36&longitude=-71.06&radius_km=50" \
   | python3 -m json.tool
 ```
-
----
-
-## Mentor chat
-
-`POST /mentors/{slug}/chat` is a live conversation with an educator, streamed as
-Server-Sent Events so the reply appears as it is written rather than after a
-ten-second pause.
-
-```bash
-curl -N -X POST http://localhost:8000/mentors/gilbert-strang/chat \
-  -H "Authorization: Bearer $TOKEN" -H 'Content-Type: application/json' \
-  -d '{"messages":[{"role":"user","content":"My students memorise row reduction without understanding it."}]}'
-
-event: delta
-data: {"text": "Strang's answer to exactly this is to delay determinants"}
-...
-event: done
-data: {"mentor": "gilbert-strang", "citations": [{"id": "S1", "label": "...", "url": "..."}], "unverified": []}
-```
-
-### Two modes, and the difference is consent
-
-| | `first_person` | `guide` |
-| --- | --- | --- |
-| Voice | speaks **as** the educator | speaks **about** their published teaching |
-| For | a composite, or someone who agreed | a real person who has not |
-| May assert | anything in their dossier | only listed claims, each cited |
-| Gate | `consent.granted` must be true, or the persona fails to load | none needed |
-
-Putting words in a real person's mouth is the failure mode this feature has, so
-the gate is in the loader rather than in a code review: a `first_person` persona
-without `consent.granted` raises at import and the app does not start. To let a
-real educator speak in their own voice, record the permission and flip it:
-
-```json
-"consent": {
-  "granted": true,
-  "source": "email from MIT OCW, 2026-09-19",
-  "scope": "his published teaching material"
-}
-```
-
-### How a guide stays honest
-
-Claims and sources are separate, and a claim names the source it came from:
-
-```json
-"sources": [
-  { "id": "S1", "label": "Interview, MIT News, 2019", "url": "https://...", "kind": "interview" }
-],
-"claims": [
-  { "text": "He delays determinants until after the four subspaces.",
-    "source": "S1",
-    "quote": "determinants are a distraction at that stage" }
-]
-```
-
-- The dossier's claim list is the **complete** set of things the guide knows. It
-  may explain, connect and apply them; it may not add a new fact about the person.
-- It cites by echoing the key — `[S1]` — and **the server checks every key it
-  writes** against the source list. Keys that match nothing come back in the
-  `done` event as `unverified` and the client shows them as unverified rather
-  than rendering a reference that does not exist.
-- A quotation is only allowed where the dossier supplies the words.
-- A guide with **no** sources loaded (`has_material: false`) will introduce
-  itself and refuse every question about the person. Answering a real person's
-  pedagogy from the model's own memory is exactly what this design rules out.
-- The loader rejects a claim citing a source id that is not defined.
-
-### The rest
-
-- **The persona is data, not code** — `app/data/mentors.json`.
-- **The prompt is built in two halves.** The dossier is identical for every
-  viewer and sits behind a cache breakpoint; the viewer's own profile follows
-  it, so answers land in *your* teaching context.
-- **The server keeps no transcript.** The client sends the conversation back
-  each turn (capped at 24), which keeps this free of a migration and makes
-  every request independently replayable.
-- **Failures travel in-band.** The 200 is already sent by the time the model
-  speaks, so a mid-reply refusal or network drop arrives as an `error` event
-  rather than an HTTP status.
-- **Pinned mentors** (`"pinned": true`) surface at the top of the Discover
-  directory. They are deliberately *not* rendered as member cards: no connect
-  button, no message thread, and a badge saying what they are.
-
-Like the other generative features it needs `LLM_API_KEY`. Without one,
-`GET /mentors` still answers with `available: false` so the client can explain
-itself, and the chat endpoint returns 503.
 
 ---
 
