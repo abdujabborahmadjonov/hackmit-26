@@ -112,6 +112,18 @@ async def client(engine) -> AsyncGenerator[AsyncClient, None]:
     fastapi_app.dependency_overrides.clear()
 
 
+@pytest.fixture(autouse=True)
+def default_search_provider(monkeypatch):
+    """Pin the search engine for every test.
+
+    Otherwise the suite inherits whatever SEARCH_PROVIDER the developer has in
+    .env: point it at a live Elasticsearch and the search tests start reading
+    that index - real data, not the fixtures they just created. Tests that want
+    the Elasticsearch backend opt in by monkeypatching it themselves.
+    """
+    monkeypatch.setattr(settings, "search_provider", "postgres")
+
+
 # --------------------------------------------------------------------------- #
 # Convenience helpers
 # --------------------------------------------------------------------------- #

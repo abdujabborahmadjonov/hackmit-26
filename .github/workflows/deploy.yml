@@ -1,0 +1,71 @@
+# Deploy the API after a merge to main.
+#
+# The API does not build from this repository - it builds from
+# `edumatch-backend`, and Render watches that. Nothing connected the two, so
+# `main` spent days ahead of what was actually running and every merge looked
+# like it had done nothing. This closes that gap.
+#
+# One-time setup, both under Settings -> Secrets and variables -> Actions:
+#
+#   DEPLOY_REPO_TOKEN   a PAT with `repo` scope, so this can push to
+#                       edumatch-backend
+#   RENDER_DEPLOY_HOOK  Render dashboard -> edumatch-api -> Settings ->
+#                       Deploy Hook -> copy the URL
+#
+# Either secret can be left unset; the step that needs it is skipped and the
+# job still reports what it did.
+name: Deploy
+
+on:
+  push:
+    branches: [main]
+  workflow_dispatch:
+
+concurrency:
+  group: deploy-api
+  cancel-in-progress: false
+
+jobs:
+  deploy:
+    name: Publish API and trigger Render
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          # Full history: the deploy repo shares this one's, so a shallow
+          # clone cannot fast-forward it.
+          fetch-depth: 0
+
+      - name: Mirror main to the deploy repository
+        if: ${{ secrets.DEPLOY_REPO_TOKEN != '' }}
+        env:
+          TOKEN: ${{ secrets.DEPLOY_REPO_TOKEN }}
+        run: |
+          git push "https://x-access-token:${TOKEN}@github.com/abdujabborahmadjonov/edumatch-backend.git" \
+            HEAD:main
+          echo "pushed $(git rev-parse --short HEAD) to edumatch-backend"
+
+      - name: Trigger the Render deploy
+        if: ${{ secrets.RENDER_DEPLOY_HOOK != '' }}
+        run: |
+          code=$(curl -s -o /dev/null -w '%{http_code}' "${{ secrets.RENDER_DEPLOY_HOOK }}")
+          echo "Render deploy hook returned $code"
+          [ "$code" -lt 400 ] || exit 1
+
+      - name: Say what happened
+        run: |
+          {
+            echo "### Deploy"
+            echo ""
+            if [ -n "${{ secrets.DEPLOY_REPO_TOKEN }}" ]; then
+              echo "- Mirrored \`$(git rev-parse --short HEAD)\` to edumatch-backend"
+            else
+              echo "- **DEPLOY_REPO_TOKEN not set** - edumatch-backend was not updated,"
+              echo "  so the API will keep serving whatever it last built."
+            fi
+            if [ -n "${{ secrets.RENDER_DEPLOY_HOOK }}" ]; then
+              echo "- Triggered the Render deploy"
+            else
+              echo "- **RENDER_DEPLOY_HOOK not set** - Render was not told to rebuild."
+            fi
+          } >> "$GITHUB_STEP_SUMMARY"

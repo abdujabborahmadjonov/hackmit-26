@@ -2,6 +2,7 @@ import { useState, type ReactNode } from "react";
 import { Link } from "react-router-dom";
 import type { Recommendation } from "../api/types";
 import { FACTOR_META, humanize } from "../api/vocab";
+import { CollaborationBrief } from "./CollaborationBrief";
 import { Donut } from "./Donut";
 import { DEFAULT_WEIGHTS, FACTOR_ORDER } from "./WeightStudio";
 import { Avatar, Badge, Button, Card, ScoreRing, Stars } from "./ui";
@@ -113,6 +114,8 @@ interface MatchCardProps {
   rankDelta?: ReactNode;
   /** Present when the viewer is re-weighting, so the breakdown matches. */
   weights?: Record<string, number>;
+  /** Generative features are configured on this deployment. */
+  aiEnabled?: boolean;
   onConnect?: (userId: string) => void;
   onMessage?: (userId: string) => void;
   onDismiss?: (userId: string) => void;
@@ -125,6 +128,7 @@ export function MatchCard({
   displayScore,
   rankDelta,
   weights,
+  aiEnabled,
   onConnect,
   onMessage,
   onDismiss,
@@ -192,6 +196,10 @@ export function MatchCard({
           </li>
         ))}
       </ul>
+
+      {aiEnabled && (
+        <CollaborationBrief teacherId={teacher.user_id} teacherName={name} />
+      )}
 
       {/* Grid-rows trick: animates open without measuring the content height. */}
       <div className="collapsible" data-open={showWhy}>

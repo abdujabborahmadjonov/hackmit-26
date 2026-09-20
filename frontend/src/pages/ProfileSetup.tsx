@@ -1,5 +1,5 @@
 import { useEffect, useState, type FormEvent } from "react";
-import { useNavigate } from "react-router-dom";
+import { Link, useNavigate } from "react-router-dom";
 import { api } from "../api/client";
 import type { ProfileInput } from "../api/types";
 import {
@@ -13,6 +13,7 @@ import {
 } from "../api/vocab";
 import { useAuth } from "../auth/AuthContext";
 import { ChipSelect, TagInput } from "../components/ChipSelect";
+import { SyllabusImport } from "../components/SyllabusImport";
 import { Badge, Button, Card, ErrorNote, Field, Input, PageHeader, Select } from "../components/ui";
 
 const EMPTY: ProfileInput = {
@@ -34,12 +35,20 @@ const EMPTY: ProfileInput = {
 };
 
 export default function ProfileSetup() {
-  const { profile, refreshProfile } = useAuth();
+  const { user, profile, refreshProfile } = useAuth();
   const navigate = useNavigate();
   const [form, setForm] = useState<ProfileInput>(EMPTY);
   const [error, setError] = useState<unknown>(null);
   const [busy, setBusy] = useState(false);
   const [saved, setSaved] = useState(false);
+  const [aiEnabled, setAiEnabled] = useState(false);
+
+  useEffect(() => {
+    void api
+      .aiStatus()
+      .then((status) => setAiEnabled(status.enabled))
+      .catch(() => setAiEnabled(false));
+  }, []);
 
   useEffect(() => {
     if (profile) {
@@ -90,7 +99,19 @@ export default function ProfileSetup() {
         eyebrow={isNew ? "Profile setup" : "Profile settings"}
         title={isNew ? "Tell us how you teach" : "Your teaching profile"}
         description="The strongest matches start with an honest picture of your classroom—your methods, learners, expertise, and the environment where you do your best work."
-        actions={profile?.has_embedding ? <Badge tone="emerald">Semantic profile ready</Badge> : undefined}
+        actions={
+          <div className="flex flex-wrap items-center gap-2">
+            {profile?.has_embedding ? <Badge tone="emerald">Semantic profile ready</Badge> : null}
+            {user && profile ? (
+              <Link
+                to={`/teachers/${user.id}`}
+                className="press inline-flex items-center rounded-xl bg-white px-3 py-1.5 text-sm font-semibold text-ink ring-1 ring-line hover:bg-slate-50"
+              >
+                View my page
+              </Link>
+            ) : null}
+          </div>
+        }
       />
 
       <div className="mt-8 rounded-2xl bg-indigo-50 p-5 ring-1 ring-indigo-100">
@@ -110,6 +131,34 @@ export default function ProfileSetup() {
           />
         </div>
       </div>
+
+      {aiEnabled && (
+        <div className="mt-6">
+          <SyllabusImport
+            onExtract={(draft) =>
+              setForm((current) => ({
+                ...current,
+                // Merge, never clobber: anything already typed wins.
+                subjects: current.subjects.length ? current.subjects : draft.subjects,
+                education_levels: current.education_levels.length
+                  ? current.education_levels
+                  : draft.education_levels,
+                teaching_levels: current.teaching_levels.length
+                  ? current.teaching_levels
+                  : draft.teaching_levels,
+                teaching_methods: current.teaching_methods.length
+                  ? current.teaching_methods
+                  : draft.teaching_methods,
+                fields_of_expertise: current.fields_of_expertise.length
+                  ? current.fields_of_expertise
+                  : draft.fields_of_expertise,
+                teaching_style: current.teaching_style || draft.teaching_style,
+                class_size: current.class_size ?? draft.class_size,
+              }))
+            }
+          />
+        </div>
+      )}
 
       <form onSubmit={submit} className="mt-6 space-y-6">
         <Card className="space-y-5 p-6 sm:p-7">

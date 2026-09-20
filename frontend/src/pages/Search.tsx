@@ -9,9 +9,16 @@ import {
   TEACHING_METHODS,
   humanize,
 } from "../api/vocab";
+import { useAuth } from "../auth/AuthContext";
 import { TeacherCard } from "../components/TeacherCard";
 import { TeacherCardSkeleton } from "../components/Skeleton";
 import { Badge, Button, Card, ErrorNote, Field, Input, PageHeader, Select } from "../components/ui";
+
+function parseRadiusKm(value: string): number | undefined {
+  const radius = Number(value);
+  if (!Number.isFinite(radius) || radius <= 0) return undefined;
+  return radius;
+}
 
 interface Filters {
   query: string;
@@ -40,6 +47,7 @@ const EMPTY: Filters = {
 };
 
 export default function Search() {
+  const { profile } = useAuth();
   const [filters, setFilters] = useState<Filters>(EMPTY);
   const [data, setData] = useState<TeacherSearchResponse | null>(null);
   const [loading, setLoading] = useState(false);
@@ -49,6 +57,10 @@ export default function Search() {
     setLoading(true);
     setError(null);
     const city = CITIES.find((c) => c.name === active.city);
+    const radiusKm = parseRadiusKm(active.radius_km);
+    const latitude = city?.lat ?? profile?.latitude ?? undefined;
+    const longitude = city?.lon ?? profile?.longitude ?? undefined;
+    const hasGeo = radiusKm !== undefined && latitude != null && longitude != null;
     try {
       setData(
         await api.searchTeachers({
@@ -57,9 +69,9 @@ export default function Search() {
           education_level: active.education_level || undefined,
           teaching_level: active.teaching_level || undefined,
           teaching_method: active.teaching_method || undefined,
-          latitude: city?.lat,
-          longitude: city?.lon,
-          radius_km: city ? Number(active.radius_km) : undefined,
+          latitude: hasGeo ? latitude : undefined,
+          longitude: hasGeo ? longitude : undefined,
+          radius_km: hasGeo ? radiusKm : undefined,
           minimum_rating: active.minimum_rating || undefined,
           class_size: active.class_size || undefined,
           sort: active.sort,
@@ -71,11 +83,14 @@ export default function Search() {
     } finally {
       setLoading(false);
     }
-  }, []);
+  }, [profile?.latitude, profile?.longitude]);
 
   useEffect(() => {
-    void run(EMPTY);
-  }, [run]);
+    const handle = window.setTimeout(() => void run(filters), 250);
+    return () => window.clearTimeout(handle);
+    // Geographic controls apply as they change; other filters still use Submit.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [filters.city, filters.radius_km, run]);
 
   function set<K extends keyof Filters>(key: K, value: Filters[K]) {
     setFilters((current) => ({ ...current, [key]: value }));
@@ -183,7 +198,7 @@ export default function Search() {
             </Field>
             <Field label="Near">
               <Select value={filters.city} onChange={(e) => set("city", e.target.value)}>
-                <option value="">Anywhere</option>
+                <option value="">My location</option>
                 {CITIES.map((c) => (
                   <option key={c.name} value={c.name}>
                     {c.name}
@@ -191,14 +206,21 @@ export default function Search() {
                 ))}
               </Select>
             </Field>
-            <Field label="Within (km)">
+            <Field
+              label="Within (km)"
+              hint={
+                filters.city
+                  ? `Around ${filters.city}`
+                  : "Around your profile location. Clear to search everywhere."
+              }
+            >
               <Input
                 type="number"
                 min={1}
                 max={20000}
                 value={filters.radius_km}
                 onChange={(e) => set("radius_km", e.target.value)}
-                disabled={!filters.city}
+                placeholder="Any"
               />
             </Field>
             <Field label="Learner level">

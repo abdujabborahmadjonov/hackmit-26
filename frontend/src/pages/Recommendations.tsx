@@ -3,6 +3,7 @@ import { useNavigate } from "react-router-dom";
 import { api } from "../api/client";
 import type { Recommendation, RecommendationResponse } from "../api/types";
 import { MatchCard } from "../components/MatchCard";
+import { PinnedMentors } from "../components/PinnedMentors";
 import { MatchCardSkeleton } from "../components/Skeleton";
 import {
   FACTOR_ORDER,
@@ -30,6 +31,7 @@ export default function Recommendations() {
   const [connecting, setConnecting] = useState<string | null>(null);
   const [connected, setConnected] = useState<Set<string>>(new Set());
   const [dismissed, setDismissed] = useState<Set<string>>(new Set());
+  const [aiEnabled, setAiEnabled] = useState(false);
 
   const load = useCallback(async () => {
     setLoading(true);
@@ -51,6 +53,14 @@ export default function Recommendations() {
   useEffect(() => {
     void load();
   }, [load]);
+
+  useEffect(() => {
+    // One probe, so buttons that would only 503 never render.
+    void api
+      .aiStatus()
+      .then((status) => setAiEnabled(status.enabled))
+      .catch(() => setAiEnabled(false));
+  }, []);
 
   const defaults = data?.weights ?? null;
   const changed = useMemo(() => {
@@ -161,6 +171,11 @@ export default function Recommendations() {
         <ErrorNote error={error} />
       </div>
 
+      <PinnedMentors
+        title="Pinned first"
+        description="Always here, whatever your matches look like"
+      />
+
       {loading ? (
         <div className="mt-4 space-y-4">
           {[0, 1, 2].map((n) => (
@@ -176,6 +191,7 @@ export default function Recommendations() {
               displayScore={recommendation.localScore}
               rankDelta={changed ? <RankDelta delta={recommendation.delta} /> : null}
               weights={changed && weights ? normalise(weights) : (data?.weights ?? undefined)}
+              aiEnabled={aiEnabled}
               onConnect={connect}
               onMessage={message}
               onDismiss={dismiss}

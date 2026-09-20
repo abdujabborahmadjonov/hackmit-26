@@ -7,6 +7,25 @@
   --color-paper: oklch(0.985 0.003 265);
   --color-line: oklch(0.91 0.006 265);
 
+  /* The brand comes from the logo: navy #0c2454 with an amber #f09c0c.
+     Rather than rewrite 162 `indigo-*` classes across 29 files, the indigo
+     ramp is redefined to the navy - every existing utility keeps working and
+     picks up the new colour. Delete this block to go back to Tailwind indigo. */
+  --color-indigo-50: oklch(0.966 0.017 258);
+  --color-indigo-100: oklch(0.930 0.036 258);
+  --color-indigo-200: oklch(0.860 0.070 258);
+  --color-indigo-300: oklch(0.760 0.105 258);
+  --color-indigo-400: oklch(0.620 0.135 258);
+  --color-indigo-500: oklch(0.480 0.135 258);
+  --color-indigo-600: oklch(0.360 0.120 258);
+  --color-indigo-700: oklch(0.300 0.105 258);
+  --color-indigo-800: oklch(0.255 0.088 258);
+  --color-indigo-900: oklch(0.215 0.072 258);
+  --color-indigo-950: oklch(0.165 0.055 258);
+
+  /* The logo's amber, for the places that want a second voice. */
+  --color-brand-amber: oklch(0.775 0.155 72);
+
   /* One motion scale, used everywhere. Fast for state, slower for entrances. */
   --ease-out: cubic-bezier(0.22, 1, 0.36, 1);
   --dur-fast: 140ms;
@@ -132,6 +151,77 @@ textarea {
 }
 .press:active:not(:disabled) {
   transform: scale(0.97);
+}
+
+/* --- landing constellation ---------------------------------------------- */
+.landing-grid {
+  background-image:
+    linear-gradient(oklch(0.95 0.02 150 / 0.035) 1px, transparent 1px),
+    linear-gradient(90deg, oklch(0.95 0.02 150 / 0.035) 1px, transparent 1px);
+  background-size: 72px 72px;
+  mask-image: linear-gradient(to bottom, black 0%, transparent 82%);
+}
+
+.landing-glow {
+  background:
+    radial-gradient(circle at 72% 43%, oklch(0.84 0.18 125 / 0.13), transparent 18%),
+    radial-gradient(circle at 78% 45%, oklch(0.71 0.11 190 / 0.12), transparent 38%);
+}
+
+@keyframes orbit-spin {
+  to {
+    transform: rotate(360deg);
+  }
+}
+
+@keyframes orbit-spin-reverse {
+  to {
+    transform: rotate(-360deg);
+  }
+}
+
+@keyframes constellation-float {
+  0%, 100% {
+    transform: translate3d(0, 0, 0);
+  }
+  50% {
+    transform: translate3d(0, -9px, 0);
+  }
+}
+
+@keyframes signal-pulse {
+  0%, 100% {
+    box-shadow: 0 0 70px oklch(0.88 0.18 125 / 0.08);
+  }
+  50% {
+    box-shadow: 0 0 105px oklch(0.88 0.18 125 / 0.18);
+  }
+}
+
+.landing-orbit-spin {
+  animation: orbit-spin 42s linear infinite;
+  transform-box: fill-box;
+}
+
+.landing-orbit-spin-reverse {
+  animation: orbit-spin-reverse 34s linear infinite;
+  transform-box: fill-box;
+}
+
+.landing-float {
+  animation: constellation-float 5.5s var(--ease-out) infinite;
+}
+
+.landing-pulse {
+  animation: signal-pulse 4s ease-in-out infinite;
+}
+
+.landing-dark-donut .fill-ink {
+  fill: white;
+}
+
+.landing-dark-donut .fill-muted {
+  fill: oklch(0.78 0.01 150);
 }
 
 /* --- range inputs: the tuner is the thing people touch most -------------- */

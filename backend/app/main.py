@@ -14,17 +14,26 @@ from fastapi.responses import JSONResponse
 from fastapi.staticfiles import StaticFiles
 
 from app.api import (
+    ai,
     auth,
+    class_profiles,
     connections,
+    course_plans,
+    forum,
+    mentors,
     messages,
     profiles,
     ratings,
     recommendations,
     resources,
     search,
+    student_tokens,
+    technique_search,
+    techniques,
     users,
+    voice,
 )
-from app.config import settings
+from app.config import orphaned_env_lines, settings
 from app.database import engine, ensure_extensions
 from app.services.embedding_service import get_embedding_service
 
@@ -65,9 +74,27 @@ TAGS_METADATA = [
     {"name": "recommendations", "description": "The hybrid matching engine and its explanations."},
     {"name": "search", "description": "Filtered, semantic and geographic discovery."},
     {"name": "resources", "description": "Teaching materials: metadata, uploads, recommendations."},
-    {"name": "ratings", "description": "Peer ratings and reviews."},
+    {"name": "ratings", "description": "Peer and verified student ratings."},
+    {
+        "name": "student-tokens",
+        "description": "Classroom codes educators issue so students can leave verified ratings.",
+    },
     {"name": "connections", "description": "Connection requests between educators."},
     {"name": "messages", "description": "Direct messaging (HTTPS transport security only)."},
+    {"name": "forum", "description": "Public discussion topics and replies between educators."},
+    {"name": "class-profiles", "description": "Per-class teaching context for technique search."},
+    {
+        "name": "course-plans",
+        "description": "AI class plan generator grounded in resources, techniques, and peer classes.",
+    },
+    {"name": "techniques", "description": "Teaching technique cards, drafts, and student ratings."},
+    {
+        "name": "technique-search",
+        "description": "Concept/problem search, follow-ups, ranking, and planning mode.",
+    },
+    {"name": "ai", "description": "Generative features: collaboration briefs and syllabus import."},
+    {"name": "mentors", "description": "Live streaming conversation with an educator persona."},
+    {"name": "voice", "description": "Speech synthesis for mentor chat."},
     {"name": "system", "description": "Health and diagnostics."},
 ]
 
@@ -75,6 +102,16 @@ TAGS_METADATA = [
 @asynccontextmanager
 async def lifespan(app: FastAPI):
     logger.info("Starting %s (%s)", settings.app_name, settings.environment)
+
+    orphans = orphaned_env_lines()
+    if orphans:
+        logger.warning(
+            "%s line(s) in .env hold a value with no NAME= in front of them (line %s). "
+            "Those settings are being ignored - check for a key pasted without its "
+            "variable name.",
+            len(orphans),
+            ", ".join(str(n) for n in orphans),
+        )
     try:
         await ensure_extensions()
     except Exception as exc:  # pragma: no cover - surfaced at /health instead
@@ -103,6 +140,7 @@ async def lifespan(app: FastAPI):
         from app.services import elasticsearch_service as es
 
         await es.close_client()
+
     await engine.dispose()
     logger.info("Shutdown complete")
 
@@ -152,14 +190,23 @@ def create_app() -> FastAPI:
 
     for router in (
         auth.router,
+        mentors.router,
+        voice.router,
+        ai.router,
         users.router,
         profiles.router,
         recommendations.router,
         search.router,
         resources.router,
         ratings.router,
+        student_tokens.router,
         connections.router,
         messages.router,
+        forum.router,
+        class_profiles.router,
+        course_plans.router,
+        techniques.router,
+        technique_search.router,
     ):
         app.include_router(router)
 

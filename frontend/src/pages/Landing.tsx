@@ -1,50 +1,64 @@
 import { useEffect, useState } from "react";
+import { Logo } from "../components/Logo";
 import { Link, useNavigate } from "react-router-dom";
 import { api } from "../api/client";
-import { FACTOR_META } from "../api/vocab";
 import { useAuth } from "../auth/AuthContext";
-import { Donut } from "../components/Donut";
-import { FACTOR_ORDER } from "../components/WeightStudio";
-import { Avatar, Badge, Button, ErrorNote, ScoreRing } from "../components/ui";
+import { ErrorNote } from "../components/ui";
 
 const DEMO = { email: "demo_teacher@example.com", password: "DemoPassword123!" };
 
-const WEIGHTS: Record<string, number> = {
-  semantic: 0.3,
-  expertise: 0.2,
-  education: 0.15,
-  teaching_level: 0.15,
-  location: 0.1,
-  class_size: 0.1,
-};
+/** One exchange from the mentor, shown as the product card. It is the real
+ *  shape of a reply - a claim, then where it came from. */
+const TRANSCRIPT = [
+  { who: "you", text: "My students memorise the syntax and freeze on the first real bug." },
+  {
+    who: "them",
+    text: "Then stop teaching syntax and start teaching the bug. I open every lecture with broken code and two minutes of pair discussion before I run it.",
+  },
+  { who: "cite", text: "Guest lecture, Winter 2013 · 09:51" },
+];
 
 const STEPS = [
-  {
-    eyebrow: "Your context",
-    title: "Describe how you teach",
-    body: "Not just your subject — your classroom. “Project-based, students ship a working app each unit.”",
-  },
-  {
-    eyebrow: "Semantic matching",
-    title: "We read it, not just index it",
-    body: "Your teaching style becomes a vector stored in pgvector, so “hands-on builds” finds “students construct” too.",
-  },
-  {
-    eyebrow: "Clear results",
-    title: "See who fits, and why",
-    body: "Every match shows its reasons — shared subjects, same level, distance, class size — and the maths behind them.",
-  },
+  [
+    "Write the classroom, not the résumé",
+    "Describe how your students actually spend the hour. The matching reads meaning, not keywords.",
+  ],
+  [
+    "Meet the people who fit",
+    "Every match arrives with its reasoning: shared subjects, learner level, distance, how close your teaching philosophies sit.",
+  ],
+  [
+    "Talk to an educator who has done it",
+    "Ask a mentor in text or out loud. Every claim is cited, and it says so when it has nothing.",
+  ],
 ];
 
-const PREVIEW_FACTORS = [
-  { label: "Teaching philosophy", score: 0.96, colour: FACTOR_META.semantic.colour },
-  { label: "Subjects & expertise", score: 0.92, colour: FACTOR_META.expertise.colour },
-  { label: "Education level", score: 1, colour: FACTOR_META.education.colour },
+const COMPARISON: [string, string, string, string][] = [
+  [
+    "How you are matched",
+    "Teaching philosophy, read semantically",
+    "Subject tags you tick yourself",
+    "Whoever posted most recently",
+  ],
+  [
+    "Why this person",
+    "Shown, factor by factor, with the score",
+    "Not shown",
+    "You guess from a bio",
+  ],
+  [
+    "Asking a hard question",
+    "A mentor answers, and cites where it came from",
+    "Nobody to ask",
+    "Ask forty people, hope one replies",
+  ],
+  [
+    "When it does not know",
+    "It says so rather than inventing",
+    "—",
+    "Someone answers confidently anyway",
+  ],
 ];
-
-const linkButton =
-  "press inline-flex items-center justify-center rounded-lg px-3 py-1.5 text-sm font-medium " +
-  "focus:outline-none focus-visible:ring-2 focus-visible:ring-indigo-500 focus-visible:ring-offset-2";
 
 export default function Landing() {
   const { login } = useAuth();
@@ -54,7 +68,7 @@ export default function Landing() {
   const [error, setError] = useState<unknown>(null);
 
   useEffect(() => {
-    // Public endpoints - shows the demo corpus is real without needing a login.
+    // Public endpoints - shows the corpus is real without needing a login.
     void Promise.all([api.searchTeachers({ limit: 1 }), api.resources({ limit: 1 })])
       .then(([teachers, resources]) =>
         setStats({ teachers: teachers.total, resources: resources.total }),
@@ -76,322 +90,351 @@ export default function Landing() {
   }
 
   return (
-    <div className="min-h-screen overflow-hidden bg-paper">
-      <header className="relative z-10 mx-auto flex max-w-6xl items-center justify-between px-5 py-5 sm:px-6">
-        <Link
-          to="/"
-          className="press flex items-center gap-2.5 font-semibold tracking-tight text-ink"
-        >
-          <span className="grid h-8 w-8 place-items-center rounded-lg bg-indigo-600 text-sm text-white shadow-sm">
-            E
-          </span>
-          EduMatch
-        </Link>
-        <div className="flex items-center gap-2">
-          <Link
-            to="/login"
-            className={`${linkButton} text-muted hover:bg-slate-100 hover:text-ink`}
-          >
-            Sign in
+    <div className="min-h-screen bg-white text-slate-900">
+      {/* --- nav ----------------------------------------------------------- */}
+      <header className="sticky top-0 z-30 border-b border-slate-200/80 bg-white/85 backdrop-blur-xl">
+        <div className="mx-auto flex h-16 max-w-6xl items-center gap-6 px-5 sm:px-8">
+          <Link to="/" className="press flex shrink-0 items-center gap-2.5 font-semibold tracking-tight">
+            <Logo size={32} />
+            EduMatch
           </Link>
-          <Link
-            to="/register"
-            className={`${linkButton} bg-indigo-600 text-white shadow-sm hover:bg-indigo-700`}
-          >
-            Create account
-          </Link>
+          <nav className="hidden flex-1 items-center gap-7 text-sm text-slate-600 md:flex">
+            <a className="press hover:text-slate-900" href="#how">How it works</a>
+            <a className="press hover:text-slate-900" href="#mentor">Mentors</a>
+            <a className="press hover:text-slate-900" href="#compare">Compare</a>
+          </nav>
+          <div className="ml-auto flex items-center gap-2 sm:gap-3">
+            <Link
+              to="/login"
+              className="press rounded-lg px-3 py-2 text-sm font-medium text-slate-700 hover:text-slate-900"
+            >
+              Sign in
+            </Link>
+            <Link
+              to="/register"
+              className="press rounded-lg bg-indigo-600 px-4 py-2 text-sm font-semibold text-white shadow-sm hover:bg-indigo-700"
+            >
+              Get started
+            </Link>
+          </div>
         </div>
       </header>
 
-      <main>
-        <section className="relative">
-          <div
-            className="pointer-events-none absolute -right-32 -top-32 h-[34rem] w-[34rem] rounded-full bg-indigo-100/60 blur-3xl"
-            aria-hidden="true"
-          />
-          <div
-            className="pointer-events-none absolute -left-48 top-80 h-80 w-80 rounded-full bg-emerald-100/45 blur-3xl"
-            aria-hidden="true"
-          />
+      {/* --- hero ---------------------------------------------------------- */}
+      <section className="relative overflow-hidden">
+        {/* A faint grid, fading out downward, so the white does not read as empty. */}
+        <div
+          aria-hidden="true"
+          className="pointer-events-none absolute inset-0 [mask-image:linear-gradient(to_bottom,black,transparent_78%)]"
+          style={{
+            backgroundImage:
+              "linear-gradient(to right, rgb(226 232 240 / 0.7) 1px, transparent 1px)," +
+              "linear-gradient(to bottom, rgb(226 232 240 / 0.7) 1px, transparent 1px)",
+            backgroundSize: "56px 56px",
+          }}
+        />
 
-          <div className="relative mx-auto grid max-w-6xl items-center gap-12 px-5 pb-20 pt-12 sm:px-6 sm:pt-20 lg:grid-cols-[1.02fr_0.98fr] lg:gap-16 lg:pb-28 lg:pt-24">
-            <div className="rise">
-              <div className="inline-flex items-center gap-2 rounded-full bg-indigo-50 px-3 py-1.5 text-xs font-semibold text-indigo-700 ring-1 ring-indigo-100">
-                <span className="h-1.5 w-1.5 rounded-full bg-indigo-500" />
-                Explainable matching for educators
-              </div>
-              <h1 className="mt-6 max-w-xl text-4xl font-semibold leading-[1.08] tracking-[-0.035em] text-ink sm:text-6xl">
-                Meet the educator who gets how you teach.
-              </h1>
-              <p className="mt-6 max-w-xl text-lg leading-8 text-muted">
-                EduMatch looks beyond job titles and subject lists. It understands your teaching
-                philosophy, finds compatible collaborators, and explains every introduction.
-              </p>
-
-              <div className="mt-8 flex flex-wrap items-center gap-3">
-                <Button
-                  onClick={tryDemo}
-                  loading={busy}
-                  className="px-5 py-3 text-base shadow-lg shadow-indigo-600/20 hover:shadow-indigo-600/30"
-                >
-                  Explore Alice's matches
-                  {!busy && (
-                    <svg aria-hidden="true" className="h-4 w-4" viewBox="0 0 20 20" fill="none">
-                      <path
-                        d="M4 10h12m-5-5 5 5-5 5"
-                        stroke="currentColor"
-                        strokeWidth="1.8"
-                        strokeLinecap="round"
-                        strokeLinejoin="round"
-                      />
-                    </svg>
-                  )}
-                </Button>
-                <Link
-                  to="/register"
-                  className={`${linkButton} bg-white px-5 py-3 text-base text-ink ring-1 ring-line hover:bg-slate-50`}
-                >
-                  Build your profile
-                </Link>
-              </div>
-              <div className="mt-3 max-w-md">
-                <ErrorNote error={error} />
-              </div>
-              <p className="mt-4 text-xs leading-5 text-muted">
-                No setup needed. The demo signs you in as Alice, a project-based CS teacher in
-                Boston.
-              </p>
-
-              <dl className="mt-10 grid max-w-lg grid-cols-3 divide-x divide-line border-y border-line py-4">
-                <div className="pr-4">
-                  <dt className="text-xs text-muted">Educators</dt>
-                  <dd className="mt-1 text-lg font-semibold text-ink">
-                    {stats ? stats.teachers.toLocaleString() : "10k+"}
-                  </dd>
-                </div>
-                <div className="px-4">
-                  <dt className="text-xs text-muted">Resources</dt>
-                  <dd className="mt-1 text-lg font-semibold text-ink">
-                    {stats ? stats.resources.toLocaleString() : "50k+"}
-                  </dd>
-                </div>
-                <div className="pl-4">
-                  <dt className="text-xs text-muted">Match factors</dt>
-                  <dd className="mt-1 text-lg font-semibold text-ink">6</dd>
-                </div>
-              </dl>
-            </div>
-
-            <div className="rise relative mx-auto w-full max-w-xl lg:mx-0">
-              <div
-                className="absolute -inset-6 -z-10 rounded-[2rem] bg-indigo-100/55 blur-2xl"
-                aria-hidden="true"
-              />
-              <div className="overflow-hidden rounded-2xl bg-white ring-1 ring-slate-200 shadow-2xl shadow-indigo-950/10">
-                <div className="flex items-center justify-between border-b border-line bg-slate-50/80 px-5 py-3.5">
-                  <div className="flex items-center gap-2">
-                    <span className="h-2.5 w-2.5 rounded-full bg-rose-300" />
-                    <span className="h-2.5 w-2.5 rounded-full bg-amber-300" />
-                    <span className="h-2.5 w-2.5 rounded-full bg-emerald-300" />
-                  </div>
-                  <span className="text-[11px] font-medium text-muted">YOUR TOP MATCH</span>
-                  <span className="w-12" />
-                </div>
-
-                <div className="p-5 sm:p-7">
-                  <div className="flex items-start gap-4">
-                    <Avatar name="Bob Martinez" size={56} />
-                    <div className="min-w-0 flex-1">
-                      <div className="flex flex-wrap items-center gap-2">
-                        <h2 className="text-lg font-semibold text-ink">Bob Martinez</h2>
-                        <Badge tone="emerald">Great fit</Badge>
-                      </div>
-                      <p className="mt-0.5 text-sm text-muted">
-                        Computer Science · Cambridge Rindge & Latin
-                      </p>
-                      <p className="mt-1 text-xs text-muted">Cambridge, MA · 4 km away</p>
-                    </div>
-                    <ScoreRing score={0.94} size={62} />
-                  </div>
-
-                  <div className="mt-5 rounded-xl bg-indigo-50/70 p-4 ring-1 ring-indigo-100">
-                    <p className="text-[11px] font-semibold uppercase tracking-wider text-indigo-700">
-                      Why Bob stands out
-                    </p>
-                    <p className="mt-2 text-sm leading-6 text-slate-700">
-                      You both turn CS classes into collaborative studios where students ship real
-                      projects, review each other's work, and improve in public.
-                    </p>
-                  </div>
-
-                  <div className="mt-5 space-y-3.5">
-                    {PREVIEW_FACTORS.map((factor) => (
-                      <div key={factor.label}>
-                        <div className="mb-1.5 flex items-center justify-between text-xs">
-                          <span className="font-medium text-slate-700">{factor.label}</span>
-                          <span className="tabular-nums text-muted">
-                            {Math.round(factor.score * 100)}%
-                          </span>
-                        </div>
-                        <div className="h-1.5 overflow-hidden rounded-full bg-slate-100">
-                          <div
-                            className="h-full rounded-full"
-                            style={{
-                              width: `${factor.score * 100}%`,
-                              backgroundColor: factor.colour,
-                            }}
-                          />
-                        </div>
-                      </div>
-                    ))}
-                  </div>
-
-                  <div className="mt-5 flex flex-wrap gap-2 border-t border-line pt-5">
-                    <Badge tone="indigo">Project based</Badge>
-                    <Badge>Python</Badge>
-                    <Badge>High school</Badge>
-                    <Badge>Collaborative</Badge>
-                  </div>
-                </div>
-              </div>
-
-              <div className="absolute -bottom-7 -left-4 hidden items-center gap-3 rounded-xl bg-white px-4 py-3 ring-1 ring-line shadow-lg sm:flex">
-                <span className="grid h-8 w-8 place-items-center rounded-full bg-emerald-50 text-emerald-600">
-                  <svg aria-hidden="true" className="h-4 w-4" viewBox="0 0 20 20" fill="none">
-                    <path
-                      d="m5 10 3 3 7-7"
-                      stroke="currentColor"
-                      strokeWidth="2"
-                      strokeLinecap="round"
-                      strokeLinejoin="round"
-                    />
-                  </svg>
-                </span>
-                <div>
-                  <p className="text-xs font-semibold text-ink">No black-box score</p>
-                  <p className="text-[11px] text-muted">Every factor is visible</p>
-                </div>
-              </div>
-            </div>
-          </div>
-        </section>
-
-        <section className="border-y border-line bg-white">
-          <div className="mx-auto max-w-6xl px-5 py-20 sm:px-6">
-            <div className="max-w-2xl">
-              <p className="text-xs font-semibold uppercase tracking-[0.16em] text-indigo-600">
-                From profile to partnership
-              </p>
-              <h2 className="mt-3 text-3xl font-semibold tracking-tight text-ink sm:text-4xl">
-                Matching that starts with your classroom.
-              </h2>
-              <p className="mt-4 text-base leading-7 text-muted">
-                A short profile becomes a ranked, transparent set of educators you can actually
-                learn from and build with.
-              </p>
-            </div>
-
-            <div className="stagger mt-10 grid gap-4 md:grid-cols-3">
-              {STEPS.map((step, index) => (
-                <article
-                  key={step.title}
-                  className="relative overflow-hidden rounded-2xl bg-paper p-6 ring-1 ring-line"
-                >
-                  <div className="flex items-center justify-between">
-                    <span className="grid h-9 w-9 place-items-center rounded-xl bg-indigo-600 text-sm font-semibold text-white shadow-sm">
-                      {index + 1}
-                    </span>
-                    <span className="text-[11px] font-semibold uppercase tracking-wider text-muted">
-                      {step.eyebrow}
-                    </span>
-                  </div>
-                  <h3 className="mt-8 text-lg font-semibold text-ink">{step.title}</h3>
-                  <p className="mt-2 text-sm leading-6 text-muted">{step.body}</p>
-                </article>
-              ))}
-            </div>
-          </div>
-        </section>
-
-        <section className="mx-auto grid max-w-6xl items-center gap-12 px-5 py-20 sm:px-6 lg:grid-cols-[0.85fr_1.15fr] lg:py-24">
+        <div className="relative mx-auto grid max-w-6xl gap-14 px-5 pb-20 pt-14 sm:px-8 lg:grid-cols-[1.05fr_1fr] lg:items-center lg:gap-10 lg:pb-28 lg:pt-20">
           <div>
-            <p className="text-xs font-semibold uppercase tracking-[0.16em] text-indigo-600">
-              Transparent by design
+            <span className="inline-flex items-center gap-2 rounded-full border border-slate-200 bg-white px-3 py-1.5 text-sm text-slate-600 shadow-sm">
+              <span className="h-1.5 w-1.5 rounded-full bg-indigo-600" />
+              New — talk to a mentor, out loud
+            </span>
+
+            {/* No hard line breaks: at narrow widths they fight the natural
+                wrap and strand a word per line. `text-balance` keeps the lines
+                even by itself. */}
+            <h1 className="mt-7 max-w-[13ch] text-balance text-[2.5rem] font-semibold leading-[1.02] tracking-[-0.035em] sm:max-w-[14ch] sm:text-[3.25rem] sm:leading-[0.98] lg:text-[4rem]">
+              The colleague who teaches like you is out there.
+            </h1>
+
+            <p className="mt-6 max-w-lg text-lg leading-7 text-slate-600">
+              Describe how you actually teach. EduMatch reads the meaning, not the keywords, and
+              shows you exactly why it put you two together.
             </p>
-            <h2 className="mt-3 text-3xl font-semibold tracking-tight text-ink sm:text-4xl">
-              Six signals. One match you can trust.
-            </h2>
-            <p className="mt-4 max-w-lg text-base leading-7 text-muted">
-              Every score is a weighted sum of six comparable factors. Open any result to see the
-              exact contribution—or tune the weights and watch your ranking update live.
-            </p>
-            <div className="mt-6 flex flex-wrap gap-2">
-              <span className="rounded-full bg-white px-3 py-1.5 text-xs font-medium text-slate-700 ring-1 ring-line">
-                Explainable
-              </span>
-              <span className="rounded-full bg-white px-3 py-1.5 text-xs font-medium text-slate-700 ring-1 ring-line">
-                Adjustable
-              </span>
-              <span className="rounded-full bg-white px-3 py-1.5 text-xs font-medium text-slate-700 ring-1 ring-line">
-                Built for educators
-              </span>
+
+            <div className="mt-8 flex flex-wrap items-center gap-3">
+              <button
+                type="button"
+                onClick={tryDemo}
+                disabled={busy}
+                className="press inline-flex items-center justify-center rounded-lg bg-indigo-600 px-5 py-3 text-sm font-semibold text-white shadow-sm hover:bg-indigo-700 disabled:opacity-60"
+              >
+                {busy ? "Opening…" : "Explore the demo"}
+              </button>
+              <Link
+                to="/register"
+                className="press inline-flex items-center justify-center rounded-lg border border-slate-300 bg-white px-5 py-3 text-sm font-semibold text-slate-900 hover:bg-slate-50"
+              >
+                Create an account
+              </Link>
+            </div>
+
+            <dl className="mt-9 space-y-1.5 text-sm">
+              <div className="flex flex-wrap items-baseline gap-x-2">
+                <dt className="font-semibold">No setup</dt>
+                <dd className="text-slate-600">the demo account is already furnished</dd>
+              </div>
+              <div className="flex flex-wrap items-baseline gap-x-2">
+                <dt className="font-semibold">Every match explained</dt>
+                <dd className="text-slate-600">factor by factor, with the numbers</dd>
+              </div>
+              <div className="flex flex-wrap items-baseline gap-x-2">
+                <dt className="font-semibold">Mentors cite their sources</dt>
+                <dd className="text-slate-600">or tell you they have none</dd>
+              </div>
+            </dl>
+
+            <div className="mt-4">
+              <ErrorNote error={error} />
             </div>
           </div>
 
-          <div className="flex flex-col items-center gap-8 rounded-2xl bg-white p-6 ring-1 ring-line shadow-sm sm:flex-row sm:p-8">
-            <Donut
-              segments={FACTOR_ORDER.map((factor) => ({
-                key: factor,
-                label: FACTOR_META[factor].label,
-                value: WEIGHTS[factor],
-                colour: FACTOR_META[factor].colour,
-              }))}
-              size={200}
-              thickness={30}
-              centreValue="100%"
-              centreCaption="of a match score"
-            />
-            <ul className="w-full flex-1 space-y-2">
-              {FACTOR_ORDER.map((factor) => (
-                <li
-                  key={factor}
-                  className="flex items-center gap-3 border-b border-line/70 pb-2 text-sm last:border-0"
-                >
-                  <span
-                    className="h-2.5 w-2.5 shrink-0 rounded-sm"
-                    style={{ background: FACTOR_META[factor].colour }}
-                  />
-                  <span className="text-ink">{FACTOR_META[factor].label}</span>
-                  <span className="ml-auto tabular-nums text-muted">
-                    {Math.round(WEIGHTS[factor] * 100)}%
-                  </span>
+          {/* The product, as a card - a real exchange rather than a mockup. */}
+          <div className="relative">
+            <div className="overflow-hidden rounded-2xl bg-slate-900 shadow-2xl ring-1 ring-slate-900/10">
+              <div className="flex items-center gap-3 border-b border-white/10 px-4 py-3">
+                <span className="text-xs font-medium text-white/80">Osmar Zaïane</span>
+                <span className="rounded-full bg-white/10 px-2 py-0.5 text-[10px] font-medium text-white/60">
+                  AI persona
+                </span>
+                <span className="ml-auto flex items-center gap-1.5 text-[11px] text-emerald-400">
+                  <span className="h-1.5 w-1.5 rounded-full bg-emerald-400" />
+                  live
+                </span>
+              </div>
+              <div className="space-y-3 px-4 py-5">
+                {TRANSCRIPT.map((line, index) =>
+                  line.who === "cite" ? (
+                    <p key={index} className="pl-1 font-mono text-[11px] text-white/35">
+                      ↳ {line.text}
+                    </p>
+                  ) : (
+                    <div
+                      key={index}
+                      className={line.who === "you" ? "flex justify-end" : "flex justify-start"}
+                    >
+                      <p
+                        className={
+                          "max-w-[85%] rounded-2xl px-3.5 py-2.5 text-sm leading-6 " +
+                          (line.who === "you"
+                            ? "rounded-br-sm bg-indigo-600 text-white"
+                            : "rounded-tl-sm bg-white/10 text-white/90")
+                        }
+                      >
+                        {line.text}
+                      </p>
+                    </div>
+                  ),
+                )}
+              </div>
+            </div>
+            <p className="mt-3 px-1 text-xs leading-5 text-slate-500">
+              An AI persona built with the educator's permission, from material you can check.
+            </p>
+          </div>
+        </div>
+      </section>
+
+      {/* --- stats --------------------------------------------------------- */}
+      <section className="border-y border-slate-200 bg-white">
+        <div className="mx-auto grid max-w-6xl divide-slate-200 px-5 sm:px-8 md:grid-cols-3 md:divide-x">
+          {[
+            [stats ? stats.teachers.toLocaleString() : "—", "educators in the network"],
+            [stats ? stats.resources.toLocaleString() : "—", "teaching resources shared"],
+            ["6 factors", "behind every match, all visible"],
+          ].map(([value, caption]) => (
+            <div key={caption} className="px-2 py-8 text-center">
+              <p className="text-2xl font-semibold tracking-tight sm:text-3xl">{value}</p>
+              <p className="mt-1 text-sm text-slate-600">{caption}</p>
+            </div>
+          ))}
+        </div>
+      </section>
+
+      {/* --- how ----------------------------------------------------------- */}
+      <section id="how" className="mx-auto max-w-6xl px-5 py-20 sm:px-8 lg:py-28">
+        <p className="text-xs font-semibold uppercase tracking-[0.18em] text-slate-500">
+          How it works
+        </p>
+        <h2 className="mt-4 max-w-2xl text-3xl font-semibold leading-tight tracking-[-0.03em] sm:text-5xl">
+          Three steps, and none of them are a keyword search.
+        </h2>
+
+        <div className="mt-12 grid gap-px overflow-hidden rounded-2xl bg-slate-200 md:grid-cols-3">
+          {STEPS.map(([title, body], index) => (
+            <div key={title} className="bg-white p-7">
+              <span className="font-mono text-sm text-indigo-600">0{index + 1}</span>
+              <h3 className="mt-4 text-lg font-semibold tracking-tight">{title}</h3>
+              <p className="mt-2 text-sm leading-6 text-slate-600">{body}</p>
+            </div>
+          ))}
+        </div>
+      </section>
+
+      {/* --- mentor -------------------------------------------------------- */}
+      <section id="mentor" className="border-y border-slate-200 bg-slate-50">
+        <div className="mx-auto grid max-w-6xl gap-12 px-5 py-20 sm:px-8 lg:grid-cols-2 lg:items-center lg:py-28">
+          <div>
+            <p className="text-xs font-semibold uppercase tracking-[0.18em] text-slate-500">
+              Ask a mentor
+            </p>
+            <h2 className="mt-4 text-3xl font-semibold leading-tight tracking-[-0.03em] sm:text-5xl">
+              An educator who answers, and shows their working.
+            </h2>
+            <p className="mt-6 max-w-lg text-lg leading-7 text-slate-600">
+              Type, or press the microphone and talk. Replies arrive as they are written and are
+              spoken sentence by sentence, so it moves like a conversation rather than a lookup.
+            </p>
+            <ul className="mt-8 space-y-3.5">
+              {[
+                "Every claim carries the source it came from — and the server checks those citations.",
+                "A question past their material gets researched, and marked as research rather than recollection.",
+                "A persona with nothing on file declines instead of inventing.",
+              ].map((point) => (
+                <li key={point} className="flex gap-3 text-sm leading-6 text-slate-700">
+                  <span aria-hidden className="mt-0.5 text-indigo-600">✓</span>
+                  {point}
                 </li>
               ))}
             </ul>
-          </div>
-        </section>
-
-        <section className="px-5 pb-20 sm:px-6">
-          <div className="mx-auto flex max-w-6xl flex-col items-start justify-between gap-7 overflow-hidden rounded-3xl bg-indigo-600 px-7 py-10 text-white sm:px-10 sm:py-12 lg:flex-row lg:items-center">
-            <div>
-              <p className="text-sm font-medium text-indigo-200">Your best collaborator may be nearby.</p>
-              <h2 className="mt-2 max-w-2xl text-3xl font-semibold tracking-tight">
-                See who understands your classroom.
-              </h2>
-            </div>
-            <Button
-              onClick={tryDemo}
-              loading={busy}
-              className="shrink-0 bg-white px-5 py-3 text-base text-indigo-700 shadow-none hover:bg-indigo-50"
+            <Link
+              to="/register"
+              className="press mt-9 inline-flex items-center gap-2 rounded-lg bg-indigo-600 px-5 py-3 text-sm font-semibold text-white shadow-sm hover:bg-indigo-700"
             >
-              Try the live demo
-            </Button>
+              Meet a mentor
+              <span aria-hidden>→</span>
+            </Link>
           </div>
-        </section>
-      </main>
 
-      <footer className="border-t border-line py-8 text-center text-xs text-muted">
-        Built for HackMIT 2026 · FastAPI · PostgreSQL + pgvector · React
+          <div className="rounded-2xl bg-white p-2 shadow-xl ring-1 ring-slate-200">
+            <div className="rounded-xl bg-slate-900 p-6">
+              <div className="flex items-center justify-between">
+                <div>
+                  <p className="text-sm font-medium text-white/90">Osmar Zaïane</p>
+                  <p className="text-xs text-white/40">0:42</p>
+                </div>
+                <span className="rounded-full bg-white/10 px-2.5 py-1 text-[11px] text-white/60">
+                  Speaking
+                </span>
+              </div>
+              <div className="mt-6 grid h-40 place-items-center">
+                {/* A stand-in for the avatar - the live one is 10MB of model. */}
+                <div className="relative grid h-28 w-28 place-items-center">
+                  <span className="absolute inset-0 animate-pulse rounded-full bg-indigo-500/20" />
+                  <span className="absolute inset-4 rounded-full bg-indigo-500/30" />
+                  <span className="relative h-16 w-16 rounded-full bg-indigo-500/70" />
+                </div>
+              </div>
+              <div className="mt-4 flex items-center justify-center gap-3">
+                <span className="grid h-10 w-10 place-items-center rounded-full bg-white/10 text-white/70">
+                  <svg viewBox="0 0 24 24" className="h-4 w-4" fill="none" stroke="currentColor" strokeWidth="1.9" strokeLinecap="round">
+                    <path d="M11 5 6 9H3v6h3l5 4V5Z" />
+                    <path d="M15.5 8.5a5 5 0 0 1 0 7" />
+                  </svg>
+                </span>
+                <span className="grid h-14 w-14 place-items-center rounded-full bg-white text-slate-900">
+                  <svg viewBox="0 0 24 24" className="h-5 w-5" fill="none" stroke="currentColor" strokeWidth="1.9" strokeLinecap="round">
+                    <rect x="9" y="3" width="6" height="11" rx="3" />
+                    <path d="M5 11a7 7 0 0 0 14 0M12 18v3" />
+                  </svg>
+                </span>
+                <span className="grid h-10 w-10 place-items-center rounded-full bg-rose-500 text-white">
+                  <svg viewBox="0 0 24 24" className="h-4 w-4" fill="none" stroke="currentColor" strokeWidth="1.9" strokeLinecap="round">
+                    <path d="M3 10c5-4 13-4 18 0l-2.5 3-4-1.5V9a12 12 0 0 0-5 0v2.5L5.5 13 3 10Z" />
+                  </svg>
+                </span>
+              </div>
+            </div>
+          </div>
+        </div>
+      </section>
+
+      {/* --- compare ------------------------------------------------------- */}
+      <section id="compare" className="mx-auto max-w-6xl px-5 py-20 sm:px-8 lg:py-28">
+        <p className="text-xs font-semibold uppercase tracking-[0.18em] text-slate-500">Compare</p>
+        <h2 className="mt-4 max-w-2xl text-3xl font-semibold leading-tight tracking-[-0.03em] sm:text-5xl">
+          What you get that a directory does not.
+        </h2>
+
+        <div className="mt-12 overflow-x-auto">
+          <table className="w-full min-w-[46rem] border-separate border-spacing-0 text-left text-sm">
+            <thead>
+              <tr className="text-xs uppercase tracking-wider text-slate-500">
+                <th className="rounded-tl-2xl border-y border-l border-slate-200 bg-slate-50 px-5 py-4 font-medium">
+                  Feature
+                </th>
+                <th className="border-y border-slate-200 bg-indigo-50/70 px-5 py-4 font-semibold text-indigo-700">
+                  EduMatch
+                </th>
+                <th className="border-y border-slate-200 bg-slate-50 px-5 py-4 font-medium">
+                  A teacher directory
+                </th>
+                <th className="rounded-tr-2xl border-y border-r border-slate-200 bg-slate-50 px-5 py-4 font-medium">
+                  A staffroom group chat
+                </th>
+              </tr>
+            </thead>
+            <tbody>
+              {COMPARISON.map(([feature, ours, directory, chat], index) => {
+                const last = index === COMPARISON.length - 1;
+                return (
+                  <tr key={feature} className="align-top">
+                    <td className={"border-b border-l border-slate-200 px-5 py-4 font-medium " + (last ? "rounded-bl-2xl" : "")}>
+                      {feature}
+                    </td>
+                    <td className="border-b border-slate-200 bg-indigo-50/40 px-5 py-4">
+                      <span className="mr-1.5 text-indigo-600">✓</span>
+                      {ours}
+                    </td>
+                    <td className="border-b border-slate-200 px-5 py-4 text-slate-500">{directory}</td>
+                    <td className={"border-b border-r border-slate-200 px-5 py-4 text-slate-500 " + (last ? "rounded-br-2xl" : "")}>
+                      {chat}
+                    </td>
+                  </tr>
+                );
+              })}
+            </tbody>
+          </table>
+        </div>
+      </section>
+
+      {/* --- close --------------------------------------------------------- */}
+      <section className="border-t border-slate-200 bg-slate-50">
+        <div className="mx-auto max-w-6xl px-5 py-20 text-center sm:px-8 lg:py-24">
+          <h2 className="mx-auto max-w-2xl text-3xl font-semibold leading-tight tracking-[-0.03em] sm:text-5xl">
+            Find the person who already solved it.
+          </h2>
+          <p className="mx-auto mt-5 max-w-xl text-lg leading-7 text-slate-600">
+            The demo account is furnished and waiting. No card, no setup.
+          </p>
+          <div className="mt-9 flex flex-wrap items-center justify-center gap-3">
+            <button
+              type="button"
+              onClick={tryDemo}
+              disabled={busy}
+              className="press inline-flex items-center justify-center rounded-lg bg-indigo-600 px-5 py-3 text-sm font-semibold text-white shadow-sm hover:bg-indigo-700 disabled:opacity-60"
+            >
+              {busy ? "Opening…" : "Explore the demo"}
+            </button>
+            <Link
+              to="/register"
+              className="press inline-flex items-center justify-center rounded-lg border border-slate-300 bg-white px-5 py-3 text-sm font-semibold text-slate-900 hover:bg-slate-50"
+            >
+              Create an account
+            </Link>
+          </div>
+        </div>
+      </section>
+
+      <footer className="border-t border-slate-200 bg-white">
+        <div className="mx-auto flex max-w-6xl flex-wrap items-center gap-x-6 gap-y-2 px-5 py-8 text-sm text-slate-500 sm:px-8">
+          <span className="font-semibold text-slate-900">EduMatch</span>
+          <span>An AI-powered professional network for educators.</span>
+          <Link className="press ml-auto hover:text-slate-900" to="/login">
+            Sign in
+          </Link>
+        </div>
       </footer>
     </div>
   );

@@ -58,10 +58,36 @@ docker compose exec backend python scripts/generate_demo_data.py
 
 ### With the Elasticsearch engine
 
+Elastic Cloud is the intended backend **after** Postgres has been copied into
+it. Render stays on `SEARCH_PROVIDER=postgres` until that one-time reindex
+runs; boot only creates empty indices and would otherwise serve zero hits.
+
+Locally, put these in `backend/.env` (the API key is never committed):
+
+```
+SEARCH_PROVIDER=elasticsearch
+ELASTICSEARCH_URL=https://my-vectordb-project-b04eea.es.us-central1.gcp.elastic.cloud:443
+ELASTICSEARCH_API_KEY=<your encoded API key>
+```
+
 ```bash
-SEARCH_PROVIDER=elasticsearch docker compose --profile elasticsearch up --build
+docker compose up --build
 docker compose exec backend python scripts/reindex_elasticsearch.py
 ```
+
+The reindex writes into staging indices and aliases the live names over only
+after a successful refresh, so a failed bulk load leaves the previous search
+index in place.
+
+Production cutover (same script, production `DATABASE_URL` + API key):
+
+```bash
+python scripts/reindex_elasticsearch.py
+# then set SEARCH_PROVIDER=elasticsearch on the Render service
+```
+
+For a local cluster instead: `docker compose --profile elasticsearch up --build`
+with `ELASTICSEARCH_URL=http://elasticsearch:9200` and no API key.
 
 `GET /search/engine` reports which engine is live. If Elasticsearch goes down,
 search transparently falls back to Postgres (`SEARCH_FALLBACK_TO_POSTGRES=true`).
@@ -99,9 +125,11 @@ backend/
 │   ├── models/                 SQLAlchemy 2.0 models (one file per table group)
 │   ├── schemas/                Pydantic v2 request/response models
 │   ├── api/                    Routers: auth, users, profiles, recommendations,
-│   │                           search, resources, ratings, connections, messages
+│   │                           search, resources, ratings, connections,
+│   │                           messages, ai, techniques, class profiles
 │   ├── services/               recommendation · embedding · search ·
-│   │                           elasticsearch · storage · profile · demo data
+│   │                           elasticsearch · storage · profile · demo data ·
+│   │                           llm · technique search
 │   └── utils/                  auth (JWT/Argon2), geo (haversine), rate limiting
 ├── migrations/                 Alembic (async)
 ├── scripts/                    generate_demo_data.py · reindex_elasticsearch.py
@@ -254,6 +282,7 @@ rebuilds both indices from scratch.
 | Ratings | `POST/PUT/DELETE /teachers/{id}/ratings` · `GET /teachers/{id}/ratings` · `GET /teachers/{id}/ratings/summary` |
 | Connections | `POST /connections` · `GET /connections` · `PUT /connections/{id}` · `DELETE /connections/{id}` |
 | Messages | `POST /messages/conversations` · `GET /messages/conversations` · `GET/POST /messages/conversations/{id}/messages` · `POST /messages/conversations/{id}/read` |
+| AI | `GET /ai/status` · `GET /ai/brief/{teacher_id}` · `POST /ai/profile-from-document` |
 | System | `GET /` · `GET /health` |
 
 Uploads accept PDF, PPT/PPTX, DOC/DOCX, TXT, PNG/JPG up to `MAX_UPLOAD_SIZE_MB`
@@ -464,7 +493,7 @@ For Fly, enable pgvector once with
 | TLS | terminate HTTPS at the platform's proxy (all of the above do this for you) |
 | Uploads | local disk needs a persistent volume; otherwise set `STORAGE_PROVIDER=s3` |
 | Rate limiting | in-process, so it is per worker — move it to Redis before scaling out |
-| Elasticsearch | optional; set `SEARCH_PROVIDER=elasticsearch` + `ELASTICSEARCH_URL`, then run `scripts/reindex_elasticsearch.py` |
+| Elasticsearch | keep `SEARCH_PROVIDER=postgres` until `scripts/reindex_elasticsearch.py` has copied existing rows; then set `SEARCH_PROVIDER=elasticsearch` with `ELASTICSEARCH_URL` and `ELASTICSEARCH_API_KEY` |
 
 ---
 
@@ -535,7 +564,8 @@ for `main` and it stays correct as jobs are added or renamed.
 | `EMBEDDING_API_KEY` | — | Required by hosted providers |
 | `EMBEDDING_DIM` | `384` | Vector width (schema-affecting) |
 | `SEARCH_PROVIDER` | `postgres` | `postgres` · `elasticsearch` |
-| `ELASTICSEARCH_URL` | `http://localhost:9200` | Cluster endpoint |
+| `ELASTICSEARCH_URL` | `http://localhost:9200` | Cluster endpoint (Elastic Cloud: `https://….elastic.cloud:443`) |
+| `ELASTICSEARCH_API_KEY` | — | Elastic Cloud API key. Takes precedence over username/password. |
 | `STORAGE_PROVIDER` | `local` | `local` · `supabase` · `s3` |
 | `MAX_UPLOAD_SIZE_MB` | `25` | Upload ceiling |
 | `CORS_ORIGINS` | `*` | Comma-separated origins |
