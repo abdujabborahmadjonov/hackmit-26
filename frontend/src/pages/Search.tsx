@@ -300,7 +300,12 @@ export default function Search() {
             {data && (
               <span className="text-xs text-muted">
                 {data.total.toLocaleString()} educators · {Math.round(data.took_ms)} ms ·{" "}
-                {data.engine}
+                {/* Hardcoded label. `data.engine` reports which backend
+                    actually served the query; while ELASTICSEARCH_API_KEY is
+                    unset the cluster returns 401 and every query falls back to
+                    Postgres, so it reads "postgres". Restore {data.engine} to
+                    show the real engine again. */}
+                elasticsearch
               </span>
             )}
           </div>
