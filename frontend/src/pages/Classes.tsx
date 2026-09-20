@@ -1,7 +1,13 @@
 import { useCallback, useEffect, useRef, useState, type FormEvent } from "react";
 import { Link } from "react-router-dom";
 import { api } from "../api/client";
-import type { ClassFormat, ClassProfile, ClassProfileInput, ClassStatus } from "../api/types";
+import type {
+  ClassFormat,
+  ClassProfile,
+  ClassProfileInput,
+  ClassStatus,
+  CoursePlanSummary,
+} from "../api/types";
 import { CLASS_FORMATS, EDUCATION_LEVELS, SUBJECTS, humanize } from "../api/vocab";
 import {
   Badge,
@@ -54,6 +60,7 @@ function sizeLabel(klass: ClassProfile): string {
 export default function Classes() {
   const fileRef = useRef<HTMLInputElement>(null);
   const [items, setItems] = useState<ClassProfile[]>([]);
+  const [plans, setPlans] = useState<CoursePlanSummary[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<unknown>(null);
   const [composing, setComposing] = useState(false);
@@ -67,8 +74,12 @@ export default function Classes() {
 
   const load = useCallback(async () => {
     try {
-      const data = await api.classProfiles({ limit: 50 });
-      setItems(data.items);
+      const [classes, coursePlans] = await Promise.all([
+        api.classProfiles({ limit: 50 }),
+        api.coursePlans({ limit: 50 }),
+      ]);
+      setItems(classes.items);
+      setPlans(coursePlans.items);
     } catch (err) {
       setError(err);
     } finally {
@@ -212,13 +223,16 @@ export default function Classes() {
       <PageHeader
         eyebrow="Your classrooms"
         title="Class profiles"
-        description="Describe each class you teach so technique search and planning can match context — size, format, and constraints."
+        description="Describe each class you teach so technique search and planning can match context — size, format, and constraints. Or generate a full course plan from the library."
         actions={
           <>
+            <Link to="/classes/generate">
+              <Button size="sm">Generate course</Button>
+            </Link>
             <Button variant="secondary" size="sm" loading={extracting} onClick={() => fileRef.current?.click()}>
               Import syllabus
             </Button>
-            <Button size="sm" onClick={openCreate}>
+            <Button size="sm" variant="secondary" onClick={openCreate}>
               New class
             </Button>
             <input
@@ -239,6 +253,43 @@ export default function Classes() {
       <div className="mt-4">
         <ErrorNote error={error} />
       </div>
+
+      {plans.length > 0 && (
+        <section className="mt-6">
+          <div className="mb-3 flex items-end justify-between gap-3">
+            <div>
+              <p className="text-sm font-semibold text-ink">Course plans</p>
+              <p className="text-xs text-muted">
+                Generated outlines grounded in resources and peer classes.
+              </p>
+            </div>
+            <Link
+              to="/classes/generate"
+              className="text-xs font-semibold text-indigo-600 hover:text-indigo-700"
+            >
+              New plan →
+            </Link>
+          </div>
+          <ul className="grid gap-3 sm:grid-cols-2">
+            {plans.map((plan) => (
+              <li key={plan.id}>
+                <Link to={`/classes/plans/${plan.id}`}>
+                  <Card className="h-full p-4" interactive>
+                    <p className="font-semibold text-ink">{plan.title}</p>
+                    <p className="mt-1 text-sm text-muted">
+                      {humanize(plan.subject)} · {plan.duration_weeks} weeks ·{" "}
+                      {plan.unit_count} units
+                    </p>
+                    <div className="mt-3">
+                      <Badge tone="amber">{humanize(plan.status)}</Badge>
+                    </div>
+                  </Card>
+                </Link>
+              </li>
+            ))}
+          </ul>
+        </section>
+      )}
 
       {composing && (
         <Card className="mt-6 p-5">
@@ -411,9 +462,16 @@ export default function Classes() {
         <div className="mt-7">
           <EmptyState
             title="No class profiles yet"
-            body="Add a class you teach — or import a syllabus — so technique search can stay grounded in your context."
+            body="Generate a course plan from the library, add a class you teach, or import a syllabus."
             action={
-              <Button onClick={openCreate}>New class</Button>
+              <div className="flex flex-wrap gap-2">
+                <Link to="/classes/generate">
+                  <Button>Generate course</Button>
+                </Link>
+                <Button variant="secondary" onClick={openCreate}>
+                  New class
+                </Button>
+              </div>
             }
           />
         </div>
@@ -444,6 +502,12 @@ export default function Classes() {
                     className="text-xs font-semibold text-indigo-600 hover:text-indigo-700"
                   >
                     Plan ahead →
+                  </Link>
+                  <Link
+                    to={`/classes/generate?classId=${klass.id}`}
+                    className="text-xs font-semibold text-indigo-600 hover:text-indigo-700"
+                  >
+                    Generate course →
                   </Link>
                 </div>
                 <div className="mt-auto flex flex-wrap gap-2 pt-4">

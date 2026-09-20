@@ -81,6 +81,7 @@ async def ai_status() -> AIStatus:
                 "class_import",
                 "technique_draft",
                 "technique_search_parse",
+                "course_plan_generate",
             ]
             if llm_service.is_enabled()
             else []

@@ -7,6 +7,10 @@ import type {
   ClassProfileDraft,
   ClassProfileInput,
   Connection,
+  CoursePlan,
+  CoursePlanGenerateInput,
+  CoursePlanStructureInput,
+  CoursePlanSummary,
   Mentor,
   MentorSource,
   ProfileDraft,
@@ -105,6 +109,15 @@ function readError(status: number, body: unknown): ApiError {
         [Array.isArray(d.loc) ? d.loc.slice(1).join(".") : "", d.msg].filter(Boolean).join(": "),
       );
       return new ApiError(status, parts.join("; "));
+    }
+    if (payload.detail && typeof payload.detail === "object") {
+      const nested = payload.detail as {
+        reason?: string;
+        detail?: string;
+        message?: string;
+      };
+      const message = nested.reason || nested.detail || nested.message;
+      if (message) return new ApiError(status, message);
     }
   }
   return new ApiError(status, `Request failed (${status})`);
@@ -549,6 +562,57 @@ export const api = {
     concept_id?: string;
     concept_label?: string;
   }) => request<PlanningResponse>("/technique-search/planning", { query: params }),
+
+  // --- course plans ---
+  coursePlans: (params?: Query) =>
+    request<Page<CoursePlanSummary>>("/course-plans", { query: params }),
+  coursePlan: (id: string) => request<CoursePlan>(`/course-plans/${id}`),
+  generateCoursePlan: (data: CoursePlanGenerateInput) =>
+    request<CoursePlan>("/course-plans/generate", {
+      method: "POST",
+      body: JSON.stringify(data),
+    }),
+  updateCoursePlan: (
+    id: string,
+    data: Partial<{
+      title: string;
+      status: string;
+      duration_weeks: number;
+      sessions_per_week: number;
+      goals: string | null;
+      overview: string | null;
+      constraints: string | null;
+    }>,
+  ) =>
+    request<CoursePlan>(`/course-plans/${id}`, {
+      method: "PUT",
+      body: JSON.stringify(data),
+    }),
+  updateCoursePlanStructure: (id: string, data: CoursePlanStructureInput) =>
+    request<CoursePlan>(`/course-plans/${id}/structure`, {
+      method: "PUT",
+      body: JSON.stringify(data),
+    }),
+  regenerateCoursePlan: (
+    id: string,
+    data?: {
+      duration_weeks?: number;
+      sessions_per_week?: number;
+      goals?: string | null;
+      constraints?: string | null;
+      topic_hints?: string[];
+    },
+  ) =>
+    request<CoursePlan>(`/course-plans/${id}/regenerate`, {
+      method: "POST",
+      body: JSON.stringify(data ?? {}),
+    }),
+  regenerateCoursePlanUnit: (planId: string, unitId: string) =>
+    request<CoursePlan>(`/course-plans/${planId}/units/${unitId}/regenerate`, {
+      method: "POST",
+    }),
+  deleteCoursePlan: (id: string) =>
+    request<{ detail: string }>(`/course-plans/${id}`, { method: "DELETE" }),
 
   // --- mentors ---
   mentors: () => request<Mentor[]>("/mentors"),

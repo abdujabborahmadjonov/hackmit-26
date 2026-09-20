@@ -3,6 +3,12 @@
 from app.models.class_profile import ClassProfile
 from app.models.concept import Concept, ConceptAlias
 from app.models.connection import Connection, ConnectionStatus
+from app.models.course_plan import (
+    CoursePlan,
+    CoursePlanItem,
+    CoursePlanSession,
+    CoursePlanUnit,
+)
 from app.models.forum import ForumPost, ForumTopic
 from app.models.message import Conversation, ConversationParticipant, Message
 from app.models.profile import TeacherProfile
@@ -21,6 +27,10 @@ __all__ = [
     "ConnectionStatus",
     "Conversation",
     "ConversationParticipant",
+    "CoursePlan",
+    "CoursePlanItem",
+    "CoursePlanSession",
+    "CoursePlanUnit",
     "ForumPost",
     "ForumTopic",
     "Message",

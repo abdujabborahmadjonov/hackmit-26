@@ -440,6 +440,108 @@ export interface PlanningResponse {
   pitfalls: PitfallItem[];
 }
 
+export type CoursePlanStatus = "draft" | "active" | "archived";
+export type CoursePlanItemRole = "core" | "extension" | "assessment";
+
+export interface CoursePlanGenerateInput {
+  title: string;
+  subject: string;
+  level: string;
+  format: ClassFormat;
+  duration_weeks: number;
+  sessions_per_week?: number;
+  class_size?: number | null;
+  class_size_min?: number | null;
+  class_size_max?: number | null;
+  class_length_minutes?: number | null;
+  goals?: string | null;
+  constraints?: string | null;
+  student_background?: string | null;
+  technology?: string | null;
+  notes?: string | null;
+  topic_hints?: string[];
+  class_profile_id?: string | null;
+}
+
+export interface CoursePlanItem {
+  id: string;
+  position: number;
+  role: CoursePlanItemRole;
+  resource_id: string | null;
+  technique_id: string | null;
+  resource_title: string | null;
+  technique_title: string | null;
+}
+
+export interface CoursePlanSession {
+  id: string;
+  position: number;
+  title: string;
+  focus: string | null;
+  activities_summary: string | null;
+  items: CoursePlanItem[];
+}
+
+export interface CoursePlanUnit {
+  id: string;
+  position: number;
+  title: string;
+  objectives: string | null;
+  concept_labels: string[];
+  sessions: CoursePlanSession[];
+}
+
+export interface CoursePlanSummary {
+  id: string;
+  teacher_id: string;
+  class_profile_id: string | null;
+  title: string;
+  subject: string;
+  level: string;
+  format: ClassFormat;
+  status: CoursePlanStatus;
+  duration_weeks: number;
+  sessions_per_week: number;
+  goals: string | null;
+  overview: string | null;
+  unit_count: number;
+  created_at: string;
+  updated_at: string;
+}
+
+export interface CoursePlan extends Omit<CoursePlanSummary, "unit_count"> {
+  constraints: string | null;
+  generation_inputs: Record<string, unknown>;
+  similar_class_ids: string[];
+  similar_classes: {
+    id: string;
+    title: string;
+    subject: string;
+    level: string;
+    format: string;
+  }[];
+  units: CoursePlanUnit[];
+}
+
+export interface CoursePlanStructureInput {
+  overview?: string | null;
+  units: {
+    title: string;
+    objectives?: string | null;
+    concept_labels?: string[];
+    sessions: {
+      title: string;
+      focus?: string | null;
+      activities_summary?: string | null;
+      items: {
+        role?: CoursePlanItemRole;
+        resource_id?: string | null;
+        technique_id?: string | null;
+      }[];
+    }[];
+  }[];
+}
+
 export interface RatingLink {
   id: string;
   technique_id: string;
