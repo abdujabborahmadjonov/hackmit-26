@@ -18,6 +18,7 @@ from app.api import (
     auth,
     class_profiles,
     connections,
+    course_plans,
     forum,
     mentors,
     messages,
@@ -82,6 +83,10 @@ TAGS_METADATA = [
     {"name": "messages", "description": "Direct messaging (HTTPS transport security only)."},
     {"name": "forum", "description": "Public discussion topics and replies between educators."},
     {"name": "class-profiles", "description": "Per-class teaching context for technique search."},
+    {
+        "name": "course-plans",
+        "description": "AI class plan generator grounded in resources, techniques, and peer classes.",
+    },
     {"name": "techniques", "description": "Teaching technique cards, drafts, and student ratings."},
     {
         "name": "technique-search",
@@ -199,6 +204,7 @@ def create_app() -> FastAPI:
         messages.router,
         forum.router,
         class_profiles.router,
+        course_plans.router,
         techniques.router,
         technique_search.router,
     ):

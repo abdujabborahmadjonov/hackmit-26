@@ -15,7 +15,7 @@ import logging
 from collections.abc import AsyncIterator
 from typing import Any
 
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, Field, model_validator
 
 from app.config import settings
 from app.taxonomy import (
@@ -44,7 +44,7 @@ def is_enabled() -> bool:
     return bool(settings.llm_api_key)
 
 
-def _client() -> Any:
+def _client(*, timeout: float = 45.0) -> Any:
     if not is_enabled():
         raise LLMUnavailable(
             "Generative features need LLM_API_KEY (an Anthropic API key). "
@@ -54,7 +54,7 @@ def _client() -> Any:
         from anthropic import AsyncAnthropic
     except ImportError as exc:  # pragma: no cover - dependency is in requirements
         raise LLMUnavailable("The 'anthropic' package is not installed") from exc
-    return AsyncAnthropic(api_key=settings.llm_api_key, timeout=45.0)
+    return AsyncAnthropic(api_key=settings.llm_api_key, timeout=timeout)
 
 
 # --------------------------------------------------------------------------- #
@@ -747,3 +747,264 @@ async def stream_mentor_reply(
 
     if on_sources is not None and sources:
         on_sources(sources)
+
+
+# --------------------------------------------------------------------------- #
+# Class plan generation (retrieve-then-generate, grounded IDs only)
+# --------------------------------------------------------------------------- #
+
+
+class GeneratedPlanItem(BaseModel):
+    resource_id: str = ""
+    technique_id: str = ""
+    role: str = "core"
+
+
+def _as_text(value: Any) -> str:
+    if value is None:
+        return ""
+    if isinstance(value, list):
+        return "; ".join(str(x) for x in value)
+    return str(value)
+
+
+class GeneratedPlanSession(BaseModel):
+    title: str = ""
+    focus: str = ""
+    activities_summary: str = ""
+    items: list[GeneratedPlanItem] = Field(default_factory=list)
+
+    @model_validator(mode="before")
+    @classmethod
+    def coerce_text_fields(cls, data: Any) -> Any:
+        if not isinstance(data, dict):
+            return data
+        out = dict(data)
+        for key in ("focus", "activities_summary", "title"):
+            if key in out:
+                out[key] = _as_text(out.get(key))
+        return out
+
+
+class GeneratedPlanUnit(BaseModel):
+    title: str = ""
+    objectives: str = ""
+    concept_labels: list[str] = Field(default_factory=list)
+    sessions: list[GeneratedPlanSession] = Field(default_factory=list)
+
+    @model_validator(mode="before")
+    @classmethod
+    def coerce_text_fields(cls, data: Any) -> Any:
+        if not isinstance(data, dict):
+            return data
+        out = dict(data)
+        for key in ("objectives", "title"):
+            if key in out:
+                out[key] = _as_text(out.get(key))
+        labels = out.get("concept_labels")
+        if isinstance(labels, str):
+            out["concept_labels"] = [
+                part.strip() for part in labels.split(",") if part.strip()
+            ]
+        elif labels is None:
+            out["concept_labels"] = []
+        return out
+
+
+class GeneratedCoursePlan(BaseModel):
+    title: str = ""
+    overview: str = ""
+    units: list[GeneratedPlanUnit] = Field(default_factory=list)
+    cannot_generate: bool = False
+    cannot_generate_reason: str = ""
+    confidence: str = "medium"
+
+    @model_validator(mode="before")
+    @classmethod
+    def coerce_top_level(cls, data: Any) -> Any:
+        if not isinstance(data, dict):
+            return data
+        out = dict(data)
+        flag = out.get("cannot_generate")
+        if isinstance(flag, str):
+            out["cannot_generate"] = flag.strip().lower() in {"true", "1", "yes"}
+        conf = out.get("confidence")
+        if conf is not None and not isinstance(conf, str):
+            out["confidence"] = str(conf)
+        for key in ("title", "overview", "cannot_generate_reason"):
+            if key in out:
+                out[key] = _as_text(out.get(key))
+        return out
+
+
+COURSE_PLAN_SYSTEM = f"""You design high-level multi-week class plans for educators.
+
+You receive:
+- A brief describing the class the teacher wants
+- Candidate RESOURCES (shared materials) with UUIDs
+- Candidate TECHNIQUES (teaching strategies) with UUIDs
+- Similar peer CLASS PROFILES (structure/pacing inspiration only)
+
+Hard rules:
+- Use ONLY resource_id and technique_id values from the candidate lists. Never invent UUIDs.
+- Every session MUST include at least one item with a resource_id from the candidate list.
+- Techniques are optional extras when a good match exists.
+- Prefer pacing ideas from similar peer classes when they fit the brief.
+- Keep units high-level: title, objectives, concept labels, and short session focus notes — not full lesson scripts.
+- Cover approximately duration_weeks × sessions_per_week sessions, grouped into sensible units.
+- Education levels must stay within: {', '.join(EDUCATION_LEVELS)}.
+- When candidate resources share the brief's subject (even if titles are imperfect topic matches),
+  still generate a plan and cite the best-fit resources as supporting materials. Note imperfect
+  topic fit briefly in overview — do not refuse solely for imperfect topic alignment.
+- Set cannot_generate=true ONLY when the candidate resource list is empty or clearly unusable
+  (wrong field entirely with no subject-compatible IDs). Do not invent citations.
+
+Return ONLY a JSON object with keys:
+title, overview, units, cannot_generate, cannot_generate_reason, confidence
+
+units is an array of {{title, objectives, concept_labels, sessions}}
+sessions is an array of {{title, focus, activities_summary, items}}
+items is an array of {{resource_id, technique_id, role}} where role is core|extension|assessment
+Use "" for unused optional string fields. cannot_generate is a boolean.
+confidence must be a string such as "high", "medium", or "low" — never a number.
+"""
+
+
+def _format_resource_candidates(resources: list[Any]) -> str:
+    lines: list[str] = []
+    for r in resources:
+        lines.append(
+            f"- id={r.id} | {r.title}"
+            + (f" | type={r.resource_type}" if r.resource_type else "")
+            + (f" | subject={r.subject}" if r.subject else "")
+            + (f" | level={r.education_level}" if r.education_level else "")
+        )
+        if r.description:
+            lines.append(f"  {str(r.description)[:180]}")
+    return "\n".join(lines) if lines else "(none)"
+
+
+def _format_technique_candidates(techniques: list[Any]) -> str:
+    lines: list[str] = []
+    for t in techniques:
+        lines.append(
+            f"- id={t.id} | {t.title}"
+            + (f" | subject={t.context_subject}" if t.context_subject else "")
+            + (f" | level={t.context_level}" if t.context_level else "")
+        )
+        lines.append(f"  {str(t.summary)[:180]}")
+    return "\n".join(lines) if lines else "(none)"
+
+
+def _format_similar_classes(classes: list[Any]) -> str:
+    lines: list[str] = []
+    for c in classes:
+        size = c.effective_class_size() if hasattr(c, "effective_class_size") else None
+        lines.append(
+            f"- {c.title} | {c.subject}/{c.level}/{c.format}"
+            + (f" | ~{int(size)} students" if size else "")
+            + (f" | {c.class_length_minutes} min" if c.class_length_minutes else "")
+        )
+        if c.notes:
+            lines.append(f"  notes: {str(c.notes)[:160]}")
+        if c.constraints:
+            lines.append(f"  constraints: {str(c.constraints)[:160]}")
+    return "\n".join(lines) if lines else "(none)"
+
+
+async def generate_course_plan_outline(
+    *,
+    brief: dict[str, Any],
+    resources: list[Any],
+    techniques: list[Any],
+    similar_classes: list[Any],
+    existing_overview: str | None = None,
+    unit_focus: dict[str, Any] | None = None,
+) -> GeneratedCoursePlan:
+    """Produce a grounded course outline. Caller validates IDs against candidates."""
+    import json
+    import re
+
+    client = _client(timeout=180.0)
+    total_sessions = int(brief.get("duration_weeks", 1)) * int(
+        brief.get("sessions_per_week", 1)
+    )
+    user_parts = [
+        "CLASS BRIEF:",
+        f"  title: {brief.get('title')}",
+        f"  subject: {brief.get('subject')}",
+        f"  level: {brief.get('level')}",
+        f"  format: {brief.get('format')}",
+        f"  duration_weeks: {brief.get('duration_weeks')}",
+        f"  sessions_per_week: {brief.get('sessions_per_week')}",
+        f"  target_session_count: ~{total_sessions}",
+        f"  class_size: {brief.get('class_size') or brief.get('class_size_min') or 'unspecified'}",
+        f"  goals: {brief.get('goals') or 'unspecified'}",
+        f"  constraints: {brief.get('constraints') or 'none'}",
+        f"  student_background: {brief.get('student_background') or 'unspecified'}",
+        f"  technology: {brief.get('technology') or 'unspecified'}",
+        f"  topic_hints: {', '.join(brief.get('topic_hints') or []) or 'none'}",
+        "",
+        "CANDIDATE RESOURCES (cite by id):",
+        _format_resource_candidates(resources),
+        "",
+        "CANDIDATE TECHNIQUES (optional extras, cite by id):",
+        _format_technique_candidates(techniques),
+        "",
+        "SIMILAR PEER CLASSES (pacing inspiration only):",
+        _format_similar_classes(similar_classes),
+    ]
+    if unit_focus:
+        user_parts += [
+            "",
+            "REGENERATE ONLY THIS UNIT (keep other units out of the response):",
+            f"  unit_index: {unit_focus.get('position')}",
+            f"  current_title: {unit_focus.get('title')}",
+            f"  current_objectives: {unit_focus.get('objectives') or ''}",
+            "Return a full plan JSON but with units containing ONLY the regenerated unit.",
+        ]
+    if existing_overview:
+        user_parts += ["", f"Prior plan overview for continuity: {existing_overview[:800]}"]
+
+    try:
+        response = await client.beta.messages.create(
+            model=MODEL,
+            max_tokens=8000,
+            system=COURSE_PLAN_SYSTEM,
+            messages=[{"role": "user", "content": "\n".join(user_parts)}],
+            betas=[FALLBACK_BETA],
+            fallbacks="default",
+        )
+    except Exception as exc:
+        logger.warning("Class plan generation failed: %s", exc)
+        raise LLMUnavailable(f"Class plan generation failed: {exc}") from exc
+
+    raw = "".join(
+        block.text for block in response.content if getattr(block, "type", None) == "text"
+    ).strip()
+    if not raw:
+        raise LLMUnavailable("The model returned an empty class plan.")
+
+    # Strip common fences / leading prose before the JSON object.
+    cleaned = raw
+    fence = re.search(r"```(?:json)?\s*([\s\S]*?)```", cleaned, re.IGNORECASE)
+    if fence:
+        cleaned = fence.group(1).strip()
+    else:
+        start = cleaned.find("{")
+        end = cleaned.rfind("}")
+        if start >= 0 and end > start:
+            cleaned = cleaned[start : end + 1]
+
+    try:
+        payload = json.loads(cleaned)
+        if not isinstance(payload, dict):
+            raise ValueError("expected object")
+        return GeneratedCoursePlan.model_validate(payload)
+    except Exception as exc:
+        logger.warning(
+            "Class plan JSON parse failed (%s). Raw head: %s",
+            exc,
+            raw[:500],
+        )
+        raise LLMUnavailable("The model did not return a usable class plan.") from exc
