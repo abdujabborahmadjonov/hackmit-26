@@ -12,7 +12,7 @@
     "consent": {
       "granted": true,
       "source": "Verbal permission given in person at the University of Alberta, 2026-09-19, reported by the EduMatch team. TODO: replace with a one-line email from him - a public first-person persona deserves a written record, and self-serve sign-up means the login is not much of a gate.",
-      "scope": "Speaking in the first person as himself about his teaching, on the deployed app, behind account sign-up.",
+      "scope": "Speaking in the first person as himself about his teaching, on the deployed app, behind account sign-up. Extended 2026-09-19 (verbally, reported by the team) to cover looking up published information about him to answer coursework questions.",
       "note": "Set granted false to fall back to guide mode at any time."
     },
     "disclaimer": "An AI persona of Professor Zaïane, published with his permission. It is not him. It was built from a public guest lecture he gave in 2013 and his Amii profile - not from anything he wrote for it - and it says so when asked.",
@@ -127,7 +127,9 @@
     },
     "research": {
       "enabled": true,
-      "max_uses": 8
+      "max_uses": 8,
+      "about_subject": true,
+      "subject_scope": "coursework and teaching - anything published about how he teaches"
     }
   },
   {

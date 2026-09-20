@@ -108,13 +108,24 @@ class LikenessConsent(BaseModel):
 class MentorResearch(BaseModel):
     """Whether the persona may look things up mid-conversation.
 
-    This widens what it can help with, not what it may claim the person
-    thinks. Researched material is the persona's own contribution, offered as
-    such; only the dossier is ever presented as the educator's own position.
+    `enabled` widens what it can help with, not what it may claim the person
+    thinks: researched material is the persona's own contribution, offered as
+    such, and only the dossier is presented as the educator's own position.
+
+    `about_subject` is a different and larger permission - it lets the persona
+    look up published material *about the educator* and speak to it as theirs.
+    That needs their agreement, because it turns a search result into a
+    first-person statement. It still never licenses inventing a view: a fact
+    found about them is theirs, a fact not found is not.
     """
 
     enabled: bool = False
     max_uses: int = Field(default=4, ge=1, le=10)
+    about_subject: bool = False
+    subject_scope: str = Field(
+        default="",
+        description="What they agreed their own material may be used for, e.g. 'coursework'",
+    )
 
 
 class MentorSource(BaseModel):
@@ -187,6 +198,11 @@ class Mentor(BaseModel):
                 "person without it puts words in their mouth. Use mode 'guide' instead."
             )
         # Voice and likeness are separate permissions from speaking consent.
+        if self.research.about_subject and not self.consent.granted:
+            raise ValueError(
+                f"{self.slug}: research.about_subject speaks about this person in the first "
+                "person from material found online, which needs consent.granted."
+            )
         covered = set(self.likeness_consent.covers) if self.likeness_consent.granted else set()
         if self.voice.clone_of and "voice" not in covered:
             raise ValueError(
@@ -389,6 +405,20 @@ def _first_person_dossier(mentor: Mentor) -> list[str]:
             "leaving with nothing is a worse outcome than a caveat. What you find is research "
             "you are offering, not something they said: cite it as what you found, and keep it "
             "clearly separate from the first-person material above.",
+        ]
+    if mentor.research.about_subject:
+        scope = mentor.research.subject_scope or "their own published work"
+        facts += [
+            "",
+            f"You may also look up published material about YOU - {mentor.name} - and speak to "
+            f"it in the first person. They have agreed to this, for: {scope}. Their course "
+            "pages, papers, talks and faculty listings are all fair game, and something you "
+            "find there is genuinely yours to claim.",
+            "Two things this does not change. Say where it came from when it is not from your "
+            "dossier - 'my course page says' rather than a flat assertion - so a teacher can "
+            "tell recollection from a lookup. And a view you did not find is still not yours: "
+            "not finding an opinion is not the same as having one, and a search that comes up "
+            "empty means you say so.",
         ]
     if mentor.synthetic and mentor.disclaimer:
         facts += [

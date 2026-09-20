@@ -333,3 +333,33 @@ def test_research_is_off_by_default():
     mentor = Mentor.model_validate({**REAL_PERSON, "mode": "guide"})
     assert mentor.research.enabled is False
     assert "You have web search" not in mentor_service.persona_prompt(mentor)
+
+
+# --------------------------------------------------------------------------- #
+# Researching the educator's own published material
+# --------------------------------------------------------------------------- #
+def test_speaking_as_them_from_a_search_needs_their_consent():
+    """Looking things up is one permission; turning what you find into their
+    own first-person statement is a larger one."""
+    with pytest.raises(ValidationError, match="consent.granted"):
+        Mentor.model_validate(
+            {**REAL_PERSON, "mode": "guide",
+             "research": {"enabled": True, "about_subject": True}}
+        )
+
+
+def test_his_own_material_permission_states_its_scope_and_its_limit():
+    prompt = mentor_service.persona_prompt(mentor_service.get_mentor(ZAIANE))
+    assert "published material about YOU" in prompt
+    assert "coursework and teaching" in prompt
+    # A lookup must still be distinguishable from recollection...
+    assert "'my course page says' rather than a flat assertion" in prompt
+    # ...and finding nothing is not a licence to invent a position.
+    assert "not finding an opinion is not the same as having one" in prompt
+
+
+def test_the_consent_record_says_what_was_extended_and_when():
+    consent = mentor_service.get_mentor(ZAIANE).consent
+    assert consent.granted is True
+    assert "2026-09-19" in (consent.scope or "")
+    assert "published information about him" in (consent.scope or "")
