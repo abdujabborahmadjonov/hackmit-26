@@ -122,12 +122,20 @@ async function request<T>(
 
 /** Mentor chat streams, so it bypasses `request()` and reads the body itself.
  *  EventSource is not an option: it cannot POST and cannot send the token. */
+export interface ResearchedPage {
+  url: string;
+  title: string;
+}
+
 export interface MentorReplyEnd {
   /** The sources this reply actually cited, in the order it cited them. */
   citations: MentorSource[];
   /** Keys the model wrote that match no source. The server checks; we show
    *  them as unverified rather than pretending they are references. */
   unverified: string[];
+  /** Pages looked up mid-answer. Deliberately separate from `citations`:
+   *  those are the educator's own material, these are not. */
+  researched: ResearchedPage[];
 }
 
 export async function streamMentorChat(
@@ -136,6 +144,9 @@ export async function streamMentorChat(
   options: {
     onDelta: (text: string) => void;
     onEnd?: (end: MentorReplyEnd) => void;
+    /** Fires when the mentor starts looking something up. A search can add
+     *  half a minute, and a silent spinner that long reads as a hang. */
+    onSearching?: (query: string | null) => void;
     signal?: AbortSignal;
   },
 ): Promise<void> {
@@ -176,15 +187,19 @@ export async function streamMentorChat(
           detail?: string;
           citations?: MentorSource[];
           unverified?: string[];
+          researched?: ResearchedPage[];
+          query?: string | null;
         })
       : {};
     if (event === "delta" && payload.text) options.onDelta(payload.text);
+    if (event === "searching") options.onSearching?.(payload.query ?? null);
     // The 200 was sent before the model spoke, so a failure arrives in-band.
     if (event === "error") throw new ApiError(502, payload.detail ?? "The conversation dropped.");
     if (event === "done") {
       options.onEnd?.({
         citations: payload.citations ?? [],
         unverified: payload.unverified ?? [],
+        researched: payload.researched ?? [],
       });
       return true;
     }

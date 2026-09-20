@@ -83,9 +83,16 @@ async def converse(slug: str | None, viewer_description: str | None) -> int:
         print()
         reply = ""
         try:
-            async for chunk in llm_service.stream_mentor_reply(persona, viewer, turns):
-                reply += chunk
-                print(chunk, end="", flush=True)
+            async for piece in llm_service.stream_mentor_reply(
+                persona, viewer, turns,
+                research=mentor.research.enabled, max_searches=mentor.research.max_uses,
+            ):
+                if piece["type"] == "search":
+                    query = piece.get("query")
+                    print(f"{DIM}[searching{': ' + query if query else ''}]{OFF}", flush=True)
+                    continue
+                reply += piece["text"]
+                print(piece["text"], end="", flush=True)
         except LLMUnavailable as exc:
             print(f"\n{WARN}{exc}{OFF}\n")
             turns.pop()

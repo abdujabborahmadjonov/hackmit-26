@@ -3,6 +3,7 @@ import { Link, useNavigate, useParams } from "react-router-dom";
 import { api, streamMentorChat } from "../api/client";
 import type { MentorReplyEnd } from "../api/client";
 import type { ChatTurn, Mentor as MentorPersona, MentorSource } from "../api/types";
+import type { ResearchedPage } from "../api/client";
 // Three.js is ~500kB and most visitors never open voice mode, so it is only
 // fetched when someone actually switches to it.
 const VoiceMode = lazy(() =>
@@ -24,6 +25,7 @@ import {
 interface Turn extends ChatTurn {
   citations?: MentorSource[];
   unverified?: string[];
+  researched?: ResearchedPage[];
 }
 
 /** A live conversation with a mentor.
@@ -44,6 +46,7 @@ export default function Mentor() {
   const [loading, setLoading] = useState(true);
   const [turns, setTurns] = useState<Turn[]>([]);
   const [streaming, setStreaming] = useState<string | null>(null);
+  const [searching, setSearching] = useState<string | null>(null);
   const [draft, setDraft] = useState("");
   const [error, setError] = useState<unknown>(null);
   const [mode, setMode] = useState<"text" | "voice">("text");
@@ -67,6 +70,7 @@ export default function Mentor() {
     abort.current?.abort();
     setTurns([]);
     setStreaming(null);
+    setSearching(null);
     setError(null);
     setMode("text");
   }, [slug]);
@@ -84,6 +88,7 @@ export default function Mentor() {
     setDraft("");
     setError(null);
     setStreaming("");
+    setSearching(null);
 
     const controller = new AbortController();
     abort.current = controller;
@@ -98,7 +103,9 @@ export default function Mentor() {
         onDelta: (chunk) => {
           reply += chunk;
           setStreaming(reply);
+          setSearching(null);
         },
+        onSearching: (query) => setSearching(query ?? ""),
         onEnd: (payload) => {
           finished.end = payload;
         },
@@ -110,6 +117,7 @@ export default function Mentor() {
           content: reply,
           citations: finished.end?.citations,
           unverified: finished.end?.unverified,
+          researched: finished.end?.researched,
         },
       ]);
     } catch (err) {
@@ -121,6 +129,7 @@ export default function Mentor() {
       else setTurns(turns);
     } finally {
       setStreaming(null);
+      setSearching(null);
       abort.current = null;
       input.current?.focus();
     }
@@ -265,6 +274,7 @@ export default function Mentor() {
               avatar={mentor.avatar_url}
               citations={turn.citations}
               unverified={turn.unverified}
+              researched={turn.researched}
             >
               {turn.content}
             </Bubble>
@@ -280,7 +290,11 @@ export default function Mentor() {
               ) : (
                 <span className="inline-flex items-center gap-2 text-muted">
                   <Spinner className="h-4 w-4" />
-                  reading the sources
+                  {searching === null
+                    ? "reading his material"
+                    : searching
+                      ? `searching the web — ${searching}`
+                      : "searching the web…"}
                 </span>
               )}
             </Bubble>
@@ -387,6 +401,7 @@ function Bubble({
   avatar,
   citations,
   unverified,
+  researched,
   children,
 }: {
   from: "you" | "mentor";
@@ -394,6 +409,7 @@ function Bubble({
   avatar?: string;
   citations?: MentorSource[];
   unverified?: string[];
+  researched?: ResearchedPage[];
   children: React.ReactNode;
 }) {
   const mine = from === "you";
@@ -431,6 +447,31 @@ function Bubble({
               </li>
             ))}
           </ul>
+        )}
+
+        {/* Looked up mid-answer. Labelled as the persona's research rather
+            than the educator's own material - the distinction is the point. */}
+        {!!researched?.length && (
+          <details className="mt-2 pl-1">
+            <summary className="cursor-pointer text-xs text-muted hover:text-ink">
+              Looked up {researched.length} source{researched.length === 1 ? "" : "s"} — not his
+              own material
+            </summary>
+            <ul className="mt-1 space-y-1">
+              {researched.map((page) => (
+                <li key={page.url} className="text-xs leading-5 text-muted">
+                  <a
+                    className="underline decoration-line underline-offset-2 hover:text-ink"
+                    href={page.url}
+                    target="_blank"
+                    rel="noreferrer noopener"
+                  >
+                    {page.title || page.url}
+                  </a>
+                </li>
+              ))}
+            </ul>
+          </details>
         )}
 
         {/* The server could not match these keys to a source, so they are not

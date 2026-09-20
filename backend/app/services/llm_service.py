@@ -245,38 +245,131 @@ async def extract_profile_from_document(
 # --------------------------------------------------------------------------- #
 # Mentor chat
 # --------------------------------------------------------------------------- #
+# Anthropic-hosted search: it runs server side, so there is no second provider
+# and no key of ours in the browser.
+WEB_SEARCH_TOOL = "web_search_20260209"
+# A server tool can hand the turn back mid-search; each pause is one more round
+# trip, and this caps how many we will follow before giving up.
+MAX_PAUSE_TURNS = 3
+
+
+def web_sources(message: Any) -> list[dict[str, str]]:
+    """The pages a reply actually consulted, for the client to show.
+
+    A failed search comes back as HTTP 200 with an error object where the
+    result list would be, so the shape is checked rather than assumed.
+    """
+    found: list[dict[str, str]] = []
+    seen: set[str] = set()
+    for block in getattr(message, "content", []) or []:
+        if getattr(block, "type", None) != "web_search_tool_result":
+            continue
+        results = getattr(block, "content", None)
+        if not isinstance(results, list):  # an error object, not results
+            logger.info("Web search returned an error block: %s", results)
+            continue
+        for result in results:
+            url = getattr(result, "url", "")
+            if url and url not in seen:
+                seen.add(url)
+                found.append({"url": url, "title": getattr(result, "title", "") or url})
+    return found
+
+
 async def stream_mentor_reply(
     persona_prompt: str,
     viewer_prompt: str,
     messages: list[dict[str, str]],
     *,
-    max_tokens: int = 1200,
-) -> AsyncIterator[str]:
-    """Stream one reply, token by token, as the persona.
+    max_tokens: int = 1600,
+    research: bool = False,
+    max_searches: int = 6,
+    on_sources: Any = None,
+) -> AsyncIterator[dict]:
+    """Stream one reply, as the persona, in pieces.
+
+    Yields `{"type": "text", ...}` for prose and `{"type": "search", ...}` when the
+    model goes looking something up. A search can add half a minute, and a
+    spinner that says nothing for that long reads as broken - so the client
+    is told what is happening rather than left guessing.
 
     The persona dossier is the same for every viewer, so it goes first behind a
     cache breakpoint; the viewer's own profile follows it and varies per user.
+
+    With `research`, the model can search the web mid-answer, which lets it help
+    with questions the dossier does not cover. What it finds is the persona's
+    own contribution, not the educator's view - the prompt is what keeps those
+    apart, and `on_sources` receives the pages consulted so the client can show
+    where the researched half came from.
     """
     client = _client()
     system = [
         {"type": "text", "text": persona_prompt, "cache_control": {"type": "ephemeral"}},
         {"type": "text", "text": viewer_prompt},
     ]
-    try:
-        async with client.beta.messages.stream(
-            model=MODEL,
-            max_tokens=max_tokens,
-            system=system,
-            messages=messages,
-            betas=[FALLBACK_BETA],
-            fallbacks="default",
-        ) as stream:
-            async for chunk in stream.text_stream:
-                yield chunk
-            final = await stream.get_final_message()
-    except Exception as exc:
-        logger.warning("Mentor chat failed: %s", exc)
-        raise LLMUnavailable(f"The conversation dropped: {exc}") from exc
+    tools = (
+        [{"type": WEB_SEARCH_TOOL, "name": "web_search", "max_uses": max_searches}]
+        if research
+        else []
+    )
 
-    if getattr(final, "stop_reason", None) == "refusal":
-        raise LLMUnavailable("The model declined to answer this one.")
+    turns: list[Any] = list(messages)
+    sources: list[dict[str, str]] = []
+    wrote_text = False
+    searched_since_text = False
+
+    for _ in range(MAX_PAUSE_TURNS + 1):
+        try:
+            async with client.beta.messages.stream(
+                model=MODEL,
+                max_tokens=max_tokens,
+                system=system,
+                messages=turns,
+                tools=tools,
+                betas=[FALLBACK_BETA],
+                fallbacks="default",
+            ) as stream:
+                # Events rather than `text_stream`: a search sits between two
+                # text blocks, and concatenating them gives "...my view.I then
+                # looked". Citations also split prose into many text blocks
+                # though, so the break goes only where a *search* interrupted
+                # it - not at every block boundary.
+                async for event in stream:
+                    if event.type == "content_block_start":
+                        kind = getattr(event.content_block, "type", None)
+                        if kind == "text":
+                            if wrote_text and searched_since_text:
+                                yield {"type": "text", "text": "\n\n"}
+                            searched_since_text = False
+                        else:
+                            searched_since_text = True
+                            if kind == "server_tool_use":
+                                yield {"type": "search"}
+                    elif event.type == "input_json":
+                        # The search query arrives as it is composed; show it.
+                        query = getattr(event, "snapshot", None)
+                        if isinstance(query, dict) and query.get("query"):
+                            yield {"type": "search", "query": str(query["query"])[:120]}
+                    elif event.type == "text":
+                        wrote_text = True
+                        yield {"type": "text", "text": event.text}
+                final = await stream.get_final_message()
+        except Exception as exc:
+            logger.warning("Mentor chat failed: %s", exc)
+            raise LLMUnavailable(f"The conversation dropped: {exc}") from exc
+
+        for source in web_sources(final):
+            if source not in sources:
+                sources.append(source)
+
+        if getattr(final, "stop_reason", None) == "refusal":
+            raise LLMUnavailable("The model declined to answer this one.")
+
+        # The search tool hit its own iteration limit; hand the turn back.
+        if getattr(final, "stop_reason", None) == "pause_turn":
+            turns.append({"role": "assistant", "content": final.content})
+            continue
+        break
+
+    if on_sources is not None and sources:
+        on_sources(sources)

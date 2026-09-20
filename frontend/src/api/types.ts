@@ -259,6 +259,8 @@ export interface Mentor {
   /** Absent when the API predates voice mode - always guard. */
   voice?: MentorVoice;
   avatar?: MentorAvatar;
+  /** Whether this persona may look things up mid-conversation. */
+  research?: boolean;
   synthetic: boolean;
   disclaimer: string;
   subjects: string[];

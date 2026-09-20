@@ -91,6 +91,7 @@ class MentorCard(BaseModel):
     avatar_url: str
     voice: MentorVoice
     avatar: MentorAvatar
+    research: bool
     synthetic: bool
     disclaimer: str
     subjects: list[str]
@@ -122,6 +123,7 @@ class MentorCard(BaseModel):
             avatar_url=mentor.avatar_url,
             voice=mentor.voice,
             avatar=mentor.avatar,
+            research=mentor.research.enabled,
             synthetic=mentor.synthetic,
             disclaimer=mentor.disclaimer,
             subjects=mentor.teaches.subjects,
@@ -210,10 +212,34 @@ async def chat(slug: str, body: ChatRequest, current_user: CurrentUser, db: DB) 
 
     async def events() -> AsyncIterator[str]:
         reply: list[str] = []
+        researched: list[dict] = []
         try:
-            async for chunk in llm_service.stream_mentor_reply(persona, viewer, turns):
-                reply.append(chunk)
-                yield _sse("delta", {"text": chunk})
+            # A distinct sentinel: `None` is a legitimate query value (the first
+            # search event fires before the query text has been composed), so
+            # initialising to None swallows the first announcement.
+            unset = object()
+            last_query: object = unset
+            async for piece in llm_service.stream_mentor_reply(
+                persona,
+                viewer,
+                turns,
+                research=mentor.research.enabled,
+                max_searches=mentor.research.max_uses,
+                on_sources=researched.extend,
+            ):
+                # A stub in the tests may still yield plain text.
+                if isinstance(piece, str):
+                    piece = {"type": "text", "text": piece}
+                if piece["type"] == "text":
+                    reply.append(piece["text"])
+                    yield _sse("delta", {"text": piece["text"]})
+                elif piece["type"] == "search":
+                    # Only when the query actually changes, or a long search
+                    # floods the client with identical frames.
+                    query = piece.get("query")
+                    if query != last_query:
+                        last_query = query
+                        yield _sse("searching", {"query": query})
         except LLMUnavailable as exc:
             yield _sse("error", {"detail": str(exc)})
             return
@@ -229,6 +255,10 @@ async def chat(slug: str, body: ChatRequest, current_user: CurrentUser, db: DB) 
                 "mentor": mentor.slug,
                 "citations": [source.model_dump() for source in cited],
                 "unverified": unknown,
+                # Pages consulted mid-answer. Separate from `citations`, which
+                # are the educator's own material - the client shows them
+                # differently because they mean different things.
+                "researched": researched,
             },
         )
 

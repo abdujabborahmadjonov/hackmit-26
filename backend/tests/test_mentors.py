@@ -37,11 +37,13 @@ def _events(body: str) -> list[tuple[str, dict]]:
     return parsed
 
 
-def _stub_stream(*chunks: str, fail_with: str | None = None):
+def _stub_stream(*chunks: str, fail_with: str | None = None, sources: list[dict] | None = None):
     async def stream(persona, viewer, messages, **kwargs) -> AsyncIterator[str]:
-        stream.seen = {"persona": persona, "viewer": viewer, "messages": messages}
+        stream.seen = {"persona": persona, "viewer": viewer, "messages": messages, **kwargs}
         for chunk in chunks:
             yield chunk
+        if sources and kwargs.get("on_sources"):
+            kwargs["on_sources"](sources)
         if fail_with:
             raise LLMUnavailable(fail_with)
 
@@ -167,8 +169,13 @@ async def test_chat_streams_deltas_then_done(client, monkeypatch):
     assert "".join(p["text"] for name, p in events if name == "delta") == (
         "Silence is a seating problem."
     )
-    # A first-person persona cites nothing, so the footnote list is empty.
-    assert events[-1][1] == {"mentor": SLUG, "citations": [], "unverified": []}
+    # A first-person persona that did not search cites nothing either way.
+    assert events[-1][1] == {
+        "mentor": SLUG,
+        "citations": [],
+        "unverified": [],
+        "researched": [],
+    }
 
 
 async def test_chat_passes_the_persona_the_viewer_and_the_history(client, monkeypatch):
@@ -297,3 +304,71 @@ async def test_the_guide_prompt_never_asks_the_model_to_be_him(client, monkeypat
     persona = stub.seen["persona"]
     assert "You are NOT that educator" in persona
     assert "never role-play as them" in persona
+
+
+# --------------------------------------------------------------------------- #
+# Research: answering past the dossier without claiming it as the person's view
+# --------------------------------------------------------------------------- #
+async def test_research_settings_reach_the_model(client, monkeypatch):
+    monkeypatch.setattr(settings, "llm_api_key", "sk-ant-test")
+    stub = _stub_stream("ok")
+    monkeypatch.setattr(llm_service, "stream_mentor_reply", stub)
+
+    account = await register_with_profile(client, first_name="Alice")
+    await client.post(CHAT, json=HELLO, headers=account["headers"])
+
+    mentor = mentor_service.get_mentor(SLUG)
+    assert stub.seen["research"] is mentor.research.enabled
+    assert stub.seen["max_searches"] == mentor.research.max_uses
+
+
+async def test_pages_consulted_come_back_separately_from_his_own_material(client, monkeypatch):
+    """`citations` are the educator's material; `researched` is what the
+    persona looked up. The client shows them differently because conflating
+    them is exactly the claim we refuse to make."""
+    monkeypatch.setattr(settings, "llm_api_key", "sk-ant-test")
+    pages = [{"url": "https://example.org/study", "title": "A study"}]
+    monkeypatch.setattr(
+        llm_service, "stream_mentor_reply", _stub_stream("Research says x.", sources=pages)
+    )
+
+    account = await register_with_profile(client, first_name="Alice")
+    response = await client.post(CHAT, json=HELLO, headers=account["headers"])
+
+    done = _events(response.text)[-1]
+    assert done[0] == "done"
+    assert done[1]["researched"] == pages
+    assert done[1]["citations"] == []
+
+
+async def test_the_listing_says_whether_a_mentor_can_research(client):
+    by_slug = {m["slug"]: m for m in (await client.get("/mentors")).json()}
+    assert by_slug["osmar-zaiane"]["research"] is True
+
+
+async def test_a_search_is_announced_so_a_long_wait_is_not_a_silent_spinner(
+    client, monkeypatch
+):
+    monkeypatch.setattr(settings, "llm_api_key", "sk-ant-test")
+
+    async def stream(persona, viewer, messages, **kwargs):
+        yield {"type": "text", "text": "Let me look. "}
+        yield {"type": "search"}            # fires before the query is composed
+        yield {"type": "search"}            # same query: must not repeat
+        yield {"type": "search", "query": "peer instruction CS1"}
+        yield {"type": "text", "text": "Here is what I found."}
+
+    monkeypatch.setattr(llm_service, "stream_mentor_reply", stream)
+    account = await register_with_profile(client, first_name="Alice")
+    response = await client.post(CHAT, json=HELLO, headers=account["headers"])
+
+    events = _events(response.text)
+    names = [name for name, _ in events]
+    # The first announcement must survive, even carrying no query yet.
+    assert names == ["delta", "searching", "searching", "delta", "done"]
+    assert [p.get("query") for n, p in events if n == "searching"] == [
+        None,
+        "peer instruction CS1",
+    ]
+    text = "".join(p["text"] for n, p in events if n == "delta")
+    assert text == "Let me look. Here is what I found."

@@ -102,6 +102,18 @@ class LikenessConsent(BaseModel):
     note: str = ""
 
 
+class MentorResearch(BaseModel):
+    """Whether the persona may look things up mid-conversation.
+
+    This widens what it can help with, not what it may claim the person
+    thinks. Researched material is the persona's own contribution, offered as
+    such; only the dossier is ever presented as the educator's own position.
+    """
+
+    enabled: bool = False
+    max_uses: int = Field(default=4, ge=1, le=10)
+
+
 class MentorSource(BaseModel):
     """One piece of published material the guide is allowed to draw on."""
 
@@ -143,6 +155,7 @@ class Mentor(BaseModel):
     avatar_seed: str = ""
     avatar_url: str = Field(default="", description="A photograph, served from the client")
     avatar_credit: str = ""
+    research: MentorResearch = Field(default_factory=MentorResearch)
     voice: MentorVoice = Field(default_factory=MentorVoice)
     avatar: MentorAvatar = Field(default_factory=MentorAvatar)
     likeness_consent: LikenessConsent = Field(default_factory=LikenessConsent)
@@ -250,6 +263,19 @@ How to talk:
   a search engine.
 - No headings, no bullet lists unless they explicitly ask for a list, no emoji.
 
+Two kinds of thing you can say, and they must never blur:
+1. WHAT IS IN YOUR DOSSIER. This is you - your teaching, your views, your experience. Speak it
+   in the first person without hedging.
+2. EVERYTHING ELSE - general knowledge, and anything you look up. Useful, and you should offer
+   it freely rather than refusing, but it is NOT your view and you must not present it as one.
+   Mark it: "that is outside anything I have said publicly, so take this as general, not as my
+   position", "I have not written about that, but what is out there is...". Then be useful.
+- The test before any sentence: would this appear in the dossier? If not, it cannot be framed
+  as something you think, said, do, or have done. An invented opinion in a real person's voice
+  is the one thing you must never produce, and a plausible one is worse than an obvious one.
+- Your own material has a date on it. If someone asks about something after it, say your
+  material stops there, then look at the current position as research rather than recollection.
+
 Non-negotiable:
 - You are an AI persona built by EduMatch, and you say so plainly if you are asked whether you
   are a real person, a human, or an AI. Never claim to be human.
@@ -282,9 +308,12 @@ What you may assert:
   but a common approach is..." with no citation key. Keep that clearly separate from what he
   said.
 
-When you have nothing:
-- "I don't have sourced material on that" is a complete and correct answer. Say it rather than
-  reaching. Offer what the dossier does cover instead, or what the teacher could go and read.
+When the dossier does not cover it:
+- Say so, then help anyway. "He has not written about that" followed by something genuinely
+  useful is the right shape. Never leave a teacher with nothing.
+- If you can search, search, and give them what you find - attributed to what you found, never
+  to him. "I don't have him on that; what the research generally says is X" is honest. "He
+  believes X" when the dossier does not say so is not, whatever you read.
 
 How to talk:
 - A conversation, not an essay. Two to five sentences unless they ask for more.
@@ -350,6 +379,14 @@ def _first_person_dossier(mentor: Mentor) -> list[str]:
     facts += [""] + _lines("Experiences they can draw on", mentor.stories)
     facts += [""] + _lines("What they like working on with other teachers", mentor.collaborates_on)
     facts += [""] + _lines("What they do NOT know", mentor.limits)
+    if mentor.research.enabled:
+        facts += [
+            "",
+            "You have web search. Use it when a question runs past the dossier - a teacher "
+            "leaving with nothing is a worse outcome than a caveat. What you find is research "
+            "you are offering, not something they said: cite it as what you found, and keep it "
+            "clearly separate from the first-person material above.",
+        ]
     if mentor.synthetic and mentor.disclaimer:
         facts += [
             "",

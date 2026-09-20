@@ -149,15 +149,55 @@ export function voicesReady(): Promise<SpeechSynthesisVoice[]> {
   });
 }
 
+/** macOS ships a pile of novelty voices that are unusable for speech.
+ *  They are real SpeechSynthesisVoice entries and will be picked by any
+ *  naive "first English voice" fallback. */
+const NOVELTY = new Set([
+  "albert", "bad news", "bahh", "bells", "boing", "bubbles", "cellos",
+  "good news", "jester", "organ", "superstar", "trinoids", "whisper",
+  "wobble", "zarvox", "junior", "ralph", "fred", "kathy", "princess",
+  "deranged", "hysterical", "bruce", "agnes", "victoria",
+]);
+
+/** Higher is better. Quality varies enormously between engines, and the old
+ *  local macOS voices are the ones people mean when they say it sounds bad. */
+export function voiceScore(voice: SpeechSynthesisVoice): number {
+  const name = voice.name.toLowerCase();
+  if (NOVELTY.has(name)) return -100;
+  if (!voice.lang.toLowerCase().startsWith("en")) return -50;
+
+  let score = 0;
+  // Neural / cloud engines, in rough order of how good they sound.
+  if (name.includes("natural")) score += 60;
+  if (name.includes("google")) score += 50;
+  if (name.includes("premium") || name.includes("enhanced")) score += 40;
+  if (name.includes("siri")) score += 35;
+  // Decent modern local voices.
+  if (/\b(samantha|daniel|karen|moira|tessa|serena|alex|allison|ava|tom|nicky)\b/.test(name))
+    score += 20;
+  // A local voice with no other signal is usually one of the old ones.
+  if (voice.localService && score === 0) score -= 10;
+  if (voice.default) score += 2;
+  return score;
+}
+
+export function usableVoices(voices: SpeechSynthesisVoice[]): SpeechSynthesisVoice[] {
+  return voices
+    .filter((v) => voiceScore(v) > -50)
+    .sort((a, b) => voiceScore(b) - voiceScore(a) || a.name.localeCompare(b.name));
+}
+
 export function pickVoice(
   voices: SpeechSynthesisVoice[],
   prefer: string[],
 ): SpeechSynthesisVoice | null {
   for (const wanted of prefer) {
-    const hit = voices.find((v) => v.name.toLowerCase().includes(wanted.toLowerCase()));
+    const hit = voices.find(
+      (v) => v.name.toLowerCase().includes(wanted.toLowerCase()) && voiceScore(v) > -50,
+    );
     if (hit) return hit;
   }
-  return voices.find((v) => v.lang.startsWith("en") && v.localService) ?? voices[0] ?? null;
+  return usableVoices(voices)[0] ?? voices[0] ?? null;
 }
 
 /** Split streamed text into speakable chunks.

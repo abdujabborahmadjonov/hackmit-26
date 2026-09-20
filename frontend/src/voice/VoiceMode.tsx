@@ -34,6 +34,7 @@ export function VoiceMode({
   const avatarConfig = mentor.avatar ?? { kind: "stylised" as const, accent: "#4f46e5" };
   const [error, setError] = useState<string | null>(null);
   const [live, setLive] = useState("");
+  const [searching, setSearching] = useState<string | null>(null);
   const abort = useRef<AbortController | null>(null);
   // The loop reads the latest transcript without being re-created each turn.
   const turnsRef = useRef(turns);
@@ -47,6 +48,7 @@ export function VoiceMode({
       onTurns(history);
       setError(null);
       setLive("");
+      setSearching(null);
 
       const controller = new AbortController();
       abort.current = controller;
@@ -59,8 +61,10 @@ export function VoiceMode({
           onDelta: (chunk) => {
             reply += chunk;
             setLive(reply);
+            setSearching(null);
             voice.current?.pushText(chunk);
           },
+          onSearching: (query) => setSearching(query ?? ""),
         });
         onTurns([...history, { role: "assistant", content: reply }]);
       } catch (err) {
@@ -71,6 +75,7 @@ export function VoiceMode({
       } finally {
         voice.current?.endStream();
         setLive("");
+        setSearching(null);
         abort.current = null;
       }
     },
@@ -106,12 +111,24 @@ export function VoiceMode({
   return (
     <div className="overflow-hidden rounded-2xl bg-slate-950 ring-1 ring-slate-800">
       <div className="relative">
-        <Avatar3D
-          mouth={v.mouth}
-          state={v.state}
-          accent={avatarConfig.accent}
-          className="h-72 w-full sm:h-96"
-        />
+        <button
+          type="button"
+          onClick={() => {
+            if (!busy) return;
+            abort.current?.abort();
+            v.cancelAll();
+          }}
+          className={"block w-full " + (busy ? "cursor-pointer" : "cursor-default")}
+          aria-label={busy ? "Stop" : undefined}
+          tabIndex={busy ? 0 : -1}
+        >
+          <Avatar3D
+            mouth={v.mouth}
+            state={v.state}
+            accent={avatarConfig.accent}
+            className="h-72 w-full sm:h-96"
+          />
+        </button>
         <div className="pointer-events-none absolute inset-x-0 top-4 text-center">
           <p className="text-sm font-medium text-white/90">{mentor.name}</p>
           <p className="text-xs text-white/45">
@@ -123,7 +140,11 @@ export function VoiceMode({
 
       {/* what is being said, either direction */}
       <div className="min-h-[5.5rem] border-t border-slate-800 px-5 py-4">
-        {v.partial ? (
+        {searching !== null ? (
+          <p className="text-sm leading-6 text-white/55 italic">
+            {searching ? `Looking it up — ${searching}` : "Looking it up…"}
+          </p>
+        ) : v.partial ? (
           <p className="text-sm leading-6 text-white/55 italic">{v.partial}</p>
         ) : shown ? (
           <p className="max-h-32 overflow-y-auto whitespace-pre-line text-sm leading-6 text-white/85">
@@ -137,32 +158,71 @@ export function VoiceMode({
       </div>
 
       <div className="flex items-center gap-3 border-t border-slate-800 px-5 py-4">
+        {/* While he is talking the primary control IS stop - one large target,
+            rather than a small ghost button off to the side. */}
         <button
           type="button"
-          onClick={() => (v.state === "listening" ? v.stopListening() : v.startListening())}
-          disabled={!v.supported.listening}
+          onClick={() => {
+            if (busy) {
+              abort.current?.abort();
+              v.cancelAll();
+            } else if (v.state === "listening") {
+              v.stopListening();
+            } else {
+              v.startListening();
+            }
+          }}
+          disabled={!v.supported.listening && !busy}
           className={
             "press flex h-12 w-12 shrink-0 items-center justify-center rounded-full transition " +
-            (v.state === "listening"
-              ? "bg-rose-500 text-white ring-4 ring-rose-500/25"
-              : "bg-white text-slate-900 hover:bg-white/90 disabled:opacity-40")
+            (busy
+              ? "bg-white text-slate-900 hover:bg-white/90"
+              : v.state === "listening"
+                ? "bg-rose-500 text-white ring-4 ring-rose-500/25"
+                : "bg-white text-slate-900 hover:bg-white/90 disabled:opacity-40")
           }
-          aria-label={v.state === "listening" ? "Stop listening" : "Start talking"}
+          aria-label={busy ? "Stop" : v.state === "listening" ? "Stop listening" : "Start talking"}
         >
-          <svg viewBox="0 0 24 24" className="h-5 w-5" fill="none" stroke="currentColor" strokeWidth="1.9" strokeLinecap="round">
-            <rect x="9" y="3" width="6" height="11" rx="3" />
-            <path d="M5 11a7 7 0 0 0 14 0M12 18v3" />
-          </svg>
+          {busy ? (
+            <svg viewBox="0 0 24 24" className="h-4 w-4" fill="currentColor">
+              <rect x="6" y="6" width="12" height="12" rx="2" />
+            </svg>
+          ) : (
+            <svg viewBox="0 0 24 24" className="h-5 w-5" fill="none" stroke="currentColor" strokeWidth="1.9" strokeLinecap="round">
+              <rect x="9" y="3" width="6" height="11" rx="3" />
+              <path d="M5 11a7 7 0 0 0 14 0M12 18v3" />
+            </svg>
+          )}
         </button>
 
         <div className="min-w-0 flex-1">
-          <p className="text-sm font-medium text-white/90">{LABEL[v.state]}</p>
+          <p className="text-sm font-medium text-white/90">
+            {busy ? "Stop" : LABEL[v.state]}
+          </p>
           <p className="truncate text-xs text-white/40">
-            {v.supported.listening
-              ? "Talking over him interrupts, the way it would with a person."
-              : "Speech recognition needs Chrome or Edge."}
+            {busy
+              ? "Or press Escape. Talking over him also stops it."
+              : v.supported.listening
+                ? "Talking over him interrupts, the way it would with a person."
+                : "Speech recognition needs Chrome or Edge."}
           </p>
         </div>
+
+        {/* Voice quality varies enormously by device, so let them choose. */}
+        {v.voices.length > 1 && (
+          <select
+            value={v.voiceName ?? ""}
+            onChange={(event) => v.selectVoice(event.target.value)}
+            className="max-w-[9.5rem] rounded-lg border-0 bg-white/10 px-2 py-1.5 text-xs text-white/80 focus:outline-none focus-visible:ring-2 focus-visible:ring-white/40"
+            aria-label="Voice"
+          >
+            {v.voices.map((voice) => (
+              <option key={voice.name} value={voice.name} className="text-ink">
+                {voice.name}
+              </option>
+            ))}
+          </select>
+        )}
 
         <Button
           variant="ghost"
@@ -172,19 +232,6 @@ export function VoiceMode({
         >
           {v.muted ? "Unmute" : "Mute"}
         </Button>
-        {busy && (
-          <Button
-            variant="ghost"
-            size="sm"
-            className="text-white/60 hover:bg-white/10 hover:text-white"
-            onClick={() => {
-              abort.current?.abort();
-              v.cancelAll();
-            }}
-          >
-            Stop
-          </Button>
-        )}
       </div>
     </div>
   );

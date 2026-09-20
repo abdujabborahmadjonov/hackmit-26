@@ -233,13 +233,18 @@ def test_the_consented_persona_has_material_and_declares_where_it_came_from():
 
 
 def test_his_limits_carry_the_two_things_a_2013_lecture_cannot_support():
-    """One talk, and an old one. Both have to be in front of the model."""
+    """One talk, and an old one. Both have to be in front of the model.
+
+    Research changed what the persona does about this - it may now look past
+    2013 - but not what it may claim: the date on his own material is still
+    the line between his view and something it found.
+    """
     prompt = mentor_service.persona_prompt(mentor_service.get_mentor(ZAIANE))
     limits = prompt.split("What they do NOT know:")[1]
     assert "2013" in limits
     assert "one lecture, not a career" in limits
-    # It must not extrapolate past the source's date.
-    assert "after 2013" in limits
+    # Anything since has to arrive as research, not as his recollection.
+    assert "research, clearly not as my recollection" in limits
 
 
 def test_the_provenance_file_exists_and_covers_every_source():
@@ -312,3 +317,19 @@ def test_every_shipped_persona_is_stylised_with_a_generic_voice():
         assert mentor.avatar.kind == "stylised", mentor.slug
         assert mentor.voice.clone_of is None, mentor.slug
         assert mentor.likeness_consent.granted is False, mentor.slug
+
+
+def test_research_prompt_separates_his_material_from_what_it_finds():
+    """The whole point of letting it search: it can answer anything, without
+    any of it becoming something the real person is said to think."""
+    prompt = mentor_service.persona_prompt(mentor_service.get_mentor(ZAIANE))
+    assert "You have web search" in prompt
+    assert "they must never blur" in prompt
+    assert "it is NOT your view" in prompt
+    assert "would this appear in the dossier" in prompt
+
+
+def test_research_is_off_by_default():
+    mentor = Mentor.model_validate({**REAL_PERSON, "mode": "guide"})
+    assert mentor.research.enabled is False
+    assert "You have web search" not in mentor_service.persona_prompt(mentor)
