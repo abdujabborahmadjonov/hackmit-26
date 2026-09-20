@@ -16,10 +16,11 @@ import Mentors from "./pages/Mentors";
 import MentorProfile from "./pages/MentorProfile";
 import Forum from "./pages/Forum";
 
+// Mentor is deliberately not here: it is reached from the pinned educators at
+// the top of Discover, where it sits in context with the rest of the network.
 const NAV = [
   { to: "/", label: "Matches", icon: "spark", end: true },
   { to: "/search", label: "Discover", icon: "search" },
-  { to: "/mentor", label: "Mentor", icon: "mentor" },
   { to: "/resources", label: "Resources", icon: "book" },
   { to: "/forum", label: "Forum", icon: "forum" },
   { to: "/connections", label: "Network", icon: "people" },
