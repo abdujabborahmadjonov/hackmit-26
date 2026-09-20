@@ -283,3 +283,73 @@ export interface ProfileDraft {
   confidence: string;
   source_name: string | null;
 }
+
+
+/** One thing a guide is allowed to draw on. Shown as a footnote under a reply. */
+export interface MentorSource {
+  id: string;
+  label: string;
+  url: string;
+  kind: "interview" | "talk" | "book" | "course" | "article" | "other";
+}
+
+export interface MentorVoice {
+  enabled: boolean;
+  provider: "browser" | "none";
+  prefer: string[];
+  pitch: number;
+  rate: number;
+  /** Names a real person this voice imitates. Requires likeness consent, so
+   *  it is null on every persona until someone records that permission. */
+  clone_of: string | null;
+}
+
+export interface MentorAvatar {
+  enabled: boolean;
+  /** "stylised" is an abstract form; "likeness" needs the person's consent. */
+  kind: "stylised" | "character" | "likeness";
+  animated?: boolean;
+  model_url: string;
+  accent: string;
+}
+
+/** An educator you can hold a live conversation with. The persona is data on
+ *  the server - `available` is false when that deployment has no model key.
+ *
+ *  `mode` is the difference that matters: a `first_person` persona speaks as
+ *  the educator (only ever a composite, or someone who agreed to it), while a
+ *  `guide` speaks *about* a real educator's published teaching and cites it. */
+export interface Mentor {
+  slug: string;
+  name: string;
+  title: string;
+  institution: string;
+  mode: "first_person" | "guide";
+  pinned: boolean;
+  location_name: string;
+  known_for: string;
+  tagline: string;
+  avatar_seed: string;
+  avatar_url: string;
+  /** Absent when the API predates voice mode - always guard. */
+  voice?: MentorVoice;
+  avatar?: MentorAvatar;
+  /** Whether this persona may look things up mid-conversation. */
+  research?: boolean;
+  synthetic: boolean;
+  disclaimer: string;
+  subjects: string[];
+  years_experience: number | null;
+  opening_line: string;
+  suggested_questions: string[];
+  collaborates_on: string[];
+  sources: MentorSource[];
+  /** False for a guide whose sources have not been filled in yet. */
+  has_material: boolean;
+  available: boolean;
+}
+
+export interface ChatTurn {
+  role: "user" | "assistant";
+  content: string;
+}
