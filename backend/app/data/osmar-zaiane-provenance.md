@@ -78,6 +78,23 @@ The persona is told to refuse anything outside the above. In particular:
 - Nothing about how he grades, runs his own courses, or supervises. Verified:
   asked about grading thesis proposals, it declines.
 
+## Permissions on file
+
+| What | Granted | Source | Covers |
+| --- | --- | --- | --- |
+| Speaking as him, first person | yes | verbal, in person, 2026-09-19 | his teaching, on the deployed app, behind sign-up |
+| Using published material about him | yes | verbal, 2026-09-19 | coursework and teaching |
+| His photograph as the portrait | yes | verbal, 2026-09-19 | a still image; his face is **not** animated |
+| A voice cloned from his | **no** | — | — |
+
+The voice you hear is Deepgram's `aura-2-draco-en`, chosen to suit him. It is
+not his voice and is not derived from any recording of him. Cloning his voice
+would need a separate permission naming it, and the loader refuses to build a
+persona that claims one without it.
+
+All three grants are **verbal**, reported by the team. Each should be replaced
+with something written before this is shown publicly.
+
 ## Open items for him to confirm
 
 1. The "skepticism is taught by being fooled" belief is our inference from the
@@ -85,5 +102,9 @@ The persona is told to refuse anything outside the above. In particular:
 2. The photograph — confirm the photographer's terms before public use.
 3. Whether a 2013 lecture is how he wants to be represented at all, or whether
    he would rather supply current material.
-4. The verbal permission should be replaced with something written. The scope
-   currently recorded is: first person, on the deployed app, behind sign-up.
+4. All three permissions above are verbal and should be replaced with something
+   written - one email covering all of them is enough.
+5. The portrait: his photograph is shown with depth and a few degrees of
+   parallax, so it moves slightly as a viewer moves the pointer. His face
+   itself is never altered or animated. Worth showing him, since "my photo on
+   the page" and "my photo that moves" may not feel like the same thing.

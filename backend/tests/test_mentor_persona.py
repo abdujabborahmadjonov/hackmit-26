@@ -312,11 +312,34 @@ def test_consent_for_one_does_not_cover_the_other():
         )
 
 
-def test_every_shipped_persona_is_stylised_with_a_generic_voice():
+def test_no_shipped_persona_uses_a_real_persons_voice():
+    """The voice is the line that has not moved. A likeness can be agreed to;
+    a synthesised version of someone's voice saying words they never said is a
+    separate permission and none of these have it."""
     for mentor in mentor_service.list_mentors():
-        assert mentor.avatar.kind == "stylised", mentor.slug
         assert mentor.voice.clone_of is None, mentor.slug
-        assert mentor.likeness_consent.granted is False, mentor.slug
+        assert "voice" not in mentor.likeness_consent.covers, mentor.slug
+
+
+def test_a_likeness_is_only_shipped_where_the_consent_records_one():
+    for mentor in mentor_service.list_mentors():
+        if mentor.avatar.kind == "likeness":
+            assert mentor.likeness_consent.granted, mentor.slug
+            assert "likeness" in mentor.likeness_consent.covers, mentor.slug
+            # Who agreed, and to what, has to be written down.
+            assert mentor.likeness_consent.source, mentor.slug
+            assert mentor.likeness_consent.scope, mentor.slug
+        else:
+            assert mentor.avatar.kind == "stylised", mentor.slug
+
+
+def test_his_likeness_consent_does_not_quietly_cover_his_voice():
+    mentor = mentor_service.get_mentor(ZAIANE)
+    assert mentor.avatar.kind == "likeness"
+    assert mentor.likeness_consent.covers == ["likeness"]
+    assert mentor.voice.clone_of is None
+    # And the note says so, for whoever edits this next.
+    assert "voice cloned from his" in mentor.likeness_consent.note
 
 
 def test_research_prompt_separates_his_material_from_what_it_finds():

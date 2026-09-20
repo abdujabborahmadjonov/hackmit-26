@@ -114,16 +114,18 @@
     },
     "avatar": {
       "enabled": true,
-      "kind": "stylised",
+      "kind": "likeness",
       "model_url": "",
       "accent": "#4f46e5"
     },
     "likeness_consent": {
-      "granted": false,
-      "covers": [],
-      "source": null,
-      "scope": null,
-      "note": "Separate from speaking consent. To use a real likeness or a voice cloned from this person, set granted true with 'likeness' and/or 'voice' in covers, and record what they actually agreed to. Until then the avatar is an abstract form and the voice is a generic synthesised one."
+      "granted": true,
+      "covers": [
+        "likeness"
+      ],
+      "source": "Verbal, 2026-09-19, reported by the EduMatch team. TODO: get this in writing - a likeness on a public deployment deserves a written record.",
+      "scope": "His photograph shown as the persona's portrait on the deployed app.",
+      "note": "Covers his IMAGE only. Not covered, and gated separately: any animation of his face, and any voice cloned from his. The voice is a generic synthesised one and voice.clone_of stays null."
     },
     "research": {
       "enabled": true,

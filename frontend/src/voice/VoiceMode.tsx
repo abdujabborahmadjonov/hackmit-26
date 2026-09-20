@@ -3,6 +3,7 @@ import { streamMentorChat } from "../api/client";
 import type { ChatTurn, Mentor } from "../api/types";
 import { Button } from "../components/ui";
 import { Avatar3D } from "./Avatar3D";
+import { PortraitAvatar } from "./PortraitAvatar";
 import { useVoice } from "./useVoice";
 
 const LABEL: Record<string, string> = {
@@ -123,17 +124,31 @@ export function VoiceMode({
           aria-label={busy ? "Stop" : undefined}
           tabIndex={busy ? 0 : -1}
         >
-          <Avatar3D
-            mouth={v.mouth}
-            state={v.state}
-            accent={avatarConfig.accent}
-            className="h-72 w-full sm:h-96"
-          />
+          {/* A likeness needs both the consent and a photograph to show; the
+              abstract form covers everyone else and every failure. */}
+          {avatarConfig.kind === "likeness" && mentor.avatar_url ? (
+            <PortraitAvatar
+              src={mentor.avatar_url}
+              mouth={v.mouth}
+              state={v.state}
+              accent={avatarConfig.accent}
+              className="h-72 w-full sm:h-96"
+            />
+          ) : (
+            <Avatar3D
+              mouth={v.mouth}
+              state={v.state}
+              accent={avatarConfig.accent}
+              className="h-72 w-full sm:h-96"
+            />
+          )}
         </button>
         <div className="pointer-events-none absolute inset-x-0 top-4 text-center">
           <p className="text-sm font-medium text-white/90">{mentor.name}</p>
           <p className="text-xs text-white/45">
-            {avatarConfig.kind === "stylised" ? "Abstract form — not a likeness" : "Likeness"}
+            {avatarConfig.kind === "stylised"
+              ? "Abstract form — not a likeness"
+              : "His photograph, used with permission — his face is not animated"}
             {mentor.voice?.clone_of ? " · cloned voice" : " · synthesised voice, not his"}
             {v.hosted.enabled && v.hosted.model ? ` · ${v.hosted.model}` : ""}
           </p>
